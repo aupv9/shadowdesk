@@ -34,6 +34,19 @@ const api = {
   },
   fingerprint: {
     presets: () => ipcRenderer.invoke('fingerprint:presets')
+  },
+  settings: {
+    get:    ()                        => ipcRenderer.invoke('settings:get'),
+    update: (partial: Record<string, any>) => ipcRenderer.invoke('settings:update', partial)
+  },
+  updater: {
+    download: ()                             => ipcRenderer.invoke('updater:download'),
+    install:  ()                             => ipcRenderer.invoke('updater:install'),
+    onStatus: (cb: (status: any) => void)    => {
+      const handler = (_event: any, status: any) => cb(status)
+      ipcRenderer.on('updater:status', handler)
+      return () => ipcRenderer.removeListener('updater:status', handler)
+    }
   }
 }
 

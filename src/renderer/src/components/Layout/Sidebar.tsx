@@ -1,13 +1,22 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Monitor,
   Globe,
   Fingerprint,
   Settings,
   Ghost,
-  LayoutGrid
+  LayoutGrid,
+  Download,
+  ArrowUpCircle
 } from 'lucide-react'
 import type { NavSection } from '../../types'
+
+interface UpdateStatus {
+  status: string
+  version?: string
+  percent?: number
+  message?: string
+}
 
 interface SidebarProps {
   active: NavSection
@@ -24,6 +33,19 @@ const NAV_ITEMS: { key: NavSection; icon: React.ElementType; label: string }[] =
 ]
 
 export function Sidebar({ active, onChange, profileCount, activeSessionCount }: SidebarProps) {
+  const [update, setUpdate] = useState<UpdateStatus | null>(null)
+
+  useEffect(() => {
+    const cleanup = window.api.updater.onStatus(setUpdate)
+    return cleanup
+  }, [])
+
+  const handleUpdateAction = () => {
+    if (!update) return
+    if (update.status === 'available') window.api.updater.download()
+    if (update.status === 'ready') window.api.updater.install()
+  }
+
   return (
     <aside className="flex flex-col w-56 min-h-screen bg-slate-900 border-r border-slate-800 select-none">
       {/* Logo */}
@@ -68,6 +90,36 @@ export function Sidebar({ active, onChange, profileCount, activeSessionCount }: 
           </button>
         ))}
       </nav>
+
+      {/* Update banner */}
+      {update && (update.status === 'available' || update.status === 'downloading' || update.status === 'ready') && (
+        <div className="mx-2 mb-2">
+          <button
+            onClick={handleUpdateAction}
+            disabled={update.status === 'downloading'}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors bg-ghost-600/20 text-ghost-400 hover:bg-ghost-600/30"
+          >
+            {update.status === 'available' && (
+              <>
+                <Download className="w-3.5 h-3.5" />
+                Update {update.version} available
+              </>
+            )}
+            {update.status === 'downloading' && (
+              <>
+                <Download className="w-3.5 h-3.5 animate-bounce" />
+                Downloading... {update.percent}%
+              </>
+            )}
+            {update.status === 'ready' && (
+              <>
+                <ArrowUpCircle className="w-3.5 h-3.5" />
+                Restart to update
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-slate-800">

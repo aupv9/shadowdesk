@@ -6,6 +6,8 @@ import AdmZip from 'adm-zip'
 import { Database } from '../database'
 import { BrowserManager } from '../browser-manager'
 import { resolveFingerprint, FINGERPRINT_PRESETS } from '../fingerprint/presets'
+import { getSettings, updateSettings } from '../settings'
+import { downloadUpdate, installUpdate } from '../auto-updater'
 import type { CreateProfileInput, CreateProxyInput } from '../../shared/types'
 import { parseNetscapeCookies, toNetscapeFormat } from '../utils/cookies'
 
@@ -248,5 +250,25 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('fingerprint:presets', () => {
     return Object.keys(FINGERPRINT_PRESETS)
+  })
+
+  // ── Settings ──────────────────────────────────────────────────────────────
+
+  ipcMain.handle('settings:get', () => {
+    return getSettings()
+  })
+
+  ipcMain.handle('settings:update', (_event, partial: Record<string, any>) => {
+    return updateSettings(partial)
+  })
+
+  // ── Auto-updater ──────────────────────────────────────────────────────────
+
+  ipcMain.handle('updater:download', () => {
+    downloadUpdate()
+  })
+
+  ipcMain.handle('updater:install', () => {
+    installUpdate()
   })
 }

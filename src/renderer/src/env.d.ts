@@ -34,5 +34,14 @@ interface Window {
     fingerprint: {
       presets: () => Promise<string[]>
     }
+    settings: {
+      get:    () => Promise<{ defaultPreset: string; language: string; theme: string; autoLaunchLastSession: boolean }>
+      update: (partial: Record<string, any>) => Promise<{ defaultPreset: string; language: string; theme: string; autoLaunchLastSession: boolean }>
+    }
+    updater: {
+      download: () => Promise<void>
+      install:  () => Promise<void>
+      onStatus: (cb: (status: { status: string; version?: string; percent?: number; message?: string }) => void) => () => void
+    }
   }
 }

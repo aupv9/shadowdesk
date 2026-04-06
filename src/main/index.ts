@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { Database } from './database'
 import { registerIpcHandlers } from './ipc/handlers'
+import { initAutoUpdater } from './auto-updater'
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -55,6 +56,11 @@ app.whenReady().then(async () => {
   registerIpcHandlers()
 
   createWindow()
+
+  // Auto-updater (only in production builds)
+  if (!isDev && mainWindow) {
+    initAutoUpdater(mainWindow)
+  }
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

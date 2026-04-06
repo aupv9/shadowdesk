@@ -51,10 +51,20 @@ export function ProfileManager() {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); setShowCreate(true) }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); document.querySelector<HTMLInputElement>('.header-search')?.focus() }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'r') { e.preventDefault(); fetchProfiles(); fetchActiveSessions() }
+      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !showCreate && !editProfile && !cookieModal) {
+        // Launch the first filtered profile if none are modals open
+        const focusedTag = document.activeElement?.tagName.toLowerCase()
+        if (focusedTag === 'input' || focusedTag === 'textarea') return
+        if (filtered.length > 0 && !activeSessions.includes(filtered[0].id)) {
+          e.preventDefault()
+          handleLaunch(filtered[0].id)
+        }
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [])
+  }, [filtered, activeSessions, showCreate, editProfile, cookieModal])
 
   const filtered = profiles.filter((p) => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
@@ -287,56 +297,58 @@ export function ProfileManager() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filtered.map((profile) => (
-              <div key={profile.id} className="relative">
-                {selectionMode && (
-                  <div
-                    className="absolute inset-0 z-10 flex items-start justify-end p-2 cursor-pointer"
-                    onClick={() => toggleSelect(profile.id)}
-                  >
-                    <input
-                      type="checkbox"
-                      readOnly
-                      checked={selected.has(profile.id)}
-                      className="w-4 h-4 accent-indigo-500 cursor-pointer"
-                    />
-                  </div>
-                )}
-                <ProfileCard
-                  profile={profile}
-                  isActive={activeSessions.includes(profile.id)}
-                  isLaunching={launching === profile.id}
-                  onLaunch={() => handleLaunch(profile.id)}
-                  onClose={() => closeProfile(profile.id)}
-                  onEdit={() => setEditProfile(profile)}
-                  onClone={() => handleClone(profile.id)}
-                  onDelete={() => handleDelete(profile.id)}
-                  onImportCookies={() => setCookieModal({ profile, mode: 'import' })}
-                  onExportCookies={() => setCookieModal({ profile, mode: 'export' })}
-                  onExportBundle={() => handleExportBundle(profile.id)}
-                  onImportBundle={handleImportBundle}
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Sticky bulk-action bar */}
-          {selected.size > 0 && (
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-5 py-3
-                            bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl">
-              <span className="text-sm text-slate-300 font-medium">{selected.size} selected</span>
-              <div className="w-px h-4 bg-slate-600" />
-              <button onClick={handleBulkClone} className="btn-ghost text-xs flex items-center gap-1.5">
-                Clone all
-              </button>
-              <button onClick={handleBulkDelete} className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                             text-red-400 hover:bg-red-600/20 transition-colors">
-                <Trash2 className="w-3.5 h-3.5" />
-                Delete all
-              </button>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filtered.map((profile) => (
+                <div key={profile.id} className="relative">
+                  {selectionMode && (
+                    <div
+                      className="absolute inset-0 z-10 flex items-start justify-end p-2 cursor-pointer"
+                      onClick={() => toggleSelect(profile.id)}
+                    >
+                      <input
+                        type="checkbox"
+                        readOnly
+                        checked={selected.has(profile.id)}
+                        className="w-4 h-4 accent-indigo-500 cursor-pointer"
+                      />
+                    </div>
+                  )}
+                  <ProfileCard
+                    profile={profile}
+                    isActive={activeSessions.includes(profile.id)}
+                    isLaunching={launching === profile.id}
+                    onLaunch={() => handleLaunch(profile.id)}
+                    onClose={() => closeProfile(profile.id)}
+                    onEdit={() => setEditProfile(profile)}
+                    onClone={() => handleClone(profile.id)}
+                    onDelete={() => handleDelete(profile.id)}
+                    onImportCookies={() => setCookieModal({ profile, mode: 'import' })}
+                    onExportCookies={() => setCookieModal({ profile, mode: 'export' })}
+                    onExportBundle={() => handleExportBundle(profile.id)}
+                    onImportBundle={handleImportBundle}
+                  />
+                </div>
+              ))}
             </div>
-          )}
+
+            {/* Sticky bulk-action bar */}
+            {selected.size > 0 && (
+              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-5 py-3
+                              bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl">
+                <span className="text-sm text-slate-300 font-medium">{selected.size} selected</span>
+                <div className="w-px h-4 bg-slate-600" />
+                <button onClick={handleBulkClone} className="btn-ghost text-xs flex items-center gap-1.5">
+                  Clone all
+                </button>
+                <button onClick={handleBulkDelete} className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                               text-red-400 hover:bg-red-600/20 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete all
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
