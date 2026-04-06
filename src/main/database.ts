@@ -185,6 +185,21 @@ export class Database {
       CREATE INDEX IF NOT EXISTS idx_detection_tests_profile ON detection_tests(profile_id);
       CREATE INDEX IF NOT EXISTS idx_detection_tests_date    ON detection_tests(tested_at);
     `)
+
+    // Phase 6 migration: profile version history
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS profile_versions (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,
+        label TEXT NOT NULL DEFAULT 'Snapshot',
+        saved_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_profile_versions_profile ON profile_versions(profile_id);
+      CREATE INDEX IF NOT EXISTS idx_profile_versions_date    ON profile_versions(saved_at);
+    `)
   }
 
   // ── Profile CRUD ──────────────────────────────────────────────────────────
@@ -499,5 +514,49 @@ export class Database {
       averageScore: Math.round(stats?.avg_score ?? 0),
       lastTestedAt: stats?.last_tested ?? null
     }
+  }
+
+  // ── Profile Versions (Phase 6) ─────────────────────────────────────────────
+
+  saveProfileVersion(version: {
+    id: string
+    profileId: string
+    fingerprint: object
+    label: string
+  }): void {
+    this.run(
+      `INSERT INTO profile_versions (id, profile_id, fingerprint, label)
+       VALUES (?, ?, ?, ?)`,
+      [version.id, version.profileId, JSON.stringify(version.fingerprint), version.label]
+    )
+    // Keep only last 20 versions per profile to avoid unbounded growth
+    this.run(
+      `DELETE FROM profile_versions
+       WHERE profile_id = ?
+         AND id NOT IN (
+           SELECT id FROM profile_versions
+           WHERE profile_id = ?
+           ORDER BY saved_at DESC
+           LIMIT 20
+         )`,
+      [version.profileId, version.profileId]
+    )
+  }
+
+  getProfileVersions(profileId: string): any[] {
+    return this.queryAll(
+      `SELECT * FROM profile_versions WHERE profile_id = ? ORDER BY saved_at DESC LIMIT 20`,
+      [profileId]
+    ).map(r => ({ ...r, fingerprint: JSON.parse(r.fingerprint) }))
+  }
+
+  getProfileVersion(versionId: string): any {
+    const row = this.queryOne(`SELECT * FROM profile_versions WHERE id = ?`, [versionId])
+    if (!row) return null
+    return { ...row, fingerprint: JSON.parse(row.fingerprint) }
+  }
+
+  deleteProfileVersion(versionId: string): void {
+    this.run(`DELETE FROM profile_versions WHERE id = ?`, [versionId])
   }
 }

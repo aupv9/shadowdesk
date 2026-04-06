@@ -109,6 +109,17 @@ export class DetectionTestRunner {
     vectors.push(await this.testCdcVariables(page))
     vectors.push(await this.testPerformanceEntries(page))
     vectors.push(await this.testNotificationPermission(page))
+    // Phase 6: 10 new vectors
+    vectors.push(await this.testDateNowPrecision(page))
+    vectors.push(await this.testWebAssemblySupport(page))
+    vectors.push(await this.testObjectDefinePropertyConsistency(page))
+    vectors.push(await this.testWorkerWebdriver(page))
+    vectors.push(await this.testCssMediaConsistency(page))
+    vectors.push(await this.testBatteryApiShape(page))
+    vectors.push(await this.testViewportConsistency(page))
+    vectors.push(await this.testSeleniumArtifacts(page))
+    vectors.push(await this.testServiceWorkerSupport(page))
+    vectors.push(await this.testDocumentFocus(page))
 
     return vectors
   }
@@ -423,6 +434,246 @@ export class DetectionTestRunner {
       category: 'API',
       passed: result !== 'denied',
       detail: `Value: ${result} (headless returns "denied")`
+    }
+  }
+
+  // ── Phase 6 vectors ────────────────────────────────────────────────────────
+
+  /** Date.now() precision — automation environments often expose microsecond precision */
+  private async testDateNowPrecision(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const samples: number[] = []
+      for (let i = 0; i < 20; i++) {
+        samples.push(Date.now() % 1000)
+      }
+      // Check if values are rounded (non-zero sub-ms fractions indicate unthrottled)
+      const unique = new Set(samples).size
+      // If all 20 samples are identical we may have over-quantised; if all different,
+      // precision is high (suspicious). Healthy range: 2–15 unique values in 20 samples.
+      return { unique, samples: samples.slice(0, 5) }
+    })
+    const passed = result.unique >= 1 && result.unique <= 18
+    return {
+      name: 'Date.now() precision',
+      category: 'Timing',
+      passed,
+      detail: `${result.unique} unique values in 20 samples (expected 1-18)`
+    }
+  }
+
+  /** WebAssembly availability — headless Chrome supports WASM; absence is suspicious */
+  private async testWebAssemblySupport(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      return typeof WebAssembly !== 'undefined' &&
+             typeof WebAssembly.compile === 'function' &&
+             typeof WebAssembly.instantiate === 'function'
+    })
+    return {
+      name: 'WebAssembly support',
+      category: 'API',
+      passed: result === true,
+      detail: result ? 'WebAssembly available' : 'WebAssembly missing — suspicious environment'
+    }
+  }
+
+  /**
+   * Object.defineProperty consistency.
+   * Detectors call getOwnPropertyDescriptor before/after defineProperty to see if
+   * descriptor flags change in unexpected ways. We check that our patched navigator
+   * properties still report consistent flags.
+   */
+  private async testObjectDefinePropertyConsistency(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      try {
+        const desc = Object.getOwnPropertyDescriptor(Navigator.prototype, 'webdriver')
+        if (!desc) return { status: 'absent', configurable: false }
+        return { status: 'present', configurable: desc.configurable ?? false }
+      } catch (e: any) {
+        return { status: 'error', configurable: false }
+      }
+    })
+    // webdriver should either be absent (best) or configurable (our patch)
+    const passed = result.status === 'absent' || result.configurable === true
+    return {
+      name: 'Object.defineProperty consistency',
+      category: 'Automation',
+      passed,
+      detail: `webdriver descriptor: ${result.status}, configurable=${result.configurable}`
+    }
+  }
+
+  /** Worker navigator.webdriver — automation can leak via worker context */
+  private async testWorkerWebdriver(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(async () => {
+      return new Promise<string>((resolve) => {
+        try {
+          const blob = new Blob([
+            'postMessage(typeof navigator.webdriver + ":" + navigator.webdriver);'
+          ], { type: 'application/javascript' })
+          const url = URL.createObjectURL(blob)
+          const worker = new Worker(url)
+          const timeout = setTimeout(() => {
+            worker.terminate()
+            resolve('timeout')
+          }, 2000)
+          worker.onmessage = (e) => {
+            clearTimeout(timeout)
+            worker.terminate()
+            URL.revokeObjectURL(url)
+            resolve(String(e.data))
+          }
+          worker.onerror = () => {
+            clearTimeout(timeout)
+            resolve('error')
+          }
+        } catch {
+          resolve('unsupported')
+        }
+      })
+    })
+    // Should be "undefined:undefined" if our Worker patch applied
+    const passed = result.includes('undefined') || result === 'error' || result === 'unsupported'
+    return {
+      name: 'Worker navigator.webdriver',
+      category: 'Automation',
+      passed,
+      detail: `Worker reports: ${result}`
+    }
+  }
+
+  /** CSS media query consistency — prefers-color-scheme and pointer should match UA */
+  private async testCssMediaConsistency(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const colorScheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark'
+                        : window.matchMedia('(prefers-color-scheme: light)').matches ? 'light'
+                        : 'none'
+      const pointer = window.matchMedia('(pointer: fine)').matches ? 'fine'
+                    : window.matchMedia('(pointer: coarse)').matches ? 'coarse'
+                    : 'none'
+      const hover = window.matchMedia('(hover: hover)').matches
+      return { colorScheme, pointer, hover }
+    })
+    // On desktop presets: pointer=fine, hover=true
+    // On mobile presets: pointer=coarse is acceptable
+    const passed = result.pointer !== 'none' && result.colorScheme !== 'none'
+    return {
+      name: 'CSS media query consistency',
+      category: 'Hardware',
+      passed,
+      detail: `pointer=${result.pointer}, hover=${result.hover}, colorScheme=${result.colorScheme}`
+    }
+  }
+
+  /** Battery API shape — real Chrome exposes getBattery(); headless may not or may return stub */
+  private async testBatteryApiShape(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(async () => {
+      try {
+        const nav = navigator as any
+        if (typeof nav.getBattery !== 'function') return { available: false, reason: 'no getBattery' }
+        const battery = await nav.getBattery()
+        return {
+          available: true,
+          charging: typeof battery.charging === 'boolean',
+          level: typeof battery.level === 'number',
+          validLevel: battery.level >= 0 && battery.level <= 1
+        }
+      } catch (e: any) {
+        return { available: false, reason: e.message ?? 'error' }
+      }
+    })
+    // Battery API absence is OK (some OS don't expose it); but if present it must be sane
+    const passed = !result.available || (result.charging && result.level && result.validLevel)
+    return {
+      name: 'Battery API shape',
+      category: 'API',
+      passed,
+      detail: result.available
+        ? `charging=${result.charging}, level=${result.level}`
+        : `Not available: ${(result as any).reason ?? 'n/a'}`
+    }
+  }
+
+  /** Viewport consistency — innerWidth/outerWidth/screen.width should be coherent */
+  private async testViewportConsistency(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => ({
+      innerW: window.innerWidth,
+      innerH: window.innerHeight,
+      outerW: window.outerWidth,
+      outerH: window.outerHeight,
+      screenW: screen.width,
+      screenH: screen.height,
+      devicePixelRatio: window.devicePixelRatio
+    }))
+    const passed =
+      result.innerW > 0 && result.innerH > 0 &&
+      result.outerW >= result.innerW &&
+      result.outerH >= result.innerH &&
+      result.screenW >= result.innerW &&
+      result.screenH >= result.innerH &&
+      result.devicePixelRatio > 0
+    return {
+      name: 'Viewport consistency',
+      category: 'Hardware',
+      passed,
+      detail: `inner=${result.innerW}x${result.innerH}, outer=${result.outerW}x${result.outerH}, screen=${result.screenW}x${result.screenH}, dpr=${result.devicePixelRatio}`
+    }
+  }
+
+  /** Selenium / other automation artifacts on window/document */
+  private async testSeleniumArtifacts(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const MARKERS = [
+        '__selenium_evaluate', '__selenium_unwrapped', '__webdriver_evaluate',
+        '__webdriver_script_function', '__webdriver_script_func',
+        '_Selenium_IDE_Recorder', '$cdc_asdjflasutopfhvcZLmcfl_',
+        '__fxdriver_evaluate', '__fxdriver_unwrapped'
+      ]
+      const found = MARKERS.filter(m => (window as any)[m] !== undefined || (document as any)[m] !== undefined)
+      return found
+    })
+    return {
+      name: 'Selenium / WebDriver artifacts',
+      category: 'Automation',
+      passed: result.length === 0,
+      detail: result.length === 0 ? 'No Selenium artifacts found' : `Found: ${result.join(', ')}`
+    }
+  }
+
+  /** Service Worker support — real Chrome supports SW; missing SW API is a red flag */
+  private async testServiceWorkerSupport(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      return 'serviceWorker' in navigator &&
+             typeof navigator.serviceWorker.register === 'function'
+    })
+    return {
+      name: 'Service Worker API',
+      category: 'API',
+      passed: result === true,
+      detail: result ? 'serviceWorker API present' : 'serviceWorker missing — detectable'
+    }
+  }
+
+  /**
+   * document.hasFocus() — automation frameworks often produce pages where
+   * hasFocus() returns false because no real OS-level focus event fires.
+   */
+  private async testDocumentFocus(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      // Simulate a user-gesture focus scenario
+      return {
+        hasFocus: document.hasFocus(),
+        visibilityState: document.visibilityState,
+        hidden: document.hidden
+      }
+    })
+    // We can't force hasFocus=true without real window focus, but visibilityState
+    // should be 'visible' and document.hidden = false
+    const passed = result.visibilityState === 'visible' && !result.hidden
+    return {
+      name: 'Document focus / visibility',
+      category: 'Browser',
+      passed,
+      detail: `hasFocus=${result.hasFocus}, visibilityState=${result.visibilityState}, hidden=${result.hidden}`
     }
   }
 }

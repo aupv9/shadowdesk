@@ -34,7 +34,10 @@ export type {
   WorkflowTemplate,
   DetectionTestResult,
   DetectionVectorResult,
-  DetectionTestSummary
+  DetectionTestSummary,
+  ProfileVersion,
+  BehaviorConfig,
+  TimingConfig
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'

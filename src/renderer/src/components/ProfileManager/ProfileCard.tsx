@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react'
 import {
   Play, Square, Trash2, Monitor, Globe,
   Clock, Loader2, MoreVertical, Pencil, Copy,
-  Cookie, FolderOpen, Download, Upload
+  Cookie, FolderOpen, Download, Upload, History
 } from 'lucide-react'
 import type { Profile } from '../../types'
 
@@ -19,6 +19,7 @@ interface Props {
   onExportCookies: () => void
   onExportBundle:  () => void
   onImportBundle:  () => void
+  onHistory:       () => void
 }
 
 const PRESET_LABELS: Record<string, string> = {
@@ -38,7 +39,7 @@ const OS_ICON: Record<string, string> = {
 export function ProfileCard({
   profile, isActive, isLaunching,
   onLaunch, onClose, onEdit, onClone, onDelete,
-  onImportCookies, onExportCookies, onExportBundle, onImportBundle
+  onImportCookies, onExportCookies, onExportBundle, onImportBundle, onHistory
 }: Props) {
   const fp     = profile.fingerprint
   const preset = PRESET_LABELS[fp?.preset] ?? fp?.preset ?? 'Unknown'
@@ -108,6 +109,7 @@ export function ProfileCard({
             <div className="border-t border-slate-700 my-1" />
             {menuItem(<Download  className="w-3.5 h-3.5" />, 'Export Bundle',  onExportBundle)}
             {menuItem(<Upload    className="w-3.5 h-3.5" />, 'Import Bundle',  onImportBundle)}
+            {menuItem(<History   className="w-3.5 h-3.5" />, 'Version History', onHistory)}
             <div className="border-t border-slate-700 my-1" />
             {menuItem(<Trash2    className="w-3.5 h-3.5" />, 'Delete',         onDelete, true)}
           </div>

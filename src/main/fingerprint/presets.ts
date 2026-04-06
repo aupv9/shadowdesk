@@ -482,6 +482,23 @@ export function resolveFingerprint(
   clone.webgl.noiseSeed = seed
   clone.audio.noiseSeed = seed
   clone.preset = presetKey
+
+  // Phase 6: inject behavior + timing defaults if not already set by preset
+  if (!clone.behavior) {
+    clone.behavior = {
+      mouseJitter: true,
+      typingNoise: true,
+      scrollInertia: true
+    }
+  }
+  if (!clone.timing) {
+    clone.timing = {
+      dateNoisePrecision: 100,
+      rafJitter: true,
+      performanceClamp: true
+    }
+  }
+
   return clone
 }
 
