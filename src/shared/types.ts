@@ -16,6 +16,9 @@ export interface FingerprintConfig {
   plugins: PluginConfig
   speech: SpeechConfig
   network?: NetworkConfig
+  // Phase 6
+  behavior?: BehaviorConfig
+  timing?: TimingConfig
 }
 
 export interface OsConfig {
@@ -95,6 +98,27 @@ export interface SpeechConfig {
 export interface NetworkConfig {
   connectionType: '4g' | '3g' | 'wifi' | 'slow'
 }
+
+// Phase 6: Behavior simulation config
+export interface BehaviorConfig {
+  // Mouse movement simulation: adds micro-jitter on pointer events
+  mouseJitter: boolean
+  // Typing cadence: randomizes keydown/keyup event timing
+  typingNoise: boolean
+  // Scroll inertia: simulates natural momentum on wheel events
+  scrollInertia: boolean
+}
+
+// Phase 6: Timing attack defense config
+export interface TimingConfig {
+  // Reduce Date.now() precision to 100ms blocks
+  dateNoisePrecision: 50 | 100 | 250
+  // Add jitter to requestAnimationFrame timestamps (±noise ms)
+  rafJitter: boolean
+  // Clamp performance.now() to same precision as Date.now
+  performanceClamp: boolean
+}
+
 
 // ─── Proxy Types ──────────────────────────────────────────────────────────────
 
@@ -397,6 +421,16 @@ export interface WorkflowTemplate {
   description: string
   category: 'scraping' | 'testing' | 'social' | 'ecommerce' | 'general'
   steps: AutomationStep[]
+}
+
+// ─── Profile Version Types (Phase 6) ─────────────────────────────────────────
+
+export interface ProfileVersion {
+  id: string
+  profileId: string
+  fingerprint: FingerprintConfig
+  savedAt: string
+  label: string
 }
 
 // ─── Detection Test Types ──────────────────────────────────────────────────

@@ -39,6 +39,17 @@ const VECTORS = [
   { category: 'Browser',    name: 'chrome.runtime Stub',        risk: 'high',     status: 'spoofed' },
   { category: 'Browser',    name: 'chrome.loadTimes Stub',      risk: 'medium',   status: 'spoofed' },
   { category: 'Evasion',    name: 'iframe contentWindow',       risk: 'medium',   status: 'spoofed' },
+  // Phase 6: New vectors
+  { category: 'Behavior',   name: 'Mouse Jitter Simulation',    risk: 'high',     status: 'spoofed' },
+  { category: 'Behavior',   name: 'Typing Cadence Noise',       risk: 'medium',   status: 'spoofed' },
+  { category: 'Behavior',   name: 'Scroll Inertia Simulation',  risk: 'medium',   status: 'spoofed' },
+  { category: 'Timing',     name: 'Date.now() Quantisation',    risk: 'high',     status: 'spoofed' },
+  { category: 'Timing',     name: 'rAF Timestamp Jitter',       risk: 'medium',   status: 'spoofed' },
+  { category: 'Timing',     name: 'performance.now() Clamping', risk: 'high',     status: 'spoofed' },
+  { category: 'Timing',     name: 'Atomics.wait() Noise',       risk: 'medium',   status: 'spoofed' },
+  { category: 'Evasion',    name: 'Object.defineProperty Trap', risk: 'high',     status: 'spoofed' },
+  { category: 'Evasion',    name: 'Worker webdriver Patch',     risk: 'critical', status: 'spoofed' },
+  { category: 'Evasion',    name: 'Blink Internal Masking',     risk: 'high',     status: 'spoofed' },
 ]
 
 const RISK_BADGE: Record<string, string> = {
