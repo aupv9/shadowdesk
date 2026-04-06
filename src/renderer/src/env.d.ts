@@ -105,5 +105,10 @@ interface Window {
       start:  (config?: Partial<import('./types').ApiServerConfig>) => Promise<import('./types').ApiServerStatus>
       stop:   () => Promise<import('./types').ApiServerStatus>
     }
+    detection: {
+      runTest: (profileId: string) => Promise<import('./types').DetectionTestResult>
+      results: (profileId?: string) => Promise<import('./types').DetectionTestResult[]>
+      summary: () => Promise<import('./types').DetectionTestSummary>
+    }
   }
 }

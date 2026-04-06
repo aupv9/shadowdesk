@@ -31,14 +31,17 @@ export type {
   UpdateWorkflowInput,
   ApiServerConfig,
   ApiServerStatus,
-  WorkflowTemplate
+  WorkflowTemplate,
+  DetectionTestResult,
+  DetectionVectorResult,
+  DetectionTestSummary
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
 
 // Renderer-only types
 
-export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'settings' | 'team' | 'account' | 'automation'
+export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'detection' | 'settings' | 'team' | 'account' | 'automation'
 
 export interface Toast {
   id: string

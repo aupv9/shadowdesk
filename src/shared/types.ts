@@ -15,10 +15,11 @@ export interface FingerprintConfig {
   media: MediaConfig
   plugins: PluginConfig
   speech: SpeechConfig
+  network?: NetworkConfig
 }
 
 export interface OsConfig {
-  platform: 'Win32' | 'MacIntel' | 'Linux x86_64' | 'Linux armv8l'
+  platform: 'Win32' | 'MacIntel' | 'Linux x86_64' | 'Linux armv8l' | 'iPhone' | 'iPad'
   version: string // e.g. '10.0.0', '14.0.0'
 }
 
@@ -89,6 +90,10 @@ export interface PluginConfig {
 
 export interface SpeechConfig {
   mode: 'filter' | 'real'
+}
+
+export interface NetworkConfig {
+  connectionType: '4g' | '3g' | 'wifi' | 'slow'
 }
 
 // ─── Proxy Types ──────────────────────────────────────────────────────────────
@@ -392,4 +397,30 @@ export interface WorkflowTemplate {
   description: string
   category: 'scraping' | 'testing' | 'social' | 'ecommerce' | 'general'
   steps: AutomationStep[]
+}
+
+// ─── Detection Test Types ──────────────────────────────────────────────────
+
+export interface DetectionTestResult {
+  id: string
+  profileId: string
+  profileName: string
+  testedAt: string
+  overallScore: number  // 0–100 (higher = less detectable)
+  vectors: DetectionVectorResult[]
+  status: 'passed' | 'warning' | 'failed'
+}
+
+export interface DetectionVectorResult {
+  name: string
+  category: string
+  passed: boolean
+  detail?: string
+}
+
+export interface DetectionTestSummary {
+  totalTests: number
+  averageScore: number
+  lastTestedAt: string | null
+  results: DetectionTestResult[]
 }

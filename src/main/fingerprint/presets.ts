@@ -336,6 +336,134 @@ export const FINGERPRINT_PRESETS: Record<string, FingerprintConfig> = {
     media: { audioInputs: 1, audioOutputs: 1, videoInputs: 2 },
     plugins: { mode: 'empty' },
     speech: { mode: 'filter' }
+  },
+
+  // ── Phase 5: iOS Mobile Presets (Safari — SEA market) ──────────────────
+
+  'ios-iphone14-safari17': {
+    preset: 'ios-iphone14-safari17',
+    os: { platform: 'iPhone', version: '17.2.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1',
+      platform: 'iPhone',
+      vendor: 'Apple Computer, Inc.',
+      version: '17',
+      languages: ['vi-VN', 'en-US', 'en']
+    },
+    screen: {
+      width: 390,
+      height: 844,
+      availWidth: 390,
+      availHeight: 844,
+      colorDepth: 24,
+      pixelRatio: 3
+    },
+    hardware: { deviceMemory: 4, hardwareConcurrency: 6, maxTouchPoints: 5 },
+    locale: { language: 'vi-VN', languages: ['vi-VN', 'en-US', 'en'], timezone: 'Asia/Ho_Chi_Minh' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Apple Inc.',
+      renderer: 'Apple GPU',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Helvetica', 'Helvetica Neue', 'Arial', 'Times New Roman',
+        'Courier New', 'Georgia', 'Verdana', 'Trebuchet MS'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 2 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' },
+    network: { connectionType: '4g' }
+  },
+
+  'ios-iphone15-safari17': {
+    preset: 'ios-iphone15-safari17',
+    os: { platform: 'iPhone', version: '17.3.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Mobile/15E148 Safari/604.1',
+      platform: 'iPhone',
+      vendor: 'Apple Computer, Inc.',
+      version: '17',
+      languages: ['th-TH', 'en-US', 'en']
+    },
+    screen: {
+      width: 393,
+      height: 852,
+      availWidth: 393,
+      availHeight: 852,
+      colorDepth: 24,
+      pixelRatio: 3
+    },
+    hardware: { deviceMemory: 4, hardwareConcurrency: 6, maxTouchPoints: 5 },
+    locale: { language: 'th-TH', languages: ['th-TH', 'en-US', 'en'], timezone: 'Asia/Bangkok' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Apple Inc.',
+      renderer: 'Apple GPU',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Helvetica', 'Helvetica Neue', 'Arial', 'Times New Roman',
+        'Courier New', 'Georgia', 'Verdana', 'Trebuchet MS'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 2 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' },
+    network: { connectionType: '4g' }
+  },
+
+  'ios-ipad-safari17': {
+    preset: 'ios-ipad-safari17',
+    os: { platform: 'iPad', version: '17.2.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (iPad; CPU OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1',
+      platform: 'iPad',
+      vendor: 'Apple Computer, Inc.',
+      version: '17',
+      languages: ['id-ID', 'en-US', 'en']
+    },
+    screen: {
+      width: 820,
+      height: 1180,
+      availWidth: 820,
+      availHeight: 1180,
+      colorDepth: 24,
+      pixelRatio: 2
+    },
+    hardware: { deviceMemory: 4, hardwareConcurrency: 4, maxTouchPoints: 5 },
+    locale: { language: 'id-ID', languages: ['id-ID', 'en-US', 'en'], timezone: 'Asia/Jakarta' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Apple Inc.',
+      renderer: 'Apple GPU',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Helvetica', 'Helvetica Neue', 'Arial', 'Times New Roman',
+        'Courier New', 'Georgia', 'Verdana', 'Trebuchet MS'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 2 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' },
+    network: { connectionType: 'wifi' }
   }
 }
 

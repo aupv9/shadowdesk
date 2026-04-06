@@ -10,7 +10,8 @@ import {
   Users,
   User,
   Crown,
-  Bot
+  Bot,
+  Shield
 } from 'lucide-react'
 import type { NavSection } from '../../types'
 import type { User as UserType, LicensePlan } from '../../types'
@@ -42,6 +43,7 @@ const NAV_ITEMS: { key: NavSection; icon: React.ElementType; label: string }[] =
   { key: 'profiles',    icon: LayoutGrid,   label: 'Profiles' },
   { key: 'proxies',     icon: Globe,        label: 'Proxies' },
   { key: 'fingerprint', icon: Fingerprint,  label: 'Fingerprint' },
+  { key: 'detection',   icon: Shield,       label: 'Detection' },
   { key: 'automation',  icon: Bot,          label: 'Automation' },
   { key: 'team',        icon: Users,        label: 'Team' },
   { key: 'account',     icon: User,         label: 'Account' },
@@ -166,7 +168,7 @@ export function Sidebar({ active, onChange, profileCount, activeSessionCount, us
             Sign in
           </button>
         )}
-        <div className="text-[10px] text-slate-600 mt-1.5 px-2">v0.3.0 Beta</div>
+        <div className="text-[10px] text-slate-600 mt-1.5 px-2">v0.5.0 Beta</div>
       </div>
     </aside>
   )

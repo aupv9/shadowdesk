@@ -3,6 +3,7 @@ import { Sidebar } from './components/Layout/Sidebar'
 import { ProfileManager } from './components/ProfileManager'
 import { ProxyManager } from './components/ProxyManager'
 import { FingerprintEditor } from './components/FingerprintEditor'
+import { DetectionDashboard } from './components/DetectionDashboard'
 import { AutomationBuilder } from './components/AutomationBuilder'
 import { SettingsPage } from './components/Settings'
 import { AccountPage } from './components/Account'
@@ -37,6 +38,7 @@ export default function App() {
         {section === 'profiles'    && <ProfileManager />}
         {section === 'proxies'     && <ProxyManager />}
         {section === 'fingerprint' && <FingerprintEditor />}
+        {section === 'detection'   && <DetectionDashboard />}
         {section === 'automation'  && <AutomationBuilder />}
         {section === 'team'        && <TeamManager />}
         {section === 'account'     && <AccountPage />}
