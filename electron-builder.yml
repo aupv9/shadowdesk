@@ -1,0 +1,42 @@
+appId: com.ghostbrowser.app
+productName: Ghost Browser
+copyright: Copyright © 2026 Ghost Browser
+
+directories:
+  buildResources: resources
+  output: dist
+
+files:
+  - out/**/*
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.ico
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  icon: resources/icon.icns
+  entitlementsInherit: resources/entitlements.mac.plist
+  hardenedRuntime: true
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  icon: resources/icon.png
+  category: Network
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+
+publish:
+  provider: github
+  owner: ghost-browser
+  repo: ghost-browser

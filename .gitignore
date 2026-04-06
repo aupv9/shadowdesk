@@ -1,0 +1,17 @@
+node_modules/
+dist/
+out/
+.DS_Store
+*.log
+*.local
+
+# Electron user data (dev)
+dev-app-update.yml
+*.packed
+
+# Chromium profiles (local data)
+profiles/
+
+# SQLite database
+*.db
+*.sqlite
