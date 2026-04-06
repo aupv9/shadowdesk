@@ -21,14 +21,21 @@ export type {
   AuditLogEntry,
   SyncState,
   SyncStatus,
-  SyncManifest
+  SyncManifest,
+  AutomationActionType,
+  AutomationStep,
+  AutomationWorkflow,
+  AutomationStepResult,
+  AutomationRunResult,
+  CreateWorkflowInput,
+  UpdateWorkflowInput
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
 
 // Renderer-only types
 
-export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'settings' | 'team' | 'account'
+export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'settings' | 'team' | 'account' | 'automation'
 
 export interface Toast {
   id: string
