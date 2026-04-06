@@ -168,6 +168,23 @@ export class Database {
       CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow ON workflow_runs(workflow_id);
       CREATE INDEX IF NOT EXISTS idx_workflow_runs_profile  ON workflow_runs(profile_id);
     `)
+
+    // Phase 5 migration: detection test results
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS detection_tests (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        profile_name TEXT NOT NULL,
+        tested_at TEXT DEFAULT (datetime('now')),
+        overall_score INTEGER NOT NULL DEFAULT 0,
+        vectors TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'pending',
+        FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_detection_tests_profile ON detection_tests(profile_id);
+      CREATE INDEX IF NOT EXISTS idx_detection_tests_date    ON detection_tests(tested_at);
+    `)
   }
 
   // ── Profile CRUD ──────────────────────────────────────────────────────────
@@ -440,5 +457,47 @@ export class Database {
       'SELECT * FROM workflow_runs WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?',
       [workflowId, limit]
     )
+  }
+
+  // ── Detection Tests ───────────────────────────────────────────────────────
+
+  saveDetectionTestResult(result: {
+    id: string
+    profileId: string
+    profileName: string
+    testedAt: string
+    overallScore: number
+    vectors: any[]
+    status: string
+  }): void {
+    this.run(
+      `INSERT INTO detection_tests (id, profile_id, profile_name, tested_at, overall_score, vectors, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [result.id, result.profileId, result.profileName, result.testedAt, result.overallScore, JSON.stringify(result.vectors), result.status]
+    )
+  }
+
+  getDetectionTestResults(profileId?: string): any[] {
+    if (profileId) {
+      return this.queryAll(
+        'SELECT * FROM detection_tests WHERE profile_id = ? ORDER BY tested_at DESC LIMIT 50',
+        [profileId]
+      ).map(r => ({ ...r, vectors: JSON.parse(r.vectors) }))
+    }
+    return this.queryAll(
+      'SELECT * FROM detection_tests ORDER BY tested_at DESC LIMIT 100'
+    ).map(r => ({ ...r, vectors: JSON.parse(r.vectors) }))
+  }
+
+  getDetectionTestSummary(): { totalTests: number; averageScore: number; lastTestedAt: string | null } {
+    const stats = this.queryOne(`
+      SELECT COUNT(*) as total, AVG(overall_score) as avg_score, MAX(tested_at) as last_tested
+      FROM detection_tests
+    `)
+    return {
+      totalTests: stats?.total ?? 0,
+      averageScore: Math.round(stats?.avg_score ?? 0),
+      lastTestedAt: stats?.last_tested ?? null
+    }
   }
 }

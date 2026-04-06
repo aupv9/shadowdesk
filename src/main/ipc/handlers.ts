@@ -17,6 +17,7 @@ import * as team from '../team'
 import { pushProfiles, pullProfiles, getSyncState, getSyncManifest, markPendingChange } from '../sync'
 import type { CreateProfileInput, CreateProxyInput, TeamRole, CreateWorkflowInput, UpdateWorkflowInput, ApiServerConfig } from '../../shared/types'
 import { parseNetscapeCookies, toNetscapeFormat } from '../utils/cookies'
+import { DetectionTestRunner } from '../detection-test'
 
 // ── Handler registration ───────────────────────────────────────────────────
 
@@ -505,5 +506,21 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('apiServer:stop', async () => {
     await apiServer.stop()
     return apiServer.getStatus()
+  })
+
+  // ── Detection Tests ───────────────────────────────────────────────────
+
+  const detectionRunner = DetectionTestRunner.getInstance()
+
+  ipcMain.handle('detection:runTest', async (_event, profileId: string) => {
+    return detectionRunner.runTest(profileId)
+  })
+
+  ipcMain.handle('detection:results', (_event, profileId?: string) => {
+    return detectionRunner.getResults(profileId)
+  })
+
+  ipcMain.handle('detection:summary', () => {
+    return db.getDetectionTestSummary()
   })
 }

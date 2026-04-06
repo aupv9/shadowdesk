@@ -34,15 +34,21 @@ src/
 │   ├── automation.ts      # AutomationEngine — 17 actions incl. conditional/loop
 │   ├── api-server.ts      # Local REST API server for external automation control
 │   ├── workflow-templates.ts # 6 pre-built workflow templates
+│   ├── detection-test.ts  # Detection test runner — evaluates 20 vectors per profile
 │   ├── fingerprint/
 │   │   ├── injector.ts    # CDP injection pipeline (evaluateOnNewDocument + CDP APIs)
-│   │   ├── presets.ts     # 8 built-in presets (5 desktop + 3 mobile); resolveFingerprint()
+│   │   ├── cdp-evasion.ts # Advanced CDP evasion — hides DevTools/automation traces
+│   │   ├── presets.ts     # 11 built-in presets (5 desktop + 3 Android + 3 iOS); resolveFingerprint()
 │   │   └── scripts/       # JS override strings (returned as template literals)
-│   │       ├── navigator.ts  — UA, platform, hardware, screen, plugins, battery, media devices
-│   │       ├── canvas.ts     — noise injection on toDataURL/toBlob/getImageData
-│   │       ├── webgl.ts      — vendor/renderer override + readPixels noise
-│   │       ├── audio.ts      — AudioContext noise on analyser + oscillator
-│   │       └── fonts.ts      — document.fonts.check whitelist + measureText noise
+│   │       ├── navigator.ts    — UA, platform, hardware, screen, plugins, battery, media devices
+│   │       ├── canvas.ts       — noise injection on toDataURL/toBlob/getImageData
+│   │       ├── webgl.ts        — vendor/renderer override + readPixels noise
+│   │       ├── audio.ts        — AudioContext noise on analyser + oscillator
+│   │       ├── fonts.ts        — document.fonts.check whitelist + measureText noise
+│   │       ├── permissions.ts  — Permissions API spoofing
+│   │       ├── storage.ts      — Storage quota fingerprint defense
+│   │       ├── network.ts      — Network Information API spoofing
+│   │       └── performance.ts  — Performance API timing sanitization
 │   └── ipc/handlers.ts    # All ipcMain.handle() registrations
 ├── preload/index.ts       # contextBridge — exposes window.api to renderer
 ├── shared/types.ts        # Shared TypeScript interfaces (Profile, ProxyConfig, FingerprintConfig, User, Team, License, Sync…)
@@ -53,7 +59,8 @@ src/
         │   ├── Layout/{Sidebar,Header}.tsx
         │   ├── ProfileManager/             # List, card, create modal
         │   ├── ProxyManager/               # Add/test/delete proxies
-        │   ├── FingerprintEditor/          # Vector protection status dashboard
+        │   ├── FingerprintEditor/          # Vector protection status dashboard (34 vectors)
+        │   ├── DetectionDashboard/         # Detection test runner + score dashboard
         │   ├── Account/                    # Auth, license, cloud sync UI
         │   ├── TeamManager/               # Team workspace, members, invites, audit log
         │   └── Settings/                  # App settings
@@ -89,8 +96,9 @@ Adding a new IPC channel requires updating all three files.
 - All scripts are combined and injected via `page.evaluateOnNewDocument(combined)`
 - Noise seeds are **deterministic per profile** (seeded from profile UUID hash)
 - **Consistency rule**: all scripts use the same seed so same profile = same fingerprint across sessions
-- Layer 1 (CDP + JS): current MVP
-- Layer 2 (Chromium C++ patches): planned Phase 4
+- Layer 1 (CDP + JS): core fingerprint spoofing
+- Layer 2 (Advanced CDP Evasion): automation hiding, stack sanitization, chrome.runtime stubs
+- Layer 3 (Chromium C++ patches): planned Phase 6
 
 ### React / State
 - State lives in **Zustand stores** — no prop drilling, no Context
@@ -107,7 +115,9 @@ Adding a new IPC channel requires updating all three files.
 
 **sync_log**: `id, direction, profile_count, status, synced_at`
 
-## Fingerprint Presets (8 built-in)
+**detection_tests**: `id, profile_id, profile_name, tested_at, overall_score, vectors (JSON), status`
+
+## Fingerprint Presets (11 built-in)
 | Key | OS | Browser |
 |-----|-----|---------|
 | `win10-chrome120` | Windows 10 | Chrome 120 |
@@ -118,6 +128,9 @@ Adding a new IPC channel requires updating all three files.
 | `android-samsung-chrome120` | Android 13 (Samsung A54) | Chrome 120 |
 | `android-pixel-chrome121` | Android 14 (Pixel 7) | Chrome 121 |
 | `android-oppo-chrome120` | Android 13 (OPPO Reno) | Chrome 120 |
+| `ios-iphone14-safari17` | iOS 17.2 (iPhone 14) | Safari 17 |
+| `ios-iphone15-safari17` | iOS 17.3 (iPhone 15) | Safari 17 |
+| `ios-ipad-safari17` | iPadOS 17.2 (iPad Air) | Safari 17 |
 
 ## Technology Choices & Rationale
 
@@ -132,8 +145,9 @@ Adding a new IPC channel requires updating all three files.
 - **Phase 1** (Weeks 1–8): MVP — profiles, fingerprint engine, proxy manager ✅
 - **Phase 2** (Weeks 9–14): Advanced vectors, proxy rotation, UX polish ✅
 - **Phase 3** (Weeks 15–22): API client, licensing, team features, cloud sync ✅
-- **Phase 4** (Weeks 23–28): Automation API, RPA builder, mobile presets, workflow templates ✅ **current**
-- **Phase 5** (Future): Custom Chromium build (C++ patches), advanced CDP evasion
+- **Phase 4** (Weeks 23–28): Automation API, RPA builder, mobile presets, workflow templates ✅
+- **Phase 5** (Weeks 29–34): Advanced CDP evasion, detection testing, iOS presets, new vectors ✅ **current**
+- **Phase 6** (Future): Custom Chromium build (C++ patches), advanced detection framework integration
 
 ## Common Gotchas
 
