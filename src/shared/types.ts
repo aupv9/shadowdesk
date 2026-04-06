@@ -18,7 +18,7 @@ export interface FingerprintConfig {
 }
 
 export interface OsConfig {
-  platform: 'Win32' | 'MacIntel' | 'Linux x86_64'
+  platform: 'Win32' | 'MacIntel' | 'Linux x86_64' | 'Linux armv8l'
   version: string // e.g. '10.0.0', '14.0.0'
 }
 
@@ -312,14 +312,22 @@ export type AutomationActionType =
   | 'evaluate'
   | 'conditional'
   | 'loop'
+  | 'hover'
+  | 'rightClick'
+  | 'setAttribute'
+  | 'httpRequest'
 
 export interface AutomationStep {
   id: string
   action: AutomationActionType
   label?: string
   params: Record<string, any>
-  // For conditional: { selector: string, thenSteps: string[], elseSteps: string[] }
-  // For loop: { times: number, steps: string[] }
+  // For conditional: { selector: string, thenSteps: AutomationStep[], elseSteps: AutomationStep[] }
+  // For loop: { times: number, steps: AutomationStep[] }
+  // For hover: { selector: string }
+  // For rightClick: { selector: string }
+  // For setAttribute: { selector: string, attribute: string, value: string }
+  // For httpRequest: { url: string, method: string, headers?: Record<string,string>, body?: string }
 }
 
 export interface AutomationWorkflow {
@@ -360,4 +368,28 @@ export interface UpdateWorkflowInput {
   name?: string
   description?: string
   steps?: AutomationStep[]
+}
+
+// ─── Automation API Server Types ───────────────────────────────────────────
+
+export interface ApiServerConfig {
+  enabled: boolean
+  port: number        // default 9222
+  authToken?: string  // optional bearer token for auth
+}
+
+export interface ApiServerStatus {
+  running: boolean
+  port: number
+  url: string
+}
+
+// ─── Workflow Template Types ───────────────────────────────────────────────
+
+export interface WorkflowTemplate {
+  id: string
+  name: string
+  description: string
+  category: 'scraping' | 'testing' | 'social' | 'ecommerce' | 'general'
+  steps: AutomationStep[]
 }

@@ -94,5 +94,16 @@ interface Window {
       isRunning: (workflowId: string, profileId: string) => Promise<boolean>
       runs:      (workflowId: string) => Promise<any[]>
     }
+    templates: {
+      list:               () => Promise<import('./types').WorkflowTemplate[]>
+      get:                (id: string) => Promise<import('./types').WorkflowTemplate>
+      createFromTemplate: (templateId: string, name?: string) => Promise<import('./types').AutomationWorkflow>
+    }
+    apiServer: {
+      status: () => Promise<import('./types').ApiServerStatus>
+      config: () => Promise<import('./types').ApiServerConfig>
+      start:  (config?: Partial<import('./types').ApiServerConfig>) => Promise<import('./types').ApiServerStatus>
+      stop:   () => Promise<import('./types').ApiServerStatus>
+    }
   }
 }

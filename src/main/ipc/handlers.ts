@@ -6,14 +6,16 @@ import AdmZip from 'adm-zip'
 import { Database } from '../database'
 import { BrowserManager } from '../browser-manager'
 import { AutomationEngine } from '../automation'
+import { ApiServer } from '../api-server'
 import { resolveFingerprint, FINGERPRINT_PRESETS } from '../fingerprint/presets'
+import { getTemplates, getTemplate } from '../workflow-templates'
 import { getSettings, updateSettings } from '../settings'
 import { downloadUpdate, installUpdate } from '../auto-updater'
 import { login, register, logout, getCurrentUser, updatePassword, isAuthenticated } from '../auth'
 import { fetchLicense, activateLicense, deactivateLicense, getCurrentLicense, checkProfileLimit, getUsage, getMachineId } from '../license'
 import * as team from '../team'
 import { pushProfiles, pullProfiles, getSyncState, getSyncManifest, markPendingChange } from '../sync'
-import type { CreateProfileInput, CreateProxyInput, TeamRole, CreateWorkflowInput, UpdateWorkflowInput } from '../../shared/types'
+import type { CreateProfileInput, CreateProxyInput, TeamRole, CreateWorkflowInput, UpdateWorkflowInput, ApiServerConfig } from '../../shared/types'
 import { parseNetscapeCookies, toNetscapeFormat } from '../utils/cookies'
 
 // ── Handler registration ───────────────────────────────────────────────────
@@ -456,5 +458,52 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('workflows:runs', (_event, workflowId: string) => {
     const rows = db.getWorkflowRuns(workflowId)
     return rows.map((r: any) => ({ ...r, step_results: JSON.parse(r.step_results) }))
+  })
+
+  // ── Workflow Templates ──────────────────────────────────────────────
+
+  ipcMain.handle('templates:list', () => {
+    return getTemplates()
+  })
+
+  ipcMain.handle('templates:get', (_event, id: string) => {
+    const tpl = getTemplate(id)
+    if (!tpl) throw new Error(`Template ${id} not found`)
+    return tpl
+  })
+
+  ipcMain.handle('templates:createFromTemplate', (_event, templateId: string, name?: string) => {
+    const tpl = getTemplate(templateId)
+    if (!tpl) throw new Error(`Template ${templateId} not found`)
+    const id = uuidv4()
+    // Deep clone steps and assign new IDs
+    const steps = JSON.parse(JSON.stringify(tpl.steps)).map((s: any) => ({
+      ...s,
+      id: uuidv4()
+    }))
+    db.createWorkflow({ id, name: name ?? tpl.name, description: tpl.description, steps })
+    const row = db.getWorkflow(id)
+    return { ...row, steps: JSON.parse(row.steps) }
+  })
+
+  // ── API Server ──────────────────────────────────────────────────────
+
+  const apiServer = ApiServer.getInstance()
+
+  ipcMain.handle('apiServer:status', () => {
+    return apiServer.getStatus()
+  })
+
+  ipcMain.handle('apiServer:config', () => {
+    return apiServer.getConfig()
+  })
+
+  ipcMain.handle('apiServer:start', async (_event, config?: Partial<ApiServerConfig>) => {
+    return apiServer.start(config)
+  })
+
+  ipcMain.handle('apiServer:stop', async () => {
+    await apiServer.stop()
+    return apiServer.getStatus()
   })
 }

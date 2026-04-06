@@ -16,29 +16,41 @@ import {
   ArrowDownToLine,
   List,
   Keyboard,
-  Code
+  Code,
+  GitBranch,
+  Repeat,
+  Hand,
+  MousePointerClick,
+  PenTool,
+  Send
 } from 'lucide-react'
 import type { AutomationStep, AutomationActionType } from '../../types'
 
 const ACTION_META: Record<AutomationActionType, { icon: React.ElementType; label: string; color: string }> = {
-  navigate:        { icon: Globe,            label: 'Navigate',         color: 'text-blue-400' },
-  click:           { icon: MousePointer,     label: 'Click',            color: 'text-green-400' },
-  type:            { icon: Type,             label: 'Type Text',        color: 'text-purple-400' },
-  wait:            { icon: Clock,            label: 'Wait',             color: 'text-yellow-400' },
-  waitForSelector: { icon: Search,           label: 'Wait for Element', color: 'text-orange-400' },
-  screenshot:      { icon: Camera,           label: 'Screenshot',       color: 'text-pink-400' },
-  extractText:     { icon: FileText,         label: 'Extract Text',     color: 'text-cyan-400' },
-  scroll:          { icon: ArrowDownToLine,   label: 'Scroll',           color: 'text-indigo-400' },
-  select:          { icon: List,             label: 'Select Option',    color: 'text-teal-400' },
-  keyPress:        { icon: Keyboard,         label: 'Key Press',        color: 'text-amber-400' },
-  evaluate:        { icon: Code,             label: 'Run Script',       color: 'text-red-400' },
-  conditional:     { icon: Code,             label: 'Conditional',      color: 'text-emerald-400' },
-  loop:            { icon: Code,             label: 'Loop',             color: 'text-violet-400' }
+  navigate:        { icon: Globe,              label: 'Navigate',         color: 'text-blue-400' },
+  click:           { icon: MousePointer,       label: 'Click',            color: 'text-green-400' },
+  type:            { icon: Type,               label: 'Type Text',        color: 'text-purple-400' },
+  wait:            { icon: Clock,              label: 'Wait',             color: 'text-yellow-400' },
+  waitForSelector: { icon: Search,             label: 'Wait for Element', color: 'text-orange-400' },
+  screenshot:      { icon: Camera,             label: 'Screenshot',       color: 'text-pink-400' },
+  extractText:     { icon: FileText,           label: 'Extract Text',     color: 'text-cyan-400' },
+  scroll:          { icon: ArrowDownToLine,    label: 'Scroll',           color: 'text-indigo-400' },
+  select:          { icon: List,               label: 'Select Option',    color: 'text-teal-400' },
+  keyPress:        { icon: Keyboard,           label: 'Key Press',        color: 'text-amber-400' },
+  evaluate:        { icon: Code,               label: 'Run Script',       color: 'text-red-400' },
+  conditional:     { icon: GitBranch,          label: 'Conditional',      color: 'text-emerald-400' },
+  loop:            { icon: Repeat,             label: 'Loop',             color: 'text-violet-400' },
+  hover:           { icon: Hand,               label: 'Hover',            color: 'text-sky-400' },
+  rightClick:      { icon: MousePointerClick,  label: 'Right Click',      color: 'text-rose-400' },
+  setAttribute:    { icon: PenTool,            label: 'Set Attribute',    color: 'text-lime-400' },
+  httpRequest:     { icon: Send,               label: 'HTTP Request',     color: 'text-fuchsia-400' }
 }
 
 const ALL_ACTIONS: AutomationActionType[] = [
   'navigate', 'click', 'type', 'wait', 'waitForSelector',
-  'screenshot', 'extractText', 'scroll', 'select', 'keyPress', 'evaluate'
+  'screenshot', 'extractText', 'scroll', 'select', 'keyPress', 'evaluate',
+  'hover', 'rightClick', 'setAttribute', 'httpRequest',
+  'conditional', 'loop'
 ]
 
 interface StepEditorProps {
@@ -64,6 +76,12 @@ function getDefaultParams(action: AutomationActionType): Record<string, any> {
     case 'select': return { selector: '', value: '' }
     case 'keyPress': return { key: 'Enter' }
     case 'evaluate': return { script: '// your code here' }
+    case 'hover': return { selector: '' }
+    case 'rightClick': return { selector: '' }
+    case 'setAttribute': return { selector: '', attribute: '', value: '' }
+    case 'httpRequest': return { url: 'https://api.example.com', method: 'GET', headers: {}, body: '' }
+    case 'conditional': return { selector: '', thenSteps: [], elseSteps: [] }
+    case 'loop': return { times: 3, steps: [] }
     default: return {}
   }
 }
@@ -77,7 +95,7 @@ export function StepEditor({ step, index, total, onUpdate, onDelete, onDuplicate
   }
 
   const handleParamChange = (key: string, value: any) => {
-    onUpdate({ params: { ...step.params, [key] } })
+    onUpdate({ params: { ...step.params, [key]: value } })
   }
 
   const Icon = meta.icon
@@ -219,6 +237,51 @@ function ParamEditor({
       return <>{field('key', 'Key (e.g. Enter, Tab, Escape)')}</>
     case 'evaluate':
       return <>{field('script', 'JavaScript code', 'textarea')}</>
+    case 'hover':
+      return <>{field('selector', 'CSS Selector')}{field('timeout', 'Timeout (ms)', 'number')}</>
+    case 'rightClick':
+      return <>{field('selector', 'CSS Selector')}{field('timeout', 'Timeout (ms)', 'number')}</>
+    case 'setAttribute':
+      return <>{field('selector', 'CSS Selector')}{field('attribute', 'Attribute name')}{field('value', 'Attribute value')}</>
+    case 'httpRequest':
+      return (
+        <>
+          {field('url', 'URL')}
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Method</label>
+            <select
+              value={params.method ?? 'GET'}
+              onChange={(e) => onChange('method', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500"
+            >
+              {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+          {field('body', 'Request body (JSON)', 'textarea')}
+        </>
+      )
+    case 'conditional':
+      return (
+        <>
+          {field('selector', 'Condition CSS Selector')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            If the selector exists on the page, the "then" branch runs; otherwise the "else" branch runs.
+            Configure branch steps in the workflow JSON.
+          </div>
+        </>
+      )
+    case 'loop':
+      return (
+        <>
+          {field('times', 'Number of iterations', 'number')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Loop steps are configured as nested steps within this action.
+            Use templates or JSON edit to define loop body.
+          </div>
+        </>
+      )
     default:
       return <div className="text-xs text-slate-500">No parameters</div>
   }
