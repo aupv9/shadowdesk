@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react'
 import {
-  Monitor,
   Globe,
   Fingerprint,
   Settings,
   Ghost,
   LayoutGrid,
   Download,
-  ArrowUpCircle
+  ArrowUpCircle,
+  Users,
+  User,
+  Crown
 } from 'lucide-react'
 import type { NavSection } from '../../types'
+import type { User as UserType, LicensePlan } from '../../types'
 
 interface UpdateStatus {
   status: string
@@ -18,21 +21,32 @@ interface UpdateStatus {
   message?: string
 }
 
+const PLAN_BADGE: Record<string, { label: string; color: string }> = {
+  free:         { label: 'Free',  color: 'bg-slate-700 text-slate-400' },
+  starter:      { label: 'Starter', color: 'bg-blue-500/20 text-blue-400' },
+  professional: { label: 'Pro',  color: 'bg-purple-500/20 text-purple-400' },
+  enterprise:   { label: 'Ent',  color: 'bg-amber-500/20 text-amber-400' }
+}
+
 interface SidebarProps {
   active: NavSection
   onChange: (s: NavSection) => void
   profileCount: number
   activeSessionCount: number
+  user?: UserType | null
+  plan?: LicensePlan
 }
 
 const NAV_ITEMS: { key: NavSection; icon: React.ElementType; label: string }[] = [
   { key: 'profiles',    icon: LayoutGrid,   label: 'Profiles' },
   { key: 'proxies',     icon: Globe,        label: 'Proxies' },
   { key: 'fingerprint', icon: Fingerprint,  label: 'Fingerprint' },
-  { key: 'settings',   icon: Settings,     label: 'Settings' }
+  { key: 'team',        icon: Users,        label: 'Team' },
+  { key: 'account',     icon: User,         label: 'Account' },
+  { key: 'settings',    icon: Settings,     label: 'Settings' }
 ]
 
-export function Sidebar({ active, onChange, profileCount, activeSessionCount }: SidebarProps) {
+export function Sidebar({ active, onChange, profileCount, activeSessionCount, user, plan = 'free' }: SidebarProps) {
   const [update, setUpdate] = useState<UpdateStatus | null>(null)
 
   useEffect(() => {
@@ -45,6 +59,8 @@ export function Sidebar({ active, onChange, profileCount, activeSessionCount }: 
     if (update.status === 'available') window.api.updater.download()
     if (update.status === 'ready') window.api.updater.install()
   }
+
+  const badge = PLAN_BADGE[plan] ?? PLAN_BADGE.free
 
   return (
     <aside className="flex flex-col w-56 min-h-screen bg-slate-900 border-r border-slate-800 select-none">
@@ -121,9 +137,34 @@ export function Sidebar({ active, onChange, profileCount, activeSessionCount }: 
         </div>
       )}
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-slate-800">
-        <div className="text-xs text-slate-600">v0.1.0 Beta</div>
+      {/* User / Plan footer */}
+      <div className="px-3 py-3 border-t border-slate-800">
+        {user ? (
+          <button
+            onClick={() => onChange('account')}
+            className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            <div className="w-7 h-7 rounded-full bg-ghost-600/20 flex items-center justify-center text-xs font-medium text-ghost-400">
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 text-left min-w-0">
+              <div className="text-xs font-medium text-white truncate">{user.name}</div>
+              <div className="text-[10px] text-slate-500 truncate">{user.email}</div>
+            </div>
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${badge.color}`}>
+              {badge.label}
+            </span>
+          </button>
+        ) : (
+          <button
+            onClick={() => onChange('account')}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+          >
+            <User className="w-4 h-4" />
+            Sign in
+          </button>
+        )}
+        <div className="text-[10px] text-slate-600 mt-1.5 px-2">v0.2.0 Beta</div>
       </div>
     </aside>
   )

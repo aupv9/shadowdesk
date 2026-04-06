@@ -43,5 +43,45 @@ interface Window {
       install:  () => Promise<void>
       onStatus: (cb: (status: { status: string; version?: string; percent?: number; message?: string }) => void) => () => void
     }
+    auth: {
+      login:           (input: { email: string; password: string })               => Promise<import('./types').User>
+      register:        (input: { email: string; password: string; name: string }) => Promise<import('./types').User>
+      logout:          ()                                                         => Promise<void>
+      me:              ()                                                         => Promise<import('./types').User | null>
+      isAuthenticated: ()                                                         => Promise<boolean>
+      updatePassword:  (current: string, newPass: string)                         => Promise<void>
+    }
+    license: {
+      current:           () => Promise<import('./types').License>
+      fetch:             () => Promise<import('./types').License | null>
+      activate:          (key: string) => Promise<import('./types').License>
+      deactivate:        () => Promise<void>
+      checkProfileLimit: () => Promise<{ allowed: boolean; current: number; max: number }>
+      usage:             () => Promise<{ profiles: number; members: number }>
+      machineId:         () => Promise<string>
+    }
+    team: {
+      get:              () => Promise<import('./types').Team | null>
+      create:           (name: string) => Promise<import('./types').Team>
+      updateName:       (name: string) => Promise<import('./types').Team>
+      delete:           () => Promise<void>
+      members:          () => Promise<import('./types').TeamMember[]>
+      updateMemberRole: (userId: string, role: string) => Promise<import('./types').TeamMember>
+      removeMember:     (userId: string) => Promise<void>
+      invite:           (email: string, role: string) => Promise<import('./types').TeamInvite>
+      invites:          () => Promise<import('./types').TeamInvite[]>
+      cancelInvite:     (inviteId: string) => Promise<void>
+      shareProfile:     (profileId: string, memberIds: string[], permission: string) => Promise<void>
+      sharedProfiles:   () => Promise<import('./types').SharedProfile[]>
+      unshareProfile:   (profileId: string, memberId: string) => Promise<void>
+      auditLog:         (params?: { page?: number; limit?: number; user_id?: string; action?: string }) => Promise<{ entries: import('./types').AuditLogEntry[]; total: number }>
+    }
+    sync: {
+      status:   () => Promise<import('./types').SyncState>
+      push:     (password: string) => Promise<void>
+      pull:     (password: string) => Promise<number>
+      manifest: () => Promise<import('./types').SyncManifest | null>
+      onStatus: (cb: (state: import('./types').SyncState) => void) => () => void
+    }
   }
 }

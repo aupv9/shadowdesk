@@ -8,7 +8,11 @@ import { BrowserManager } from '../browser-manager'
 import { resolveFingerprint, FINGERPRINT_PRESETS } from '../fingerprint/presets'
 import { getSettings, updateSettings } from '../settings'
 import { downloadUpdate, installUpdate } from '../auto-updater'
-import type { CreateProfileInput, CreateProxyInput } from '../../shared/types'
+import { login, register, logout, getCurrentUser, updatePassword, isAuthenticated } from '../auth'
+import { fetchLicense, activateLicense, deactivateLicense, getCurrentLicense, checkProfileLimit, getUsage, getMachineId } from '../license'
+import * as team from '../team'
+import { pushProfiles, pullProfiles, getSyncState, getSyncManifest, markPendingChange } from '../sync'
+import type { CreateProfileInput, CreateProxyInput, TeamRole } from '../../shared/types'
 import { parseNetscapeCookies, toNetscapeFormat } from '../utils/cookies'
 
 // ── Handler registration ───────────────────────────────────────────────────
@@ -270,5 +274,137 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('updater:install', () => {
     installUpdate()
+  })
+
+  // ── Auth ─────────────────────────────────────────────────────────────────
+
+  ipcMain.handle('auth:login', async (_event, input: { email: string; password: string }) => {
+    return login(input)
+  })
+
+  ipcMain.handle('auth:register', async (_event, input: { email: string; password: string; name: string }) => {
+    return register(input)
+  })
+
+  ipcMain.handle('auth:logout', async () => {
+    return logout()
+  })
+
+  ipcMain.handle('auth:me', async () => {
+    return getCurrentUser()
+  })
+
+  ipcMain.handle('auth:isAuthenticated', () => {
+    return isAuthenticated()
+  })
+
+  ipcMain.handle('auth:updatePassword', async (_event, currentPassword: string, newPassword: string) => {
+    return updatePassword(currentPassword, newPassword)
+  })
+
+  // ── License ──────────────────────────────────────────────────────────────
+
+  ipcMain.handle('license:current', async () => {
+    return getCurrentLicense()
+  })
+
+  ipcMain.handle('license:fetch', async () => {
+    return fetchLicense()
+  })
+
+  ipcMain.handle('license:activate', async (_event, licenseKey: string) => {
+    return activateLicense(licenseKey)
+  })
+
+  ipcMain.handle('license:deactivate', async () => {
+    return deactivateLicense()
+  })
+
+  ipcMain.handle('license:checkProfileLimit', () => {
+    return checkProfileLimit()
+  })
+
+  ipcMain.handle('license:usage', () => {
+    return getUsage()
+  })
+
+  ipcMain.handle('license:machineId', () => {
+    return getMachineId()
+  })
+
+  // ── Team ─────────────────────────────────────────────────────────────────
+
+  ipcMain.handle('team:get', async () => {
+    return team.getTeam()
+  })
+
+  ipcMain.handle('team:create', async (_event, name: string) => {
+    return team.createTeam(name)
+  })
+
+  ipcMain.handle('team:updateName', async (_event, name: string) => {
+    return team.updateTeamName(name)
+  })
+
+  ipcMain.handle('team:delete', async () => {
+    return team.deleteTeam()
+  })
+
+  ipcMain.handle('team:members', async () => {
+    return team.getMembers()
+  })
+
+  ipcMain.handle('team:updateMemberRole', async (_event, userId: string, role: TeamRole) => {
+    return team.updateMemberRole(userId, role)
+  })
+
+  ipcMain.handle('team:removeMember', async (_event, userId: string) => {
+    return team.removeMember(userId)
+  })
+
+  ipcMain.handle('team:invite', async (_event, email: string, role: TeamRole) => {
+    return team.inviteMember(email, role)
+  })
+
+  ipcMain.handle('team:invites', async () => {
+    return team.getInvites()
+  })
+
+  ipcMain.handle('team:cancelInvite', async (_event, inviteId: string) => {
+    return team.cancelInvite(inviteId)
+  })
+
+  ipcMain.handle('team:shareProfile', async (_event, profileId: string, memberIds: string[], permission: 'read' | 'write') => {
+    return team.shareProfile(profileId, memberIds, permission)
+  })
+
+  ipcMain.handle('team:sharedProfiles', async () => {
+    return team.getSharedProfiles()
+  })
+
+  ipcMain.handle('team:unshareProfile', async (_event, profileId: string, memberId: string) => {
+    return team.unshareProfile(profileId, memberId)
+  })
+
+  ipcMain.handle('team:auditLog', async (_event, params?: { page?: number; limit?: number; user_id?: string; action?: string }) => {
+    return team.getAuditLog(params)
+  })
+
+  // ── Cloud Sync ───────────────────────────────────────────────────────────
+
+  ipcMain.handle('sync:status', () => {
+    return getSyncState()
+  })
+
+  ipcMain.handle('sync:push', async (_event, encryptionPassword: string) => {
+    return pushProfiles(encryptionPassword)
+  })
+
+  ipcMain.handle('sync:pull', async (_event, encryptionPassword: string) => {
+    return pullProfiles(encryptionPassword)
+  })
+
+  ipcMain.handle('sync:manifest', async () => {
+    return getSyncManifest()
   })
 }

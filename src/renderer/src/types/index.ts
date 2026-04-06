@@ -5,12 +5,30 @@ export type {
   ProxyConfig,
   FingerprintConfig,
   CreateProfileInput,
-  CreateProxyInput
+  CreateProxyInput,
+  User,
+  AuthState,
+  LoginInput,
+  RegisterInput,
+  License,
+  LicensePlan,
+  LicenseState,
+  Team,
+  TeamMember,
+  TeamInvite,
+  TeamRole,
+  SharedProfile,
+  AuditLogEntry,
+  SyncState,
+  SyncStatus,
+  SyncManifest
 } from '../../../shared/types'
+
+export { PLAN_LIMITS } from '../../../shared/types'
 
 // Renderer-only types
 
-export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'settings'
+export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'settings' | 'team' | 'account'
 
 export interface Toast {
   id: string
