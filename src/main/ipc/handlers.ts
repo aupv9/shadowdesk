@@ -5,6 +5,7 @@ import { app } from 'electron'
 import AdmZip from 'adm-zip'
 import { Database } from '../database'
 import { BrowserManager } from '../browser-manager'
+import { AutomationEngine } from '../automation'
 import { resolveFingerprint, FINGERPRINT_PRESETS } from '../fingerprint/presets'
 import { getSettings, updateSettings } from '../settings'
 import { downloadUpdate, installUpdate } from '../auto-updater'
@@ -12,7 +13,7 @@ import { login, register, logout, getCurrentUser, updatePassword, isAuthenticate
 import { fetchLicense, activateLicense, deactivateLicense, getCurrentLicense, checkProfileLimit, getUsage, getMachineId } from '../license'
 import * as team from '../team'
 import { pushProfiles, pullProfiles, getSyncState, getSyncManifest, markPendingChange } from '../sync'
-import type { CreateProfileInput, CreateProxyInput, TeamRole } from '../../shared/types'
+import type { CreateProfileInput, CreateProxyInput, TeamRole, CreateWorkflowInput, UpdateWorkflowInput } from '../../shared/types'
 import { parseNetscapeCookies, toNetscapeFormat } from '../utils/cookies'
 
 // ── Handler registration ───────────────────────────────────────────────────
@@ -406,5 +407,54 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('sync:manifest', async () => {
     return getSyncManifest()
+  })
+
+  // ── Automation / RPA ────────────────────────────────────────────────────
+
+  const automation = AutomationEngine.getInstance()
+
+  ipcMain.handle('workflows:list', () => {
+    const rows = db.getAllWorkflows()
+    return rows.map((r: any) => ({ ...r, steps: JSON.parse(r.steps) }))
+  })
+
+  ipcMain.handle('workflows:get', (_event, id: string) => {
+    const row = db.getWorkflow(id)
+    if (!row) throw new Error(`Workflow ${id} not found`)
+    return { ...row, steps: JSON.parse(row.steps) }
+  })
+
+  ipcMain.handle('workflows:create', (_event, input: CreateWorkflowInput) => {
+    const id = uuidv4()
+    db.createWorkflow({ id, name: input.name, description: input.description, steps: input.steps })
+    const row = db.getWorkflow(id)
+    return { ...row, steps: JSON.parse(row.steps) }
+  })
+
+  ipcMain.handle('workflows:update', (_event, id: string, data: UpdateWorkflowInput) => {
+    db.updateWorkflow(id, data)
+    const row = db.getWorkflow(id)
+    return { ...row, steps: JSON.parse(row.steps) }
+  })
+
+  ipcMain.handle('workflows:delete', (_event, id: string) => {
+    db.deleteWorkflow(id)
+  })
+
+  ipcMain.handle('workflows:run', async (_event, workflowId: string, profileId: string) => {
+    return automation.executeWorkflow(workflowId, profileId)
+  })
+
+  ipcMain.handle('workflows:stop', (_event, workflowId: string, profileId: string) => {
+    automation.stopWorkflow(workflowId, profileId)
+  })
+
+  ipcMain.handle('workflows:isRunning', (_event, workflowId: string, profileId: string) => {
+    return automation.isWorkflowRunning(workflowId, profileId)
+  })
+
+  ipcMain.handle('workflows:runs', (_event, workflowId: string) => {
+    const rows = db.getWorkflowRuns(workflowId)
+    return rows.map((r: any) => ({ ...r, step_results: JSON.parse(r.step_results) }))
   })
 }

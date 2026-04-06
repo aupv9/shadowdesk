@@ -91,6 +91,17 @@ const api = {
       ipcRenderer.on('sync:status', handler)
       return () => ipcRenderer.removeListener('sync:status', handler)
     }
+  },
+  workflows: {
+    list:      ()                                                     => ipcRenderer.invoke('workflows:list'),
+    get:       (id: string)                                           => ipcRenderer.invoke('workflows:get', id),
+    create:    (input: { name: string; description?: string; steps: any[] }) => ipcRenderer.invoke('workflows:create', input),
+    update:    (id: string, data: { name?: string; description?: string; steps?: any[] }) => ipcRenderer.invoke('workflows:update', id, data),
+    delete:    (id: string)                                           => ipcRenderer.invoke('workflows:delete', id),
+    run:       (workflowId: string, profileId: string)                => ipcRenderer.invoke('workflows:run', workflowId, profileId),
+    stop:      (workflowId: string, profileId: string)                => ipcRenderer.invoke('workflows:stop', workflowId, profileId),
+    isRunning: (workflowId: string, profileId: string)                => ipcRenderer.invoke('workflows:isRunning', workflowId, profileId),
+    runs:      (workflowId: string)                                   => ipcRenderer.invoke('workflows:runs', workflowId)
   }
 }
 

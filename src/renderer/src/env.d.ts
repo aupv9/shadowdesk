@@ -83,5 +83,16 @@ interface Window {
       manifest: () => Promise<import('./types').SyncManifest | null>
       onStatus: (cb: (state: import('./types').SyncState) => void) => () => void
     }
+    workflows: {
+      list:      () => Promise<import('./types').AutomationWorkflow[]>
+      get:       (id: string) => Promise<import('./types').AutomationWorkflow>
+      create:    (input: import('./types').CreateWorkflowInput) => Promise<import('./types').AutomationWorkflow>
+      update:    (id: string, data: import('./types').UpdateWorkflowInput) => Promise<import('./types').AutomationWorkflow>
+      delete:    (id: string) => Promise<void>
+      run:       (workflowId: string, profileId: string) => Promise<import('./types').AutomationRunResult>
+      stop:      (workflowId: string, profileId: string) => Promise<void>
+      isRunning: (workflowId: string, profileId: string) => Promise<boolean>
+      runs:      (workflowId: string) => Promise<any[]>
+    }
   }
 }
