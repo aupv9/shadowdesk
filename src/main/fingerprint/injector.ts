@@ -13,6 +13,8 @@ import { buildPermissionsScript } from './scripts/permissions'
 import { buildStorageScript } from './scripts/storage'
 import { buildNetworkScript } from './scripts/network'
 import { buildPerformanceScript } from './scripts/performance'
+import { buildBehaviorScript } from './scripts/behavior'
+import { buildTimingScript } from './scripts/timing'
 import { CdpEvasion } from './cdp-evasion'
 
 export class FingerprintInjector {
@@ -33,7 +35,14 @@ export class FingerprintInjector {
       buildPermissionsScript(fp.os.platform),
       buildStorageScript(),
       buildNetworkScript(fp.network?.connectionType ?? '4g'),
-      buildPerformanceScript()
+      buildPerformanceScript(),
+      // Phase 6: Behavior simulation + timing defenses
+      fp.behavior
+        ? buildBehaviorScript(fp.behavior, fp.canvas.noiseSeed)
+        : null,
+      fp.timing
+        ? buildTimingScript(fp.timing, fp.canvas.noiseSeed ^ 0xCAFE)
+        : null
     ].filter(Boolean)
 
     const combined = scripts.join('\n;\n')

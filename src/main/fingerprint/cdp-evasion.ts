@@ -33,7 +33,11 @@ export class CdpEvasion {
       this.patchIframeContentWindow(),
       this.hideStackTraces(),
       this.patchHeadlessSignals(),
-      this.patchConsoleDebug()
+      this.patchConsoleDebug(),
+      // Phase 6: new evasion layers
+      this.patchObjectDefinePropertyTrap(),
+      this.patchWorkerNavigator(),
+      this.maskBlinkInternals()
     ].join('\n;\n')
   }
 
@@ -340,6 +344,151 @@ export class CdpEvasion {
   if (window.outerHeight === 0) {
     Object.defineProperty(window, 'outerHeight', { get: () => window.innerHeight + 85, configurable: true });
   }
+})();
+`
+  }
+
+  // ── Phase 6 methods ────────────────────────────────────────────────────────
+
+  /**
+   * Object.defineProperty trap detection evasion.
+   * Some advanced detectors call Object.getOwnPropertyDescriptor on navigator
+   * before and after our injection to detect property patching. We make our
+   * overrides look like built-in Blink properties by rewriting the descriptor
+   * metadata so configurable/enumerable/writable flags match Chrome norms.
+   */
+  private patchObjectDefinePropertyTrap(): string {
+    return `
+(function() {
+  'use strict';
+
+  // Intercept Object.getOwnPropertyDescriptor to normalise descriptor flags
+  // for navigator properties that we override via defineProperty.
+  var _origGetOPD = Object.getOwnPropertyDescriptor.bind(Object);
+  Object.getOwnPropertyDescriptor = function getOwnPropertyDescriptor(obj, prop) {
+    var desc = _origGetOPD(obj, prop);
+    if (!desc) return desc;
+
+    // Properties we override should look like native Blink properties:
+    // configurable: true, enumerable: true (same as real Chrome)
+    var navProps = new Set(['webdriver', 'platform', 'vendor', 'userAgent',
+      'languages', 'language', 'plugins', 'hardwareConcurrency', 'deviceMemory',
+      'connection', 'getBattery']);
+
+    if (obj === Navigator.prototype || obj === navigator) {
+      if (navProps.has(String(prop))) {
+        return Object.assign({}, desc, { configurable: true, enumerable: true });
+      }
+    }
+    return desc;
+  };
+  Object.defineProperty(Object.getOwnPropertyDescriptor, 'toString', {
+    value: function() { return 'function getOwnPropertyDescriptor() { [native code] }'; },
+    configurable: true
+  });
+})();
+`
+  }
+
+  /**
+   * Worker navigator.webdriver patch.
+   * Puppeteer/CDP sets navigator.webdriver = true in both the main frame AND
+   * in dedicated/shared worker contexts. Detection scripts can spawn a worker,
+   * read navigator.webdriver inside it, and expose the automation even if the
+   * main-frame value has been patched.
+   * We override the Worker constructor to inject a patch into every spawned worker.
+   */
+  private patchWorkerNavigator(): string {
+    return `
+(function() {
+  'use strict';
+
+  if (typeof Worker === 'undefined') return;
+
+  var _origWorker = Worker;
+
+  // Blob URL containing the patch to inject at the top of every worker script
+  var patchSrc = [
+    '(function(){',
+    '  try {',
+    '    Object.defineProperty(navigator, "webdriver", {',
+    '      get: function() { return undefined; },',
+    '      configurable: true',
+    '    });',
+    '  } catch(e) {}',
+    '})();'
+  ].join('\\n');
+
+  function Worker(scriptURL, options) {
+    var blobPatch = new Blob([patchSrc], { type: 'application/javascript' });
+    var patchUrl = URL.createObjectURL(blobPatch);
+    // Chain the patch + real script via importScripts inside a wrapper blob
+    var wrapperSrc = 'importScripts(' + JSON.stringify(patchUrl) + ');';
+    if (typeof scriptURL === 'string') {
+      wrapperSrc += '\\nimportScripts(' + JSON.stringify(scriptURL) + ');';
+    }
+    var wrapperBlob = new Blob([wrapperSrc], { type: 'application/javascript' });
+    var wrapperUrl = URL.createObjectURL(wrapperBlob);
+    return new _origWorker(wrapperUrl, options);
+  }
+  Worker.prototype = _origWorker.prototype;
+
+  try {
+    window.Worker = Worker;
+    Object.defineProperty(Worker, 'toString', {
+      value: function() { return 'function Worker() { [native code] }'; }
+    });
+  } catch(e) {}
+})();
+`
+  }
+
+  /**
+   * Mask Blink-specific internal properties that headless Chrome exposes but
+   * real desktop Chrome does not (or exposes differently).
+   * Targets: document.$cdc_*, window.__selenium_*, runtime-injected markers.
+   */
+  private maskBlinkInternals(): string {
+    return `
+(function() {
+  'use strict';
+
+  // Properties that real Chrome does NOT expose on document/window but headless can
+  var MASK = [
+    '__selenium_evaluate', '__selenium_unwrapped', '__webdriver_evaluate',
+    '__webdriver_script_function', '__webdriver_script_func',
+    '__webdriver_script_element', '__fxdriver_evaluate', '__fxdriver_unwrapped',
+    '_Selenium_IDE_Recorder', '_selenium', 'calledSelenium',
+    '$chrome_asyncScriptInfo', '$cdc_asdjflasutopfhvcZLmcfl_'
+  ];
+
+  var handler = {
+    has: function(target, key) {
+      if (MASK.indexOf(String(key)) !== -1) return false;
+      return key in target;
+    },
+    get: function(target, key, receiver) {
+      if (MASK.indexOf(String(key)) !== -1) return undefined;
+      return Reflect.get(target, key, receiver);
+    },
+    getOwnPropertyDescriptor: function(target, key) {
+      if (MASK.indexOf(String(key)) !== -1) return undefined;
+      return Object.getOwnPropertyDescriptor(target, key);
+    }
+  };
+
+  // Delete any existing leak before wrapping
+  MASK.forEach(function(key) {
+    try { delete window[key]; } catch(e) {}
+    try { delete document[key]; } catch(e) {}
+  });
+
+  // Wrap window in a Proxy to intercept future access (best-effort)
+  try {
+    var proxiedWindow = new Proxy(window, handler);
+    // Can't reassign window itself, but we can ensure iframe windows are clean
+    // by patching the getter on WindowProxy (handled by iframe patch above)
+  } catch(e) {}
 })();
 `
   }

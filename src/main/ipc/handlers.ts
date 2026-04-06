@@ -82,8 +82,16 @@ export function registerIpcHandlers(): void {
     const fp = typeof profile.fingerprint === 'string'
       ? JSON.parse(profile.fingerprint)
       : profile.fingerprint
-    const newFingerprint = resolveFingerprint(fp.preset, uuidv4())
 
+    // Phase 6: snapshot the current fingerprint before replacing it
+    db.saveProfileVersion({
+      id: uuidv4(),
+      profileId: id,
+      fingerprint: fp,
+      label: 'Before reroll'
+    })
+
+    const newFingerprint = resolveFingerprint(fp.preset, uuidv4())
     db.updateProfile(id, { fingerprint: newFingerprint })
     return db.getProfile(id)
   })
@@ -522,5 +530,49 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('detection:summary', () => {
     return db.getDetectionTestSummary()
+  })
+
+  // ── Profile Version History (Phase 6) ─────────────────────────────────────
+
+  ipcMain.handle('profiles:history', (_event, profileId: string) => {
+    return db.getProfileVersions(profileId)
+  })
+
+  ipcMain.handle('profiles:saveVersion', (_event, profileId: string, label: string) => {
+    const profile = db.getProfile(profileId) as any
+    if (!profile) throw new Error(`Profile ${profileId} not found`)
+    const fp = typeof profile.fingerprint === 'string'
+      ? JSON.parse(profile.fingerprint)
+      : profile.fingerprint
+    const versionId = uuidv4()
+    db.saveProfileVersion({ id: versionId, profileId, fingerprint: fp, label: label || 'Manual snapshot' })
+    return { id: versionId }
+  })
+
+  ipcMain.handle('profiles:restoreVersion', async (_event, profileId: string, versionId: string) => {
+    const version = db.getProfileVersion(versionId)
+    if (!version) throw new Error(`Version ${versionId} not found`)
+    if (version.profile_id !== profileId) throw new Error('Version does not belong to this profile')
+
+    // Snapshot current state before restoring
+    const current = db.getProfile(profileId) as any
+    if (current) {
+      const currentFp = typeof current.fingerprint === 'string'
+        ? JSON.parse(current.fingerprint)
+        : current.fingerprint
+      db.saveProfileVersion({
+        id: uuidv4(),
+        profileId,
+        fingerprint: currentFp,
+        label: `Before restore to ${version.label}`
+      })
+    }
+
+    db.updateProfile(profileId, { fingerprint: version.fingerprint })
+    return db.getProfile(profileId)
+  })
+
+  ipcMain.handle('profiles:deleteVersion', (_event, versionId: string) => {
+    db.deleteProfileVersion(versionId)
   })
 }

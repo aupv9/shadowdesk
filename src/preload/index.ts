@@ -13,7 +13,12 @@ const api = {
     setGroup:           (profileId: string, groupId: string | null) => ipcRenderer.invoke('profiles:setGroup', profileId, groupId),
     rerollFingerprint:  (id: string)                          => ipcRenderer.invoke('profiles:rerollFingerprint', id),
     export:             (id: string)                          => ipcRenderer.invoke('profiles:export', id),
-    import:             (buffer: Buffer)                      => ipcRenderer.invoke('profiles:import', buffer)
+    import:             (buffer: Buffer)                      => ipcRenderer.invoke('profiles:import', buffer),
+    // Phase 6: version history
+    history:            (profileId: string)                   => ipcRenderer.invoke('profiles:history', profileId),
+    saveVersion:        (profileId: string, label: string)    => ipcRenderer.invoke('profiles:saveVersion', profileId, label),
+    restoreVersion:     (profileId: string, versionId: string)=> ipcRenderer.invoke('profiles:restoreVersion', profileId, versionId),
+    deleteVersion:      (versionId: string)                   => ipcRenderer.invoke('profiles:deleteVersion', versionId)
   },
   cookies: {
     import: (profileId: string, text: string, format: 'netscape' | 'json') =>

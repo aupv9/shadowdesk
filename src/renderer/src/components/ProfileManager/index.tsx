@@ -7,6 +7,7 @@ import { ProfileCard } from './ProfileCard'
 import { CreateProfileModal } from './CreateProfileModal'
 import { EditProfileModal } from './EditProfileModal'
 import { CookieModal } from './CookieModal'
+import { ProfileHistory } from './ProfileHistory'
 import { Header } from '../Layout/Header'
 import type { Profile } from '../../types'
 
@@ -25,6 +26,7 @@ export function ProfileManager() {
   const [showCreate,     setShowCreate]     = useState(false)
   const [editProfile,    setEditProfile]    = useState<Profile | null>(null)
   const [cookieModal,    setCookieModal]    = useState<{ profile: Profile; mode: 'import' | 'export' } | null>(null)
+  const [historyProfile, setHistoryProfile] = useState<Profile | null>(null)
   const [search,         setSearch]         = useState('')
   const [activeGroup,    setActiveGroup]    = useState<string | null>(null) // null = All
   const [launching,      setLaunching]      = useState<string | null>(null)
@@ -327,6 +329,7 @@ export function ProfileManager() {
                     onExportCookies={() => setCookieModal({ profile, mode: 'export' })}
                     onExportBundle={() => handleExportBundle(profile.id)}
                     onImportBundle={handleImportBundle}
+                    onHistory={() => setHistoryProfile(profile)}
                   />
                 </div>
               ))}
@@ -363,6 +366,13 @@ export function ProfileManager() {
           profileId={cookieModal.profile.id}
           mode={cookieModal.mode}
           onClose={() => setCookieModal(null)}
+        />
+      )}
+      {historyProfile && (
+        <ProfileHistory
+          profile={historyProfile}
+          onClose={() => setHistoryProfile(null)}
+          onRestored={() => { fetchProfiles(); setHistoryProfile(null) }}
         />
       )}
     </div>
