@@ -186,6 +186,25 @@ export class Database {
       CREATE INDEX IF NOT EXISTS idx_detection_tests_date    ON detection_tests(tested_at);
     `)
 
+    // Phase 7 migration: session tracking
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        profile_name TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        duration_ms INTEGER DEFAULT 0,
+        pages_visited INTEGER DEFAULT 0,
+        proxy_used TEXT,
+        status TEXT DEFAULT 'active'
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_sessions_profile   ON sessions(profile_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON sessions(started_at);
+      CREATE INDEX IF NOT EXISTS idx_sessions_status     ON sessions(status);
+    `)
+
     // Phase 6 migration: profile version history
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS profile_versions (
@@ -558,5 +577,113 @@ export class Database {
 
   deleteProfileVersion(versionId: string): void {
     this.run(`DELETE FROM profile_versions WHERE id = ?`, [versionId])
+  }
+
+  // ── Sessions (Phase 7) ────────────────────────────────────────────────────
+
+  createSession(session: {
+    id: string
+    profile_id: string
+    profile_name: string
+    started_at: string
+    proxy_used: string | null
+  }): void {
+    this.run(
+      `INSERT INTO sessions (id, profile_id, profile_name, started_at, proxy_used, status)
+       VALUES (?, ?, ?, ?, ?, 'active')`,
+      [session.id, session.profile_id, session.profile_name, session.started_at, session.proxy_used]
+    )
+  }
+
+  endSession(id: string, data: {
+    ended_at: string
+    duration_ms: number
+    pages_visited: number
+    status: 'completed' | 'crashed'
+  }): void {
+    this.run(
+      `UPDATE sessions SET ended_at = ?, duration_ms = ?, pages_visited = ?, status = ? WHERE id = ?`,
+      [data.ended_at, data.duration_ms, data.pages_visited, data.status, id]
+    )
+  }
+
+  getSessions(filters?: { profileId?: string; limit?: number; offset?: number }): any[] {
+    const limit = filters?.limit ?? 50
+    const offset = filters?.offset ?? 0
+
+    if (filters?.profileId) {
+      return this.queryAll(
+        `SELECT * FROM sessions WHERE profile_id = ? ORDER BY started_at DESC LIMIT ? OFFSET ?`,
+        [filters.profileId, limit, offset]
+      )
+    }
+    return this.queryAll(
+      `SELECT * FROM sessions ORDER BY started_at DESC LIMIT ? OFFSET ?`,
+      [limit, offset]
+    )
+  }
+
+  getSessionStats(): {
+    totalSessions: number
+    activeSessions: number
+    totalDuration: number
+    avgDuration: number
+    sessionsLast30Days: number
+    perDayCounts: { date: string; count: number }[]
+  } {
+    const total = this.queryOne(`SELECT COUNT(*) as cnt FROM sessions`)
+    const active = this.queryOne(`SELECT COUNT(*) as cnt FROM sessions WHERE status = 'active'`)
+    const duration = this.queryOne(`SELECT SUM(duration_ms) as total, AVG(duration_ms) as avg FROM sessions WHERE status != 'active'`)
+    const last30 = this.queryOne(
+      `SELECT COUNT(*) as cnt FROM sessions WHERE started_at >= datetime('now', '-30 days')`
+    )
+
+    const perDay = this.queryAll(`
+      SELECT DATE(started_at) as date, COUNT(*) as count
+      FROM sessions
+      WHERE started_at >= datetime('now', '-7 days')
+      GROUP BY DATE(started_at)
+      ORDER BY date ASC
+    `)
+
+    return {
+      totalSessions: total?.cnt ?? 0,
+      activeSessions: active?.cnt ?? 0,
+      totalDuration: duration?.total ?? 0,
+      avgDuration: Math.round(duration?.avg ?? 0),
+      sessionsLast30Days: last30?.cnt ?? 0,
+      perDayCounts: perDay
+    }
+  }
+
+  getTopProfiles(limit = 10): any[] {
+    return this.queryAll(`
+      SELECT profile_id, profile_name,
+             COUNT(*) as session_count,
+             MAX(started_at) as last_used,
+             AVG(duration_ms) as avg_duration
+      FROM sessions
+      WHERE started_at >= datetime('now', '-30 days')
+      GROUP BY profile_id
+      ORDER BY session_count DESC
+      LIMIT ?
+    `, [limit])
+  }
+
+  getSessionsByProfile(profileId: string, limit = 20): any[] {
+    return this.queryAll(
+      `SELECT * FROM sessions WHERE profile_id = ? ORDER BY started_at DESC LIMIT ?`,
+      [profileId, limit]
+    )
+  }
+
+  getDatabaseSizeBytes(): number {
+    try {
+      const { statSync } = require('fs')
+      const stat = statSync(this.dbPath)
+      return stat.size
+    } catch {
+      return 0
+    }
   }
 }

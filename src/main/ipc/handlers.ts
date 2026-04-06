@@ -18,6 +18,7 @@ import { pushProfiles, pullProfiles, getSyncState, getSyncManifest, markPendingC
 import type { CreateProfileInput, CreateProxyInput, TeamRole, CreateWorkflowInput, UpdateWorkflowInput, ApiServerConfig } from '../../shared/types'
 import { parseNetscapeCookies, toNetscapeFormat } from '../utils/cookies'
 import { DetectionTestRunner } from '../detection-test'
+import { SessionTracker } from '../session-tracker'
 
 // ── Handler registration ───────────────────────────────────────────────────
 
@@ -122,6 +123,10 @@ export function registerIpcHandlers(): void {
 
     await bm.launchProfile(id, fingerprint, proxy, cookies.length > 0 ? cookies : undefined)
     db.updateProfileLastUsed(id)
+
+    // Phase 7: track session
+    const proxyLabel = proxy ? `${proxy.host}:${proxy.port}` : null
+    SessionTracker.getInstance().startSession(id, profile.name, proxyLabel)
   })
 
   ipcMain.handle('profiles:close', async (_event, id: string) => {
@@ -574,5 +579,59 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('profiles:deleteVersion', (_event, versionId: string) => {
     db.deleteProfileVersion(versionId)
+  })
+
+  // ── Sessions (Phase 7) ───────────────────────────────────────────────────
+
+  ipcMain.handle('sessions:list', (_event, filters?: { profileId?: string; limit?: number; offset?: number }) => {
+    return db.getSessions(filters)
+  })
+
+  ipcMain.handle('sessions:getByProfile', (_event, profileId: string, limit?: number) => {
+    return db.getSessionsByProfile(profileId, limit)
+  })
+
+  ipcMain.handle('sessions:getStats', () => {
+    return db.getSessionStats()
+  })
+
+  // ── Dashboard (Phase 7) ──────────────────────────────────────────────────
+
+  ipcMain.handle('dashboard:overview', () => {
+    const profiles = db.getAllProfiles()
+    const sessionStats = db.getSessionStats()
+    const detectionSummary = db.getDetectionTestSummary()
+    const proxies = db.getAllProxies()
+    const recentSessions = db.getSessions({ limit: 20 })
+    const topProfiles = db.getTopProfiles(10)
+    const detectionResults = db.getDetectionTestResults()
+    const syncLog = db.getSyncLog(1)
+    const dbSize = db.getDatabaseSizeBytes()
+
+    return {
+      totalProfiles: profiles.length,
+      activeSessions: sessionStats.activeSessions,
+      sessionsLast30Days: sessionStats.sessionsLast30Days,
+      avgDetectionScore: detectionSummary.averageScore,
+      totalDetectionTests: detectionSummary.totalTests,
+      perDayCounts: sessionStats.perDayCounts,
+      recentSessions,
+      topProfiles,
+      detectionTrend: detectionResults.slice(0, 10).map((r: any) => ({
+        id: r.id,
+        profileName: r.profile_name,
+        score: r.overall_score,
+        testedAt: r.tested_at
+      })),
+      proxyHealth: {
+        total: proxies.length,
+        healthy: proxies.filter((p: any) => p.is_healthy === 1).length,
+        unhealthy: proxies.filter((p: any) => p.is_healthy === 0 && p.last_checked_at).length,
+        untested: proxies.filter((p: any) => !p.last_checked_at).length
+      },
+      dbSizeBytes: dbSize,
+      lastSync: syncLog.length > 0 ? syncLog[0] : null,
+      appVersion: require('electron').app.getVersion()
+    }
   })
 }

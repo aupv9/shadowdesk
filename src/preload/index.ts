@@ -123,6 +123,14 @@ const api = {
     runTest: (profileId: string)        => ipcRenderer.invoke('detection:runTest', profileId),
     results: (profileId?: string)       => ipcRenderer.invoke('detection:results', profileId),
     summary: ()                         => ipcRenderer.invoke('detection:summary')
+  },
+  sessions: {
+    list:         (filters?: { profileId?: string; limit?: number; offset?: number }) => ipcRenderer.invoke('sessions:list', filters),
+    getByProfile: (profileId: string, limit?: number)                                 => ipcRenderer.invoke('sessions:getByProfile', profileId, limit),
+    getStats:     ()                                                                  => ipcRenderer.invoke('sessions:getStats')
+  },
+  dashboard: {
+    overview: () => ipcRenderer.invoke('dashboard:overview')
   }
 }
 

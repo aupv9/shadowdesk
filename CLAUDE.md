@@ -35,6 +35,7 @@ src/
 │   ├── api-server.ts      # Local REST API server for external automation control
 │   ├── workflow-templates.ts # 6 pre-built workflow templates
 │   ├── detection-test.ts  # Detection test runner — evaluates 20 vectors per profile
+│   ├── session-tracker.ts # Session lifecycle tracking (start, end, crash, page visits)
 │   ├── fingerprint/
 │   │   ├── injector.ts    # CDP injection pipeline (evaluateOnNewDocument + CDP APIs)
 │   │   ├── cdp-evasion.ts # Advanced CDP evasion — hides DevTools/automation traces
@@ -57,6 +58,7 @@ src/
         ├── App.tsx                         # Root: Sidebar + section router
         ├── components/
         │   ├── Layout/{Sidebar,Header}.tsx
+        │   ├── Dashboard/                  # Analytics dashboard, session tracking, system health
         │   ├── ProfileManager/             # List, card, create modal
         │   ├── ProxyManager/               # Add/test/delete proxies
         │   ├── FingerprintEditor/          # Vector protection status dashboard (34 vectors)
@@ -65,12 +67,13 @@ src/
         │   ├── TeamManager/               # Team workspace, members, invites, audit log
         │   └── Settings/                  # App settings
         ├── stores/
-        │   ├── profileStore.ts  # Zustand — profiles + active sessions
-        │   ├── proxyStore.ts    # Zustand — proxies + test state
-        │   ├── authStore.ts     # Zustand — auth state + login/register/logout
-        │   ├── licenseStore.ts  # Zustand — license plan + usage
-        │   ├── teamStore.ts     # Zustand — team, members, invites, audit
-        │   └── syncStore.ts     # Zustand — cloud sync status + push/pull
+        │   ├── profileStore.ts   # Zustand — profiles + active sessions
+        │   ├── proxyStore.ts     # Zustand — proxies + test state
+        │   ├── dashboardStore.ts # Zustand — dashboard overview, sessions, analytics
+        │   ├── authStore.ts      # Zustand — auth state + login/register/logout
+        │   ├── licenseStore.ts   # Zustand — license plan + usage
+        │   ├── teamStore.ts      # Zustand — team, members, invites, audit
+        │   └── syncStore.ts      # Zustand — cloud sync status + push/pull
         └── types/index.ts       # Re-exports from shared/types + renderer-only types
 ```
 
@@ -117,6 +120,8 @@ Adding a new IPC channel requires updating all three files.
 
 **detection_tests**: `id, profile_id, profile_name, tested_at, overall_score, vectors (JSON), status`
 
+**sessions**: `id, profile_id, profile_name, started_at, ended_at, duration_ms, pages_visited, proxy_used, status`
+
 ## Fingerprint Presets (11 built-in)
 | Key | OS | Browser |
 |-----|-----|---------|
@@ -146,8 +151,10 @@ Adding a new IPC channel requires updating all three files.
 - **Phase 2** (Weeks 9–14): Advanced vectors, proxy rotation, UX polish ✅
 - **Phase 3** (Weeks 15–22): API client, licensing, team features, cloud sync ✅
 - **Phase 4** (Weeks 23–28): Automation API, RPA builder, mobile presets, workflow templates ✅
-- **Phase 5** (Weeks 29–34): Advanced CDP evasion, detection testing, iOS presets, new vectors ✅ **current**
-- **Phase 6** (Future): Custom Chromium build (C++ patches), advanced detection framework integration
+- **Phase 5** (Weeks 29–34): Advanced CDP evasion, detection testing, iOS presets, new vectors ✅
+- **Phase 6** (Weeks 35–40): Advanced detection framework, behavior simulation, timing defenses, profile versioning ✅
+- **Phase 7** (Weeks 41–46): Dashboard & analytics, session tracking, detection trends, system health monitor ✅ **current**
+- **Phase 8** (Future): Custom Chromium build (C++ patches), advanced proxy management
 
 ## Common Gotchas
 
