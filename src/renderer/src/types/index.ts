@@ -28,7 +28,10 @@ export type {
   AutomationStepResult,
   AutomationRunResult,
   CreateWorkflowInput,
-  UpdateWorkflowInput
+  UpdateWorkflowInput,
+  ApiServerConfig,
+  ApiServerStatus,
+  WorkflowTemplate
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'

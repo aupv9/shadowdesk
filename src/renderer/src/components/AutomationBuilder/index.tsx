@@ -10,14 +10,15 @@ import {
   XCircle,
   AlertCircle,
   Bot,
-  GripVertical,
-  Copy
+  FileCode,
+  Layers
 } from 'lucide-react'
 import { useAutomationStore } from '../../stores/automationStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { StepEditor } from './StepEditor'
 import { WorkflowCreateModal } from './WorkflowCreateModal'
-import type { AutomationWorkflow, AutomationStep, AutomationActionType } from '../../types'
+import { TemplatePickerModal } from './TemplatePickerModal'
+import type { AutomationStep } from '../../types'
 
 export function AutomationBuilder() {
   const {
@@ -29,6 +30,7 @@ export function AutomationBuilder() {
 
   const { profiles, activeSessions } = useProfileStore()
   const [showCreate, setShowCreate] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
   const [selectedProfileId, setSelectedProfileId] = useState<string>('')
 
   useEffect(() => {
@@ -103,6 +105,12 @@ export function AutomationBuilder() {
     stopWorkflow(selectedWorkflow.id, selectedProfileId)
   }
 
+  const handleTemplateCreated = async (workflow: any) => {
+    await fetchWorkflows()
+    selectWorkflow(workflow.id)
+    setShowTemplates(false)
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -114,13 +122,22 @@ export function AutomationBuilder() {
             {workflows.length} workflow{workflows.length !== 1 ? 's' : ''}
           </span>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-3 py-2 bg-ghost-600 hover:bg-ghost-700 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          New Workflow
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowTemplates(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors"
+          >
+            <Layers className="w-4 h-4" />
+            Templates
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-ghost-600 hover:bg-ghost-700 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Workflow
+          </button>
+        </div>
       </div>
 
       {/* Error banner */}
@@ -139,7 +156,7 @@ export function AutomationBuilder() {
             <div className="p-4 text-sm text-slate-500">Loading...</div>
           ) : workflows.length === 0 ? (
             <div className="p-4 text-sm text-slate-500">
-              No workflows yet. Create one to get started.
+              No workflows yet. Create one or pick a template.
             </div>
           ) : (
             <div className="py-2">
@@ -312,10 +329,17 @@ export function AutomationBuilder() {
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
               <Bot className="w-12 h-12 text-slate-700 mb-4" />
               <h2 className="text-lg font-medium text-slate-400 mb-2">Select or create a workflow</h2>
-              <p className="text-sm text-slate-500 max-w-md">
+              <p className="text-sm text-slate-500 max-w-md mb-4">
                 Build automation workflows to control browser profiles. Add steps like navigate, click,
                 type, screenshot, and more — then run them on any active profile.
               </p>
+              <button
+                onClick={() => setShowTemplates(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors"
+              >
+                <Layers className="w-4 h-4" />
+                Browse Templates
+              </button>
             </div>
           )}
         </div>
@@ -330,6 +354,14 @@ export function AutomationBuilder() {
             selectWorkflow(w.id)
             setShowCreate(false)
           }}
+        />
+      )}
+
+      {/* Template picker modal */}
+      {showTemplates && (
+        <TemplatePickerModal
+          onClose={() => setShowTemplates(false)}
+          onCreated={handleTemplateCreated}
         />
       )}
     </div>

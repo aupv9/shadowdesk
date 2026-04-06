@@ -31,9 +31,12 @@ src/
 │   ├── license.ts         # License validation, machine fingerprint, plan limits
 │   ├── team.ts            # Team CRUD, members, invites, shared profiles, audit log
 │   ├── sync.ts            # Cloud sync with E2E encryption (AES-256-GCM)
+│   ├── automation.ts      # AutomationEngine — 17 actions incl. conditional/loop
+│   ├── api-server.ts      # Local REST API server for external automation control
+│   ├── workflow-templates.ts # 6 pre-built workflow templates
 │   ├── fingerprint/
 │   │   ├── injector.ts    # CDP injection pipeline (evaluateOnNewDocument + CDP APIs)
-│   │   ├── presets.ts     # 5 built-in presets; resolveFingerprint() assigns deterministic seeds
+│   │   ├── presets.ts     # 8 built-in presets (5 desktop + 3 mobile); resolveFingerprint()
 │   │   └── scripts/       # JS override strings (returned as template literals)
 │   │       ├── navigator.ts  — UA, platform, hardware, screen, plugins, battery, media devices
 │   │       ├── canvas.ts     — noise injection on toDataURL/toBlob/getImageData
@@ -104,7 +107,7 @@ Adding a new IPC channel requires updating all three files.
 
 **sync_log**: `id, direction, profile_count, status, synced_at`
 
-## Fingerprint Presets (5 built-in)
+## Fingerprint Presets (8 built-in)
 | Key | OS | Browser |
 |-----|-----|---------|
 | `win10-chrome120` | Windows 10 | Chrome 120 |
@@ -112,6 +115,9 @@ Adding a new IPC channel requires updating all three files.
 | `mac-ventura-chrome120` | macOS Ventura | Chrome 120 |
 | `mac-sonoma-chrome121` | macOS Sonoma | Chrome 121 |
 | `linux-ubuntu-chrome120` | Ubuntu 22.04 | Chrome 120 |
+| `android-samsung-chrome120` | Android 13 (Samsung A54) | Chrome 120 |
+| `android-pixel-chrome121` | Android 14 (Pixel 7) | Chrome 121 |
+| `android-oppo-chrome120` | Android 13 (OPPO Reno) | Chrome 120 |
 
 ## Technology Choices & Rationale
 
@@ -125,8 +131,9 @@ Adding a new IPC channel requires updating all three files.
 ## Phase Roadmap (from PRD)
 - **Phase 1** (Weeks 1–8): MVP — profiles, fingerprint engine, proxy manager ✅
 - **Phase 2** (Weeks 9–14): Advanced vectors, proxy rotation, UX polish ✅
-- **Phase 3** (Weeks 15–22): API client, licensing, team features, cloud sync ✅ **current**
-- **Phase 4** (Weeks 23+): Custom Chromium build (C++ patches), automation API, RPA builder
+- **Phase 3** (Weeks 15–22): API client, licensing, team features, cloud sync ✅
+- **Phase 4** (Weeks 23–28): Automation API, RPA builder, mobile presets, workflow templates ✅ **current**
+- **Phase 5** (Future): Custom Chromium build (C++ patches), advanced CDP evasion
 
 ## Common Gotchas
 

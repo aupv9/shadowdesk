@@ -102,6 +102,17 @@ const api = {
     stop:      (workflowId: string, profileId: string)                => ipcRenderer.invoke('workflows:stop', workflowId, profileId),
     isRunning: (workflowId: string, profileId: string)                => ipcRenderer.invoke('workflows:isRunning', workflowId, profileId),
     runs:      (workflowId: string)                                   => ipcRenderer.invoke('workflows:runs', workflowId)
+  },
+  templates: {
+    list:               ()                                            => ipcRenderer.invoke('templates:list'),
+    get:                (id: string)                                   => ipcRenderer.invoke('templates:get', id),
+    createFromTemplate: (templateId: string, name?: string)            => ipcRenderer.invoke('templates:createFromTemplate', templateId, name)
+  },
+  apiServer: {
+    status: ()                                                         => ipcRenderer.invoke('apiServer:status'),
+    config: ()                                                         => ipcRenderer.invoke('apiServer:config'),
+    start:  (config?: { enabled?: boolean; port?: number; authToken?: string }) => ipcRenderer.invoke('apiServer:start', config),
+    stop:   ()                                                         => ipcRenderer.invoke('apiServer:stop')
   }
 }
 
