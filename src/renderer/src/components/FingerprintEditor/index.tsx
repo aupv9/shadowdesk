@@ -23,6 +23,9 @@ const VECTORS = [
   { category: 'API',       name: 'Media Devices',              risk: 'medium',   status: 'spoofed' },
   { category: 'API',       name: 'Speech Synthesis Voices',    risk: 'low',      status: 'spoofed' },
   { category: 'Browser',   name: 'Plugin / MimeType List',     risk: 'high',     status: 'spoofed' },
+  { category: 'Mobile',    name: 'Touch Points / Events',      risk: 'high',     status: 'spoofed' },
+  { category: 'Mobile',    name: 'Device Pixel Ratio',         risk: 'medium',   status: 'spoofed' },
+  { category: 'Mobile',    name: 'Mobile UA & Platform',       risk: 'critical', status: 'spoofed' },
 ]
 
 const RISK_BADGE: Record<string, string> = {
@@ -94,7 +97,7 @@ export function FingerprintEditor() {
               </div>
               <div className="flex items-center gap-1.5 mt-2 text-xs text-ghost-400">
                 <Info className="w-3.5 h-3.5" />
-                Layer 1 (CDP + JS). Layer 2 Chromium patches planned for Phase 4.
+                Layer 1 (CDP + JS) + mobile profiles. Layer 2 Chromium patches planned next.
               </div>
             </div>
           </div>

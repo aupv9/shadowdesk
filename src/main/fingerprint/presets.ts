@@ -211,6 +211,131 @@ export const FINGERPRINT_PRESETS: Record<string, FingerprintConfig> = {
     media: { audioInputs: 1, audioOutputs: 1, videoInputs: 0 },
     plugins: { mode: 'realistic' },
     speech: { mode: 'filter' }
+  },
+
+  // ── Phase 4: Mobile Presets (Android Chrome — SEA market) ──────────────
+
+  'android-samsung-chrome120': {
+    preset: 'android-samsung-chrome120',
+    os: { platform: 'Linux armv8l', version: '13.0.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Linux; Android 13; SM-A546E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36',
+      platform: 'Linux armv8l',
+      vendor: 'Google Inc.',
+      version: '120',
+      languages: ['vi-VN', 'en-US', 'en']
+    },
+    screen: {
+      width: 412,
+      height: 915,
+      availWidth: 412,
+      availHeight: 883,
+      colorDepth: 24,
+      pixelRatio: 2.625
+    },
+    hardware: { deviceMemory: 8, hardwareConcurrency: 8, maxTouchPoints: 5 },
+    locale: { language: 'vi-VN', languages: ['vi-VN', 'en-US', 'en'], timezone: 'Asia/Ho_Chi_Minh' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Qualcomm',
+      renderer: 'Adreno (TM) 619',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Roboto', 'Droid Sans', 'Noto Sans', 'Noto Color Emoji',
+        'Droid Serif', 'Noto Serif', 'Courier New'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 2 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' }
+  },
+
+  'android-pixel-chrome121': {
+    preset: 'android-pixel-chrome121',
+    os: { platform: 'Linux armv8l', version: '14.0.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.143 Mobile Safari/537.36',
+      platform: 'Linux armv8l',
+      vendor: 'Google Inc.',
+      version: '121',
+      languages: ['th-TH', 'en-US', 'en']
+    },
+    screen: {
+      width: 412,
+      height: 915,
+      availWidth: 412,
+      availHeight: 891,
+      colorDepth: 24,
+      pixelRatio: 2.625
+    },
+    hardware: { deviceMemory: 8, hardwareConcurrency: 8, maxTouchPoints: 5 },
+    locale: { language: 'th-TH', languages: ['th-TH', 'en-US', 'en'], timezone: 'Asia/Bangkok' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Google Inc. (ARM)',
+      renderer: 'ANGLE (ARM, Mali-G710 MC10, OpenGL ES 3.2)',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Roboto', 'Noto Sans', 'Noto Sans Thai', 'Noto Color Emoji',
+        'Droid Sans', 'Droid Serif', 'Courier New'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 2 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' }
+  },
+
+  'android-oppo-chrome120': {
+    preset: 'android-oppo-chrome120',
+    os: { platform: 'Linux armv8l', version: '13.0.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Linux; Android 13; CPH2385) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36',
+      platform: 'Linux armv8l',
+      vendor: 'Google Inc.',
+      version: '120',
+      languages: ['id-ID', 'en-US', 'en']
+    },
+    screen: {
+      width: 393,
+      height: 873,
+      availWidth: 393,
+      availHeight: 845,
+      colorDepth: 24,
+      pixelRatio: 2.75
+    },
+    hardware: { deviceMemory: 8, hardwareConcurrency: 8, maxTouchPoints: 5 },
+    locale: { language: 'id-ID', languages: ['id-ID', 'en-US', 'en'], timezone: 'Asia/Jakarta' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Qualcomm',
+      renderer: 'Adreno (TM) 730',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Roboto', 'Noto Sans', 'Noto Color Emoji',
+        'Droid Sans', 'Droid Serif', 'Courier New'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 2 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' }
   }
 }
 

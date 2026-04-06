@@ -4,6 +4,7 @@ import { Database } from './database'
 import { registerIpcHandlers } from './ipc/handlers'
 import { initAutoUpdater } from './auto-updater'
 import { initSyncWindow } from './sync'
+import { ApiServer } from './api-server'
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -77,6 +78,11 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+// Clean up API server on quit
+app.on('before-quit', async () => {
+  await ApiServer.getInstance().stop()
 })
 
 export { mainWindow }

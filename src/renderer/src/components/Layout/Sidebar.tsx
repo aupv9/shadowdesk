@@ -166,7 +166,7 @@ export function Sidebar({ active, onChange, profileCount, activeSessionCount, us
             Sign in
           </button>
         )}
-        <div className="text-[10px] text-slate-600 mt-1.5 px-2">v0.2.0 Beta</div>
+        <div className="text-[10px] text-slate-600 mt-1.5 px-2">v0.3.0 Beta</div>
       </div>
     </aside>
   )

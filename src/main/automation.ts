@@ -8,6 +8,8 @@ import type {
   AutomationWorkflow
 } from '../shared/types'
 import type { Page } from 'puppeteer-core'
+import http from 'http'
+import https from 'https'
 
 export class AutomationEngine {
   private static instance: AutomationEngine
@@ -52,20 +54,12 @@ export class AutomationEngine {
     let runError: string | undefined
 
     try {
-      for (const step of workflow.steps) {
-        if (control.abort) {
-          status = 'stopped'
-          break
-        }
-
-        const result = await this.executeStep(page, step)
-        stepResults.push(result)
-
-        if (!result.success) {
-          status = 'failed'
-          runError = result.error
-          break
-        }
+      const result = await this.executeSteps(page, workflow.steps, control, stepResults)
+      if (result === 'stopped') status = 'stopped'
+      else if (result === 'failed') {
+        status = 'failed'
+        const lastFailed = stepResults.findLast((r) => !r.success)
+        if (lastFailed) runError = lastFailed.error
       }
     } catch (err: any) {
       status = 'failed'
@@ -99,6 +93,24 @@ export class AutomationEngine {
     return runResult
   }
 
+  /** Execute a list of steps, collecting results. Returns overall status. */
+  private async executeSteps(
+    page: Page,
+    steps: AutomationStep[],
+    control: { abort: boolean },
+    stepResults: AutomationStepResult[]
+  ): Promise<'completed' | 'failed' | 'stopped'> {
+    for (const step of steps) {
+      if (control.abort) return 'stopped'
+
+      const result = await this.executeStep(page, step, control, stepResults)
+      stepResults.push(result)
+
+      if (!result.success) return 'failed'
+    }
+    return 'completed'
+  }
+
   stopWorkflow(workflowId: string, profileId: string): void {
     const runKey = `${workflowId}:${profileId}`
     const control = this.running.get(runKey)
@@ -109,10 +121,15 @@ export class AutomationEngine {
     return this.running.has(`${workflowId}:${profileId}`)
   }
 
-  private async executeStep(page: Page, step: AutomationStep): Promise<AutomationStepResult> {
+  private async executeStep(
+    page: Page,
+    step: AutomationStep,
+    control: { abort: boolean },
+    allResults: AutomationStepResult[]
+  ): Promise<AutomationStepResult> {
     const start = Date.now()
     try {
-      const output = await this.runAction(page, step)
+      const output = await this.runAction(page, step, control, allResults)
       return {
         stepId: step.id,
         action: step.action,
@@ -131,7 +148,12 @@ export class AutomationEngine {
     }
   }
 
-  private async runAction(page: Page, step: AutomationStep): Promise<any> {
+  private async runAction(
+    page: Page,
+    step: AutomationStep,
+    control: { abort: boolean },
+    allResults: AutomationStepResult[]
+  ): Promise<any> {
     const { action, params } = step
 
     switch (action) {
@@ -203,9 +225,86 @@ export class AutomationEngine {
         return { result }
       }
 
+      // ── Phase 4 actions ──────────────────────────────────────────────
+
+      case 'hover':
+        await page.waitForSelector(params.selector, { timeout: params.timeout ?? 10000 })
+        await page.hover(params.selector)
+        return { selector: params.selector }
+
+      case 'rightClick':
+        await page.waitForSelector(params.selector, { timeout: params.timeout ?? 10000 })
+        await page.click(params.selector, { button: 'right' })
+        return { selector: params.selector }
+
+      case 'setAttribute':
+        await page.waitForSelector(params.selector, { timeout: params.timeout ?? 10000 })
+        await page.$eval(
+          params.selector,
+          (el: Element, attr: string, val: string) => el.setAttribute(attr, val),
+          params.attribute,
+          params.value
+        )
+        return { selector: params.selector, attribute: params.attribute, value: params.value }
+
+      case 'httpRequest': {
+        const response = await this.makeHttpRequest(
+          params.url,
+          params.method ?? 'GET',
+          params.headers,
+          params.body
+        )
+        return response
+      }
+
+      case 'conditional': {
+        // Evaluate condition: check if selector exists on page
+        const exists = await page.$(params.selector).then((el: any) => !!el)
+        const branch = exists ? (params.thenSteps ?? []) : (params.elseSteps ?? [])
+        if (branch.length > 0) {
+          const branchStatus = await this.executeSteps(page, branch, control, allResults)
+          if (branchStatus === 'stopped') throw new Error('Workflow stopped')
+          if (branchStatus === 'failed') throw new Error('Conditional branch failed')
+        }
+        return { condition: params.selector, matched: exists, branchSteps: branch.length }
+      }
+
+      case 'loop': {
+        const times = params.times ?? 1
+        const loopSteps: AutomationStep[] = params.steps ?? []
+        let iterations = 0
+        for (let i = 0; i < times; i++) {
+          if (control.abort) throw new Error('Workflow stopped')
+          const loopStatus = await this.executeSteps(page, loopSteps, control, allResults)
+          if (loopStatus === 'stopped') throw new Error('Workflow stopped')
+          if (loopStatus === 'failed') throw new Error(`Loop iteration ${i + 1} failed`)
+          iterations++
+        }
+        return { iterations, totalSteps: loopSteps.length * times }
+      }
+
       default:
         throw new Error(`Unknown action: ${action}`)
     }
+  }
+
+  private makeHttpRequest(
+    url: string,
+    method: string,
+    headers?: Record<string, string>,
+    body?: string
+  ): Promise<{ status: number; body: string }> {
+    return new Promise((resolve, reject) => {
+      const lib = url.startsWith('https') ? https : http
+      const req = lib.request(url, { method, headers: headers ?? {} }, (res) => {
+        let data = ''
+        res.on('data', (chunk) => (data += chunk))
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, body: data }))
+      })
+      req.on('error', reject)
+      if (body) req.write(body)
+      req.end()
+    })
   }
 
   private async getActivePage(profileId: string): Promise<Page | null> {
