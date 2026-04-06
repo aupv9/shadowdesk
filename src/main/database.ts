@@ -140,6 +140,34 @@ export class Database {
       CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
       CREATE INDEX IF NOT EXISTS idx_audit_user     ON audit_log(user_id);
     `)
+
+    // Phase 4 migration: automation workflows
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS workflows (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        steps TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS workflow_runs (
+        id TEXT PRIMARY KEY,
+        workflow_id TEXT NOT NULL,
+        profile_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'running',
+        step_results TEXT DEFAULT '[]',
+        error TEXT,
+        started_at TEXT DEFAULT (datetime('now')),
+        completed_at TEXT,
+        FOREIGN KEY(workflow_id) REFERENCES workflows(id) ON DELETE CASCADE,
+        FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow ON workflow_runs(workflow_id);
+      CREATE INDEX IF NOT EXISTS idx_workflow_runs_profile  ON workflow_runs(profile_id);
+    `)
   }
 
   // ── Profile CRUD ──────────────────────────────────────────────────────────
@@ -356,5 +384,61 @@ export class Database {
 
   getSyncLog(limit = 20): any[] {
     return this.queryAll('SELECT * FROM sync_log ORDER BY synced_at DESC LIMIT ?', [limit])
+  }
+
+  // ── Workflow CRUD ─────────────────────────────────────────────────────────
+
+  getAllWorkflows(): any[] {
+    return this.queryAll('SELECT * FROM workflows ORDER BY updated_at DESC')
+  }
+
+  getWorkflow(id: string): any {
+    return this.queryOne('SELECT * FROM workflows WHERE id = ?', [id])
+  }
+
+  createWorkflow(workflow: { id: string; name: string; description?: string; steps: any[] }): void {
+    this.run(
+      'INSERT INTO workflows (id, name, description, steps) VALUES (?, ?, ?, ?)',
+      [workflow.id, workflow.name, workflow.description ?? '', JSON.stringify(workflow.steps)]
+    )
+  }
+
+  updateWorkflow(id: string, data: { name?: string; description?: string; steps?: any[] }): void {
+    const sets: string[] = []
+    const vals: any[] = []
+    if (data.name !== undefined) { sets.push('name = ?'); vals.push(data.name) }
+    if (data.description !== undefined) { sets.push('description = ?'); vals.push(data.description) }
+    if (data.steps !== undefined) { sets.push('steps = ?'); vals.push(JSON.stringify(data.steps)) }
+    if (sets.length === 0) return
+    sets.push("updated_at = datetime('now')")
+    this.run(`UPDATE workflows SET ${sets.join(', ')} WHERE id = ?`, [...vals, id])
+  }
+
+  deleteWorkflow(id: string): void {
+    this.run('DELETE FROM workflows WHERE id = ?', [id])
+  }
+
+  // ── Workflow Run Log ──────────────────────────────────────────────────────
+
+  addWorkflowRun(run: {
+    id: string
+    workflow_id: string
+    profile_id: string
+    status: string
+    step_results: any[]
+    error?: string
+    completed_at: string
+  }): void {
+    this.run(
+      'INSERT INTO workflow_runs (id, workflow_id, profile_id, status, step_results, error, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [run.id, run.workflow_id, run.profile_id, run.status, JSON.stringify(run.step_results), run.error ?? null, run.completed_at]
+    )
+  }
+
+  getWorkflowRuns(workflowId: string, limit = 20): any[] {
+    return this.queryAll(
+      'SELECT * FROM workflow_runs WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?',
+      [workflowId, limit]
+    )
   }
 }

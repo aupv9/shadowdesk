@@ -295,3 +295,69 @@ export interface SyncManifest {
   last_modified: string
   checksum: string
 }
+
+// ─── Automation / RPA Types ─────────────────────────────────────────────────
+
+export type AutomationActionType =
+  | 'navigate'
+  | 'click'
+  | 'type'
+  | 'wait'
+  | 'waitForSelector'
+  | 'screenshot'
+  | 'extractText'
+  | 'scroll'
+  | 'select'
+  | 'keyPress'
+  | 'evaluate'
+  | 'conditional'
+  | 'loop'
+
+export interface AutomationStep {
+  id: string
+  action: AutomationActionType
+  label?: string
+  params: Record<string, any>
+  // For conditional: { selector: string, thenSteps: string[], elseSteps: string[] }
+  // For loop: { times: number, steps: string[] }
+}
+
+export interface AutomationWorkflow {
+  id: string
+  name: string
+  description?: string
+  steps: AutomationStep[]
+  created_at: string
+  updated_at: string
+}
+
+export interface AutomationStepResult {
+  stepId: string
+  action: AutomationActionType
+  success: boolean
+  duration_ms: number
+  output?: any
+  error?: string
+}
+
+export interface AutomationRunResult {
+  workflowId: string
+  profileId: string
+  status: 'completed' | 'failed' | 'stopped'
+  startedAt: string
+  completedAt: string
+  stepResults: AutomationStepResult[]
+  error?: string
+}
+
+export interface CreateWorkflowInput {
+  name: string
+  description?: string
+  steps: AutomationStep[]
+}
+
+export interface UpdateWorkflowInput {
+  name?: string
+  description?: string
+  steps?: AutomationStep[]
+}
