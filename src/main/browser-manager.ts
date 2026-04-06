@@ -3,6 +3,7 @@ import { app } from 'electron'
 import { mkdir } from 'fs/promises'
 import puppeteer, { Browser, Page } from 'puppeteer-core'
 import { FingerprintInjector } from './fingerprint/injector'
+import { SessionTracker } from './session-tracker'
 import type { FingerprintConfig, ProxyConfig } from '../shared/types'
 
 interface ActiveSession {
@@ -79,14 +80,26 @@ export class BrowserManager {
       startedAt: new Date()
     })
 
+    // Track page visits for session analytics
+    const tracker = SessionTracker.getInstance()
+    browser.on('targetcreated', (target) => {
+      if (target.type() === 'page') {
+        tracker.recordPageVisit(profileId)
+      }
+    })
+
     browser.on('disconnected', () => {
       this.sessions.delete(profileId)
+      // If session tracker still has this as active, it was an unexpected disconnect
+      tracker.crashSession(profileId)
     })
   }
 
   async closeProfile(profileId: string): Promise<void> {
     const session = this.sessions.get(profileId)
     if (session) {
+      // End session tracking before closing (so disconnected handler doesn't mark as crashed)
+      SessionTracker.getInstance().endSession(profileId)
       await session.browser.close()
       this.sessions.delete(profileId)
     }

@@ -110,5 +110,34 @@ interface Window {
       results: (profileId?: string) => Promise<import('./types').DetectionTestResult[]>
       summary: () => Promise<import('./types').DetectionTestSummary>
     }
+    sessions: {
+      list:         (filters?: { profileId?: string; limit?: number; offset?: number }) => Promise<any[]>
+      getByProfile: (profileId: string, limit?: number)                                 => Promise<any[]>
+      getStats:     ()                                                                  => Promise<{
+        totalSessions: number
+        activeSessions: number
+        totalDuration: number
+        avgDuration: number
+        sessionsLast30Days: number
+        perDayCounts: { date: string; count: number }[]
+      }>
+    }
+    dashboard: {
+      overview: () => Promise<{
+        totalProfiles: number
+        activeSessions: number
+        sessionsLast30Days: number
+        avgDetectionScore: number
+        totalDetectionTests: number
+        perDayCounts: { date: string; count: number }[]
+        recentSessions: any[]
+        topProfiles: any[]
+        detectionTrend: { id: string; profileName: string; score: number; testedAt: string }[]
+        proxyHealth: { total: number; healthy: number; unhealthy: number; untested: number }
+        dbSizeBytes: number
+        lastSync: any
+        appVersion: string
+      }>
+    }
   }
 }

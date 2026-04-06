@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Sidebar } from './components/Layout/Sidebar'
+import { DashboardPage } from './components/Dashboard'
 import { ProfileManager } from './components/ProfileManager'
 import { ProxyManager } from './components/ProxyManager'
 import { FingerprintEditor } from './components/FingerprintEditor'
@@ -14,7 +15,7 @@ import { useLicenseStore } from './stores/licenseStore'
 import type { NavSection } from './types'
 
 export default function App() {
-  const [section, setSection] = useState<NavSection>('profiles')
+  const [section, setSection] = useState<NavSection>('dashboard')
   const { profiles, activeSessions } = useProfileStore()
   const auth = useAuthStore()
   const license = useLicenseStore()
@@ -35,6 +36,7 @@ export default function App() {
         plan={license.license?.plan ?? 'free'}
       />
       <main className="flex-1 overflow-hidden flex flex-col bg-slate-900/50">
+        {section === 'dashboard'   && <DashboardPage />}
         {section === 'profiles'    && <ProfileManager />}
         {section === 'proxies'     && <ProxyManager />}
         {section === 'fingerprint' && <FingerprintEditor />}

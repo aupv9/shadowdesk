@@ -5,6 +5,7 @@ import {
   Settings,
   Ghost,
   LayoutGrid,
+  LayoutDashboard,
   Download,
   ArrowUpCircle,
   Users,
@@ -40,6 +41,7 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS: { key: NavSection; icon: React.ElementType; label: string }[] = [
+  { key: 'dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
   { key: 'profiles',    icon: LayoutGrid,   label: 'Profiles' },
   { key: 'proxies',     icon: Globe,        label: 'Proxies' },
   { key: 'fingerprint', icon: Fingerprint,  label: 'Fingerprint' },
