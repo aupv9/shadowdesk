@@ -176,7 +176,7 @@ export function SettingsPage() {
             </div>
             <div className="flex justify-between">
               <span>Phase</span>
-              <span className="text-slate-300">2 - Hardening</span>
+              <span className="text-slate-300">3 - Monetization + Team</span>
             </div>
             <div className="flex justify-between">
               <span>Fingerprint Layer</span>

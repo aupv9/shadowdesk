@@ -26,6 +26,11 @@ src/
 │   ├── index.ts           # App entry — window creation, DB init, IPC registration
 │   ├── database.ts        # sql.js SQLite wrapper (async init, sync queries)
 │   ├── browser-manager.ts # Chromium profile launcher via puppeteer-core
+│   ├── api-client.ts      # HTTP client for backend API (token auth, refresh, retry)
+│   ├── auth.ts            # Auth service (login, register, logout, token mgmt)
+│   ├── license.ts         # License validation, machine fingerprint, plan limits
+│   ├── team.ts            # Team CRUD, members, invites, shared profiles, audit log
+│   ├── sync.ts            # Cloud sync with E2E encryption (AES-256-GCM)
 │   ├── fingerprint/
 │   │   ├── injector.ts    # CDP injection pipeline (evaluateOnNewDocument + CDP APIs)
 │   │   ├── presets.ts     # 5 built-in presets; resolveFingerprint() assigns deterministic seeds
@@ -37,7 +42,7 @@ src/
 │   │       └── fonts.ts      — document.fonts.check whitelist + measureText noise
 │   └── ipc/handlers.ts    # All ipcMain.handle() registrations
 ├── preload/index.ts       # contextBridge — exposes window.api to renderer
-├── shared/types.ts        # Shared TypeScript interfaces (Profile, ProxyConfig, FingerprintConfig…)
+├── shared/types.ts        # Shared TypeScript interfaces (Profile, ProxyConfig, FingerprintConfig, User, Team, License, Sync…)
 └── renderer/              # React UI (Vite dev server in dev mode)
     └── src/
         ├── App.tsx                         # Root: Sidebar + section router
@@ -45,10 +50,17 @@ src/
         │   ├── Layout/{Sidebar,Header}.tsx
         │   ├── ProfileManager/             # List, card, create modal
         │   ├── ProxyManager/               # Add/test/delete proxies
-        │   └── FingerprintEditor/          # Vector protection status dashboard
+        │   ├── FingerprintEditor/          # Vector protection status dashboard
+        │   ├── Account/                    # Auth, license, cloud sync UI
+        │   ├── TeamManager/               # Team workspace, members, invites, audit log
+        │   └── Settings/                  # App settings
         ├── stores/
         │   ├── profileStore.ts  # Zustand — profiles + active sessions
-        │   └── proxyStore.ts    # Zustand — proxies + test state
+        │   ├── proxyStore.ts    # Zustand — proxies + test state
+        │   ├── authStore.ts     # Zustand — auth state + login/register/logout
+        │   ├── licenseStore.ts  # Zustand — license plan + usage
+        │   ├── teamStore.ts     # Zustand — team, members, invites, audit
+        │   └── syncStore.ts     # Zustand — cloud sync status + push/pull
         └── types/index.ts       # Re-exports from shared/types + renderer-only types
 ```
 
@@ -88,6 +100,10 @@ Adding a new IPC channel requires updating all three files.
 
 **proxies**: `id, name, type, host, port, username, password, country, latency_ms, is_healthy, last_checked_at, created_at`
 
+**audit_log**: `id, user_id, user_name, action, target_id, target_name, timestamp, ip_address`
+
+**sync_log**: `id, direction, profile_count, status, synced_at`
+
 ## Fingerprint Presets (5 built-in)
 | Key | OS | Browser |
 |-----|-----|---------|
@@ -107,9 +123,9 @@ Adding a new IPC channel requires updating all three files.
 | Icons | lucide-react | Tree-shakeable, consistent stroke style |
 
 ## Phase Roadmap (from PRD)
-- **Phase 1** (Weeks 1–8): MVP — profiles, fingerprint engine, proxy manager ← **current**
-- **Phase 2** (Weeks 9–14): Advanced vectors, proxy rotation, UX polish
-- **Phase 3** (Weeks 15–22): Go backend, licensing (Stripe), team features, cloud sync
+- **Phase 1** (Weeks 1–8): MVP — profiles, fingerprint engine, proxy manager ✅
+- **Phase 2** (Weeks 9–14): Advanced vectors, proxy rotation, UX polish ✅
+- **Phase 3** (Weeks 15–22): API client, licensing, team features, cloud sync ✅ **current**
 - **Phase 4** (Weeks 23+): Custom Chromium build (C++ patches), automation API, RPA builder
 
 ## Common Gotchas

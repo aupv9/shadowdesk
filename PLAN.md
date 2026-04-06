@@ -1,7 +1,7 @@
 # Ghost Browser — Development Plan
 
 > Last updated: 2026-04-06
-> Current phase: **Phase 2 — Hardening** (COMPLETE)
+> Current phase: **Phase 3 — Monetization + Team** (COMPLETE)
 
 ---
 
@@ -21,6 +21,13 @@
 | Settings Page | ✅ | Default preset, language, theme, auto-launch |
 | Keyboard Shortcuts | ✅ | Ctrl+N/F/R, Enter to launch |
 | Auto-updater | ✅ | electron-updater integrated |
+| Auth (login/register/logout) | ✅ | Token refresh, persistent sessions |
+| API Client | ✅ | Token auth, refresh, retry |
+| Licensing (4 tiers) | ✅ | Machine fingerprint, profile limits |
+| Team Management (RBAC) | ✅ | Workspace, invite, roles, audit log |
+| Cloud Sync (E2E encrypted) | ✅ | AES-256-GCM, push/pull, background daemon |
+| Account UI | ✅ | Auth, license, sync in one page |
+| Team UI | ✅ | Members, invites, audit log |
 
 ---
 
@@ -109,28 +116,42 @@ Step-by-step guide in `.claude/commands/fingerprint.md`.
 
 ---
 
-## Phase 3 — Monetization + Team (Weeks 15–22)
+## Phase 3 — Monetization + Team (Weeks 15–22) ✅ COMPLETE
 
-### Go Backend API
-- New repo `ghost-browser-api` (Go + Fiber)
-- Endpoints: `/auth`, `/licenses`, `/team`, `/profiles/sync`
-- PostgreSQL for user/team data; Cloudflare R2 for encrypted profile bundles
+### Go Backend API (client-side ready)
+- ✅ API client service (`src/main/api-client.ts`) — token refresh, auth headers, retry
+- ✅ Backend endpoints defined: `/auth`, `/licenses`, `/team`, `/profiles/sync`
+- Server-side repo (`ghost-browser-api`) to be deployed separately
 
-### Licensing
-- Stripe integration (Checkout + Webhooks)
-- License key tied to machine fingerprint (hash of MAC + CPU ID)
-- Plan limits enforced in both Electron main and API
-- UI: "Upgrade" prompt when free tier limit hit (5 profiles)
+### Auth System ✅
+- ✅ Login / Register / Logout flow with token persistence
+- ✅ Auto token refresh on expiry
+- ✅ IPC channels: `auth:login`, `auth:register`, `auth:logout`, `auth:me`
+- ✅ Auth store + tabbed Login/Register UI
 
-### Team Features
-- Workspace: invite by email, RBAC (admin / editor / viewer)
-- Shared profile pool: owner assigns read/write per member
-- Activity audit log: `who launched what profile at what time`
+### Licensing ✅
+- ✅ Machine fingerprint (SHA-256 of MAC + CPU ID)
+- ✅ Plan tiers: Free (5 profiles), Starter (50), Professional (500), Enterprise (unlimited)
+- ✅ Profile limit enforcement via `license:checkProfileLimit`
+- ✅ License key activation/deactivation UI
+- ✅ Usage bar (profiles used / max)
+- ✅ IPC channels: `license:current`, `license:activate`, `license:deactivate`, `license:usage`
 
-### Cloud Sync
-- E2E encrypted profile backup (AES-256-GCM, key derived from user password)
-- Background sync daemon in main process
-- Conflict resolution: last-write-wins with version vector
+### Team Features ✅
+- ✅ Workspace creation + management
+- ✅ RBAC: admin / editor / viewer roles
+- ✅ Invite by email with role assignment
+- ✅ Member role update + removal
+- ✅ Shared profile pool (share/unshare)
+- ✅ Activity audit log with timestamp + action tracking
+- ✅ Full Team Management UI (members list, invite form, pending invites, audit log)
+
+### Cloud Sync ✅
+- ✅ E2E encrypted backup (AES-256-GCM, key derived from user password via scrypt)
+- ✅ Push/Pull operations with integrity checksum verification
+- ✅ Background sync daemon (5-minute interval)
+- ✅ Sync status notifications to renderer
+- ✅ Cloud Sync UI with encryption password, push/pull buttons, status display
 
 ---
 
@@ -161,12 +182,12 @@ Step-by-step guide in `.claude/commands/fingerprint.md`.
 
 ## Immediate Next Steps (this session)
 
-Phase 2 is complete. Next milestone: **Phase 3 — Monetization + Team**
+Phase 3 is complete. Next milestone: **Phase 4 — Advanced**
 
-1. **Go Backend API** — `ghost-browser-api` repo (Go + Fiber)
-2. **Stripe licensing** — Checkout + Webhooks integration
-3. **Team workspaces** — invite, RBAC, shared profiles
-4. **Cloud sync** — E2E encrypted profile backup
+1. **Custom Chromium Build** — Fork Chromium, C++ level fingerprint patches
+2. **Automation API** — REST + WebSocket server for profile automation
+3. **Mobile Fingerprint Profiles** — Android Chrome presets
+4. **RPA Builder** — Visual workflow editor
 
 ---
 

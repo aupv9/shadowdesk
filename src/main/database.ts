@@ -115,6 +115,31 @@ export class Database {
     // Migration: add rotation columns to profiles if not present
     try { this.db.exec(`ALTER TABLE profiles ADD COLUMN rotation_mode TEXT DEFAULT 'none'`) } catch { /* already exists */ }
     try { this.db.exec(`ALTER TABLE profiles ADD COLUMN rotation_index INTEGER DEFAULT 0`) } catch { /* already exists */ }
+
+    // Phase 3 migration: sync tracking + audit log
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS sync_log (
+        id TEXT PRIMARY KEY,
+        direction TEXT NOT NULL,
+        profile_count INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'success',
+        synced_at TEXT DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        user_name TEXT,
+        action TEXT NOT NULL,
+        target_id TEXT,
+        target_name TEXT,
+        timestamp TEXT DEFAULT (datetime('now')),
+        ip_address TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_audit_user     ON audit_log(user_id);
+    `)
   }
 
   // ── Profile CRUD ──────────────────────────────────────────────────────────
@@ -287,5 +312,49 @@ export class Database {
 
   deleteProxy(id: string): void {
     this.run('DELETE FROM proxies WHERE id = ?', [id])
+  }
+
+  // ── Audit Log ──────────────────────────────────────────────────────────────
+
+  addAuditEntry(entry: {
+    id: string
+    user_id?: string
+    user_name?: string
+    action: string
+    target_id?: string
+    target_name?: string
+  }): void {
+    this.run(
+      `INSERT INTO audit_log (id, user_id, user_name, action, target_id, target_name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        entry.id,
+        entry.user_id ?? null,
+        entry.user_name ?? null,
+        entry.action,
+        entry.target_id ?? null,
+        entry.target_name ?? null
+      ]
+    )
+  }
+
+  getAuditLog(limit = 50, offset = 0): any[] {
+    return this.queryAll(
+      'SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ? OFFSET ?',
+      [limit, offset]
+    )
+  }
+
+  // ── Sync Log ───────────────────────────────────────────────────────────────
+
+  addSyncEntry(entry: { id: string; direction: string; profile_count: number; status: string }): void {
+    this.run(
+      'INSERT INTO sync_log (id, direction, profile_count, status) VALUES (?, ?, ?, ?)',
+      [entry.id, entry.direction, entry.profile_count, entry.status]
+    )
+  }
+
+  getSyncLog(limit = 20): any[] {
+    return this.queryAll('SELECT * FROM sync_log ORDER BY synced_at DESC LIMIT ?', [limit])
   }
 }

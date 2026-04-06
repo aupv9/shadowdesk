@@ -3,6 +3,7 @@ import { join } from 'path'
 import { Database } from './database'
 import { registerIpcHandlers } from './ipc/handlers'
 import { initAutoUpdater } from './auto-updater'
+import { initSyncWindow } from './sync'
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -60,6 +61,11 @@ app.whenReady().then(async () => {
   // Auto-updater (only in production builds)
   if (!isDev && mainWindow) {
     initAutoUpdater(mainWindow)
+  }
+
+  // Initialize sync window reference for status notifications
+  if (mainWindow) {
+    initSyncWindow(mainWindow)
   }
 
   app.on('activate', function () {
