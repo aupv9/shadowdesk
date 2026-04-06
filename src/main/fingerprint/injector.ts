@@ -9,8 +9,15 @@ import { buildWebGlScript } from './scripts/webgl'
 import { buildAudioScript } from './scripts/audio'
 import { buildFontsScript } from './scripts/fonts'
 import { buildWebRtcScript } from './scripts/webrtc'
+import { buildPermissionsScript } from './scripts/permissions'
+import { buildStorageScript } from './scripts/storage'
+import { buildNetworkScript } from './scripts/network'
+import { buildPerformanceScript } from './scripts/performance'
+import { CdpEvasion } from './cdp-evasion'
 
 export class FingerprintInjector {
+  private cdpEvasion = new CdpEvasion()
+
   async injectAll(page: Page, fp: FingerprintConfig): Promise<void> {
     const scripts = [
       buildNavigatorScript(fp.browser, fp.hardware, fp.screen, fp.media),
@@ -21,13 +28,21 @@ export class FingerprintInjector {
       buildFontsScript(fp.fonts),
       buildWebRtcScript(fp.webrtc),
       buildClientRectsScript(fp.canvas.noiseSeed),
-      buildSpeechScript(fp.speech ?? { mode: 'filter' }, fp.os)
+      buildSpeechScript(fp.speech ?? { mode: 'filter' }, fp.os),
+      // Phase 5: New vectors
+      buildPermissionsScript(fp.os.platform),
+      buildStorageScript(),
+      buildNetworkScript(fp.network?.connectionType ?? '4g'),
+      buildPerformanceScript()
     ].filter(Boolean)
 
     const combined = scripts.join('\n;\n')
 
     try {
-      // Inject before any page JS runs
+      // Phase 5: Apply CDP evasion FIRST (before any page JS)
+      await this.cdpEvasion.apply(page)
+
+      // Inject fingerprint overrides before any page JS runs
       await page.evaluateOnNewDocument(combined)
 
       // Override HTTP headers

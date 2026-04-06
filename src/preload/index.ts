@@ -113,6 +113,11 @@ const api = {
     config: ()                                                         => ipcRenderer.invoke('apiServer:config'),
     start:  (config?: { enabled?: boolean; port?: number; authToken?: string }) => ipcRenderer.invoke('apiServer:start', config),
     stop:   ()                                                         => ipcRenderer.invoke('apiServer:stop')
+  },
+  detection: {
+    runTest: (profileId: string)        => ipcRenderer.invoke('detection:runTest', profileId),
+    results: (profileId?: string)       => ipcRenderer.invoke('detection:results', profileId),
+    summary: ()                         => ipcRenderer.invoke('detection:summary')
   }
 }
 

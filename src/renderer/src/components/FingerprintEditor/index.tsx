@@ -4,28 +4,41 @@ import { Header } from '../Layout/Header'
 import { useProfileStore } from '../../stores/profileStore'
 
 const VECTORS = [
-  { category: 'Browser',   name: 'User-Agent / UA-CH',        risk: 'critical', status: 'spoofed' },
-  { category: 'Browser',   name: 'Platform / OS Version',     risk: 'critical', status: 'spoofed' },
-  { category: 'Graphics',  name: 'Canvas Fingerprint',         risk: 'critical', status: 'spoofed' },
-  { category: 'Graphics',  name: 'WebGL Vendor/Renderer',      risk: 'high',     status: 'spoofed' },
-  { category: 'Graphics',  name: 'WebGL Parameters',           risk: 'high',     status: 'spoofed' },
-  { category: 'Audio',     name: 'AudioContext',                risk: 'high',     status: 'spoofed' },
-  { category: 'Hardware',  name: 'Screen Resolution',          risk: 'medium',   status: 'spoofed' },
-  { category: 'Hardware',  name: 'Device Memory',              risk: 'medium',   status: 'spoofed' },
-  { category: 'Hardware',  name: 'Hardware Concurrency',       risk: 'medium',   status: 'spoofed' },
-  { category: 'Network',   name: 'WebRTC Local IP',            risk: 'critical', status: 'spoofed' },
-  { category: 'Locale',    name: 'Timezone',                   risk: 'high',     status: 'spoofed' },
-  { category: 'Locale',    name: 'Language / Accept-Language', risk: 'high',     status: 'spoofed' },
-  { category: 'Fonts',     name: 'Font Enumeration',           risk: 'high',     status: 'spoofed' },
-  { category: 'Fonts',     name: 'Font Metrics',               risk: 'medium',   status: 'spoofed' },
-  { category: 'DOM',       name: 'ClientRects noise',          risk: 'medium',   status: 'spoofed' },
-  { category: 'API',       name: 'Battery API',                risk: 'low',      status: 'spoofed' },
-  { category: 'API',       name: 'Media Devices',              risk: 'medium',   status: 'spoofed' },
-  { category: 'API',       name: 'Speech Synthesis Voices',    risk: 'low',      status: 'spoofed' },
-  { category: 'Browser',   name: 'Plugin / MimeType List',     risk: 'high',     status: 'spoofed' },
-  { category: 'Mobile',    name: 'Touch Points / Events',      risk: 'high',     status: 'spoofed' },
-  { category: 'Mobile',    name: 'Device Pixel Ratio',         risk: 'medium',   status: 'spoofed' },
-  { category: 'Mobile',    name: 'Mobile UA & Platform',       risk: 'critical', status: 'spoofed' },
+  { category: 'Browser',    name: 'User-Agent / UA-CH',        risk: 'critical', status: 'spoofed' },
+  { category: 'Browser',    name: 'Platform / OS Version',     risk: 'critical', status: 'spoofed' },
+  { category: 'Graphics',   name: 'Canvas Fingerprint',         risk: 'critical', status: 'spoofed' },
+  { category: 'Graphics',   name: 'WebGL Vendor/Renderer',      risk: 'high',     status: 'spoofed' },
+  { category: 'Graphics',   name: 'WebGL Parameters',           risk: 'high',     status: 'spoofed' },
+  { category: 'Audio',      name: 'AudioContext',                risk: 'high',     status: 'spoofed' },
+  { category: 'Hardware',   name: 'Screen Resolution',          risk: 'medium',   status: 'spoofed' },
+  { category: 'Hardware',   name: 'Device Memory',              risk: 'medium',   status: 'spoofed' },
+  { category: 'Hardware',   name: 'Hardware Concurrency',       risk: 'medium',   status: 'spoofed' },
+  { category: 'Network',    name: 'WebRTC Local IP',            risk: 'critical', status: 'spoofed' },
+  { category: 'Locale',     name: 'Timezone',                   risk: 'high',     status: 'spoofed' },
+  { category: 'Locale',     name: 'Language / Accept-Language', risk: 'high',     status: 'spoofed' },
+  { category: 'Fonts',      name: 'Font Enumeration',           risk: 'high',     status: 'spoofed' },
+  { category: 'Fonts',      name: 'Font Metrics',               risk: 'medium',   status: 'spoofed' },
+  { category: 'DOM',        name: 'ClientRects noise',          risk: 'medium',   status: 'spoofed' },
+  { category: 'API',        name: 'Battery API',                risk: 'low',      status: 'spoofed' },
+  { category: 'API',        name: 'Media Devices',              risk: 'medium',   status: 'spoofed' },
+  { category: 'API',        name: 'Speech Synthesis Voices',    risk: 'low',      status: 'spoofed' },
+  { category: 'Browser',    name: 'Plugin / MimeType List',     risk: 'high',     status: 'spoofed' },
+  { category: 'Mobile',     name: 'Touch Points / Events',      risk: 'high',     status: 'spoofed' },
+  { category: 'Mobile',     name: 'Device Pixel Ratio',         risk: 'medium',   status: 'spoofed' },
+  { category: 'Mobile',     name: 'Mobile UA & Platform',       risk: 'critical', status: 'spoofed' },
+  // Phase 5: New vectors
+  { category: 'Evasion',    name: 'CDP Automation Hiding',      risk: 'critical', status: 'spoofed' },
+  { category: 'Evasion',    name: 'ChromeDriver Variables',     risk: 'critical', status: 'spoofed' },
+  { category: 'Evasion',    name: 'Error Stack Sanitization',   risk: 'high',     status: 'spoofed' },
+  { category: 'Evasion',    name: 'Function.toString Masking',  risk: 'high',     status: 'spoofed' },
+  { category: 'Evasion',    name: 'Headless Signal Hiding',     risk: 'critical', status: 'spoofed' },
+  { category: 'API',        name: 'Permissions API',            risk: 'medium',   status: 'spoofed' },
+  { category: 'API',        name: 'Storage Quota',              risk: 'medium',   status: 'spoofed' },
+  { category: 'Network',    name: 'Network Information API',    risk: 'medium',   status: 'spoofed' },
+  { category: 'API',        name: 'Performance Entries',        risk: 'high',     status: 'spoofed' },
+  { category: 'Browser',    name: 'chrome.runtime Stub',        risk: 'high',     status: 'spoofed' },
+  { category: 'Browser',    name: 'chrome.loadTimes Stub',      risk: 'medium',   status: 'spoofed' },
+  { category: 'Evasion',    name: 'iframe contentWindow',       risk: 'medium',   status: 'spoofed' },
 ]
 
 const RISK_BADGE: Record<string, string> = {
@@ -97,7 +110,7 @@ export function FingerprintEditor() {
               </div>
               <div className="flex items-center gap-1.5 mt-2 text-xs text-ghost-400">
                 <Info className="w-3.5 h-3.5" />
-                Layer 1 (CDP + JS) + mobile profiles. Layer 2 Chromium patches planned next.
+                Layer 1 (CDP + JS) + Layer 2 (Advanced CDP Evasion) + iOS/Android presets active.
               </div>
             </div>
           </div>

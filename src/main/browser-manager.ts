@@ -121,7 +121,19 @@ export class BrowserManager {
       '--disable-infobars',
       '--disable-blink-features=AutomationControlled',
       `--lang=${fp.locale.language}`,
-      `--window-size=${fp.screen.width},${fp.screen.height}`
+      `--window-size=${fp.screen.width},${fp.screen.height}`,
+      // Phase 5: Enhanced CDP evasion flags
+      '--disable-features=AutomationControlled,IsolateOrigins',
+      '--disable-blink-features=AutomationControlled,IdleDetection',
+      '--disable-component-extensions-with-background-pages',
+      '--disable-default-apps',
+      '--disable-hang-monitor',
+      '--disable-popup-blocking',
+      '--disable-prompt-on-repost',
+      '--disable-background-networking',
+      '--disable-sync',
+      '--metrics-recording-only',
+      '--no-pings'
     ]
 
     // Proxy
