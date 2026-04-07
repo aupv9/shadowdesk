@@ -20,6 +20,7 @@ export function EditProfileModal({ profile, onClose }: Props) {
   const [groupId,      setGroupId]      = useState(profile.group_id ?? '')
   const [notes,        setNotes]        = useState(profile.notes ?? '')
   const [rotationMode, setRotationMode] = useState<string>(profile.rotation_mode ?? 'none')
+  const [driftEnabled, setDriftEnabled] = useState<boolean>(!!profile.drift_enabled)
   const [loading,      setLoading]      = useState(false)
   const [error,        setError]        = useState('')
 
@@ -35,6 +36,10 @@ export function EditProfileModal({ profile, onClose }: Props) {
         notes,
         rotation_mode: rotationMode
       })
+      // Phase 11.3 — drift toggle is a separate IPC call (not part of updateProfile)
+      if (driftEnabled !== !!profile.drift_enabled) {
+        await window.api.drift.setEnabled(profile.id, driftEnabled)
+      }
       onClose()
     } catch (e: any) {
       setError(e.message)
@@ -107,6 +112,28 @@ export function EditProfileModal({ profile, onClose }: Props) {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
+          </div>
+
+          {/* Phase 11.3 — Fingerprint drift */}
+          <div className="border-t border-slate-700 pt-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={driftEnabled}
+                onChange={(e) => setDriftEnabled(e.target.checked)}
+                className="mt-0.5 accent-ghost-500"
+              />
+              <div>
+                <div className="text-sm font-medium text-white">Fingerprint drift over time</div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Periodically nudges the Chrome version and noise seeds to mimic real browser updates.
+                  Use the "Apply Drift" menu item to drift now.
+                  {profile.last_drift_at && (
+                    <> Last drift: {new Date(profile.last_drift_at).toLocaleDateString()}.</>
+                  )}
+                </p>
+              </div>
+            </label>
           </div>
 
           {error && <p className="text-sm text-red-400">{error}</p>}

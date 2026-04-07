@@ -1,4 +1,4 @@
-import type { BehaviorConfig } from '../../../../shared/types'
+import type { BehaviorConfig } from '../../../shared/types'
 
 /**
  * Phase 6 — Behavior Simulation

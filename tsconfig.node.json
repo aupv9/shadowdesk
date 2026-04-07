@@ -3,8 +3,11 @@
     "composite": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "target": "ES2022",
-    "lib": ["ES2022"],
+    "target": "ES2023",
+    // DOM lib is included so puppeteer's page.evaluate() callbacks can reference
+    // browser globals (window, document, navigator, etc.) which are checked in
+    // the outer (main-process) scope but execute in the browser context.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "strict": true,
     "skipLibCheck": true,
     "noEmit": false,

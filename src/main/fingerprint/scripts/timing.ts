@@ -1,4 +1,4 @@
-import type { TimingConfig } from '../../../../shared/types'
+import type { TimingConfig } from '../../../shared/types'
 
 /**
  * Phase 6 — Timing Attack Defenses

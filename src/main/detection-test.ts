@@ -136,6 +136,12 @@ export class DetectionTestRunner {
     vectors.push(await this.testTrustTokenApiShape(page))
     vectors.push(await this.testSharedArrayBufferAvailability(page))
     vectors.push(await this.testIntlSupportedValues(page))
+    // Phase 12.A.2: 5 network/UA alignment vectors
+    vectors.push(await this.testBinaryUaAlignment(page))
+    vectors.push(await this.testUachBrandsAlignment(page))
+    vectors.push(await this.testUachPlatformAlignment(page))
+    vectors.push(await this.testUachMobileTouchAlignment(page))
+    vectors.push(await this.testAcceptLanguageAlignment(page))
 
     return vectors
   }
@@ -211,8 +217,8 @@ export class DetectionTestRunner {
         ua: navigator.userAgent.substring(0, 50)
       }
     })
-    const hasVendor = result.vendor && result.vendor !== ''
-    const hasPlatform = result.platform && result.platform !== ''
+    const hasVendor = !!result.vendor && result.vendor !== ''
+    const hasPlatform = !!result.platform && result.platform !== ''
     return {
       name: 'Navigator properties',
       category: 'Browser',
@@ -598,7 +604,7 @@ export class DetectionTestRunner {
       }
     })
     // Battery API absence is OK (some OS don't expose it); but if present it must be sane
-    const passed = !result.available || (result.charging && result.level && result.validLevel)
+    const passed = !result.available || !!(result.charging && result.level && result.validLevel)
     return {
       name: 'Battery API shape',
       category: 'API',
@@ -997,6 +1003,205 @@ export class DetectionTestRunner {
       detail: result.available
         ? `${result.tzCount} timezones, ${result.currCount} currencies`
         : 'Intl.supportedValuesOf not available'
+    }
+  }
+
+  // ── Phase 12.A.2 — Network / UA-alignment vectors ─────────────────────────
+  //
+  // These vectors don't probe a real network endpoint (no TLS proxy yet).
+  // Instead they verify that the JS-visible identity hints are internally
+  // consistent with each other AND with the real Chromium binary version.
+  //
+  // A spoofed `Chrome/121` over a real `Chrome/132` ClientHello is the most
+  // common server-side tell, so binary-major alignment is the highest-value
+  // local check we can run before shipping a TLS rewriter.
+
+  /** UA Chrome major must match the actual Chromium binary major (Phase 12.A.1). */
+  private async testBinaryUaAlignment(page: Page): Promise<DetectionVectorResult> {
+    const binary = BrowserManager.getInstance().getCachedBinaryInfo()
+    const ua = await page.evaluate(() => navigator.userAgent)
+    // Skip iOS / Safari profiles — no Chrome token in the UA
+    const m = ua.match(/Chrome\/(\d+)\./)
+    if (!m) {
+      return {
+        name: 'UA ↔ binary version alignment',
+        category: 'Network',
+        passed: true,
+        detail: `Skipped — non-Chromium UA: ${ua.substring(0, 60)}`
+      }
+    }
+    if (!binary) {
+      return {
+        name: 'UA ↔ binary version alignment',
+        category: 'Network',
+        passed: false,
+        detail: 'Binary version not yet detected — restart app to enable detection'
+      }
+    }
+    const uaMajor = parseInt(m[1], 10)
+    const passed = uaMajor === binary.major
+    return {
+      name: 'UA ↔ binary version alignment',
+      category: 'Network',
+      passed,
+      detail: passed
+        ? `UA Chrome/${uaMajor} matches binary Chrome/${binary.major}`
+        : `UA Chrome/${uaMajor} ≠ binary Chrome/${binary.major} — TLS/JA3 will reveal mismatch`
+    }
+  }
+
+  /** UA Chrome major must match navigator.userAgentData.brands major. */
+  private async testUachBrandsAlignment(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const ua = navigator.userAgent
+      const m = ua.match(/Chrome\/(\d+)\./)
+      const uaMajor = m ? parseInt(m[1], 10) : 0
+      const uad = (navigator as any).userAgentData
+      if (!uad || !Array.isArray(uad.brands)) {
+        return { available: false, uaMajor, brandMajor: 0, brands: [] as string[] }
+      }
+      // Find the non-greasy brand (the real Chrome / Chromium entry)
+      const real = uad.brands.find((b: any) =>
+        /Chromium|Google Chrome|Microsoft Edge|Opera/i.test(b.brand) &&
+        !/Not.*Brand/i.test(b.brand)
+      )
+      const brandMajor = real ? parseInt(String(real.version), 10) : 0
+      return {
+        available: true,
+        uaMajor,
+        brandMajor,
+        brands: uad.brands.map((b: any) => `${b.brand}/${b.version}`)
+      }
+    })
+    if (!result.available) {
+      // iOS / Safari has no userAgentData — that's correct
+      const ua = await page.evaluate(() => navigator.userAgent)
+      const isMobile = /iPhone|iPad|Macintosh.*Safari/i.test(ua)
+      return {
+        name: 'UA ↔ UACH brands alignment',
+        category: 'Network',
+        passed: isMobile,
+        detail: isMobile ? 'No userAgentData (expected for Safari/iOS)' : 'userAgentData missing on Chromium UA — suspicious'
+      }
+    }
+    if (result.uaMajor === 0) {
+      return {
+        name: 'UA ↔ UACH brands alignment',
+        category: 'Network',
+        passed: true,
+        detail: 'Skipped — non-Chromium UA'
+      }
+    }
+    const passed = result.uaMajor === result.brandMajor
+    return {
+      name: 'UA ↔ UACH brands alignment',
+      category: 'Network',
+      passed,
+      detail: passed
+        ? `UA Chrome/${result.uaMajor} matches brands [${result.brands.join(', ')}]`
+        : `UA Chrome/${result.uaMajor} ≠ brand Chrome/${result.brandMajor}`
+    }
+  }
+
+  /** navigator.userAgentData.platform must match navigator.platform family. */
+  private async testUachPlatformAlignment(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const platform = navigator.platform
+      const uad = (navigator as any).userAgentData
+      const uadPlatform = uad ? uad.platform : null
+      return { platform, uadPlatform, hasUad: !!uad }
+    })
+    if (!result.hasUad) {
+      return {
+        name: 'UA-CH platform alignment',
+        category: 'Network',
+        passed: true,
+        detail: `No userAgentData (Safari/iOS) — platform=${result.platform}`
+      }
+    }
+    // Map navigator.platform → expected userAgentData.platform family
+    const family = (p: string): string => {
+      if (/Win/i.test(p)) return 'Windows'
+      if (/Mac/i.test(p)) return 'macOS'
+      if (/Linux/i.test(p)) return 'Linux'
+      if (/Android/i.test(p)) return 'Android'
+      if (/iPhone|iPad/i.test(p)) return 'iOS'
+      return ''
+    }
+    const expected = family(result.platform)
+    const passed = expected === '' || expected === result.uadPlatform
+    return {
+      name: 'UA-CH platform alignment',
+      category: 'Network',
+      passed,
+      detail: passed
+        ? `platform="${result.platform}" matches UA-CH platform="${result.uadPlatform}"`
+        : `platform="${result.platform}" → expected "${expected}" but UA-CH = "${result.uadPlatform}"`
+    }
+  }
+
+  /** UA-CH mobile flag must agree with maxTouchPoints. */
+  private async testUachMobileTouchAlignment(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const uad        = (navigator as any).userAgentData
+      const uadMobile  = uad ? !!uad.mobile : null
+      const touchPts   = navigator.maxTouchPoints
+      const ua         = navigator.userAgent
+      const uaMobile   = /Mobile|Android|iPhone|iPad/i.test(ua)
+      return { uadMobile, touchPts, uaMobile, hasUad: !!uad }
+    })
+    if (!result.hasUad) {
+      // Safari/iOS — fall back to UA + touch consistency
+      const passed = result.uaMobile ? result.touchPts > 0 : true
+      return {
+        name: 'UA-CH mobile ↔ touch alignment',
+        category: 'Network',
+        passed,
+        detail: `UA mobile=${result.uaMobile}, maxTouchPoints=${result.touchPts}`
+      }
+    }
+    // Mobile UA should report touchPts > 0 and UA-CH mobile === true
+    const expected = result.uaMobile
+    const passed   = result.uadMobile === expected &&
+                     (expected ? result.touchPts > 0 : true)
+    return {
+      name: 'UA-CH mobile ↔ touch alignment',
+      category: 'Network',
+      passed,
+      detail: passed
+        ? `UA-CH mobile=${result.uadMobile}, touchPts=${result.touchPts}, UA mobile=${result.uaMobile}`
+        : `Mismatch: UA mobile=${result.uaMobile}, UA-CH mobile=${result.uadMobile}, touchPts=${result.touchPts}`
+    }
+  }
+
+  /** navigator.languages[0] base must match Intl resolved locale. */
+  private async testAcceptLanguageAlignment(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const langs   = navigator.languages || []
+      const lang    = navigator.language
+      const intlLoc = Intl.DateTimeFormat().resolvedOptions().locale
+      return { langs: [...langs], lang, intlLoc }
+    })
+    if (result.langs.length === 0) {
+      return {
+        name: 'Accept-Language alignment',
+        category: 'Network',
+        passed: false,
+        detail: 'navigator.languages is empty — header will leak default locale'
+      }
+    }
+    const base   = (s: string): string => (s || '').split('-')[0].toLowerCase()
+    const first  = base(result.langs[0])
+    const navLng = base(result.lang)
+    const intl   = base(result.intlLoc)
+    const passed = first === navLng && first === intl
+    return {
+      name: 'Accept-Language alignment',
+      category: 'Network',
+      passed,
+      detail: passed
+        ? `languages[0]=${result.langs[0]}, language=${result.lang}, intl=${result.intlLoc}`
+        : `Mismatch: languages[0]=${result.langs[0]}, language=${result.lang}, intl=${result.intlLoc}`
     }
   }
 }

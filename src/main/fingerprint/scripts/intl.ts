@@ -1,4 +1,4 @@
-import type { LocaleConfig } from '../../../../shared/types'
+import type { LocaleConfig } from '../../../shared/types'
 
 /**
  * Phase 8 — Intl API locale normalization.

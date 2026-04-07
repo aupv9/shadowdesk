@@ -127,9 +127,17 @@ export async function pullProfiles(encryptionPassword: string): Promise<number> 
     const db = Database.getInstance()
 
     let imported = 0
+    let conflicts = 0
     for (const profile of payload.profiles) {
-      const existing = db.getProfile(profile.id)
+      const existing = db.getProfile(profile.id) as any
       if (existing) {
+        // Conflict detection: skip overwrite if local is newer
+        const localUpdated = existing.updated_at ?? existing.last_used_at ?? ''
+        const remoteUpdated = profile.updated_at ?? ''
+        if (localUpdated && remoteUpdated && localUpdated > remoteUpdated) {
+          conflicts++
+          continue // local wins — skip this profile
+        }
         db.updateProfile(profile.id, {
           name: profile.name,
           fingerprint: typeof profile.fingerprint === 'string'
@@ -154,6 +162,9 @@ export async function pullProfiles(encryptionPassword: string): Promise<number> 
         }
       }
       imported++
+    }
+    if (conflicts > 0) {
+      console.info(`[Sync] ${conflicts} profile(s) skipped (local version is newer)`)
     }
 
     lastSyncedAt = new Date().toISOString()

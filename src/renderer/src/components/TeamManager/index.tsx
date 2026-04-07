@@ -250,7 +250,9 @@ export function TeamManager() {
                       </div>
                     )}
                     {member.user_id === team.team?.owner_id && (
-                      <Crown className="w-4 h-4 text-amber-400" title="Owner" />
+                      <span title="Owner" className="inline-flex">
+                        <Crown className="w-4 h-4 text-amber-400" />
+                      </span>
                     )}
                   </div>
                 </div>

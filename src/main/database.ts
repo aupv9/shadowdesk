@@ -200,6 +200,234 @@ export class Database {
       CREATE INDEX IF NOT EXISTS idx_profile_versions_profile ON profile_versions(profile_id);
       CREATE INDEX IF NOT EXISTS idx_profile_versions_date    ON profile_versions(saved_at);
     `)
+
+    // Phase 10.2 — workflow schedules (cron-driven)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS workflow_schedules (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL DEFAULT 'Schedule',
+        workflow_id TEXT NOT NULL,
+        profile_ids TEXT NOT NULL DEFAULT '[]',
+        cron TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        last_run_at TEXT,
+        next_run_at TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY(workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_schedules_workflow ON workflow_schedules(workflow_id);
+      CREATE INDEX IF NOT EXISTS idx_schedules_enabled ON workflow_schedules(enabled);
+    `)
+
+    // Phase 10.3 — per-profile extension paths
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS profile_extensions (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        path TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_extensions_profile ON profile_extensions(profile_id);
+    `)
+
+    // Phase 11.3 — fingerprint drift tracking
+    try {
+      this.db.exec(`ALTER TABLE profiles ADD COLUMN drift_enabled INTEGER DEFAULT 0`)
+    } catch { /* exists */ }
+    try {
+      this.db.exec(`ALTER TABLE profiles ADD COLUMN last_drift_at TEXT`)
+    } catch { /* exists */ }
+    try {
+      this.db.exec(`ALTER TABLE profiles ADD COLUMN warmed_up INTEGER DEFAULT 0`)
+    } catch { /* exists */ }
+
+    // Variables column for workflows (Phase 11.1 — added previously, ensure exists)
+    try {
+      this.db.exec(`ALTER TABLE workflows ADD COLUMN variables TEXT`)
+    } catch { /* exists */ }
+
+    // Phase 12.C.3 — encrypted credential vault
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS credentials (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT,
+        label TEXT NOT NULL,
+        username_enc TEXT NOT NULL,
+        password_enc TEXT NOT NULL,
+        fields_enc TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_credentials_profile ON credentials(profile_id);
+
+      CREATE TABLE IF NOT EXISTS vault_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    `)
+  }
+
+  // ── Vault meta (Phase 12.C.3) ────────────────────────────────────────────
+
+  getVaultMeta(key: string): string | null {
+    const row = this.queryOne('SELECT value FROM vault_meta WHERE key = ?', [key])
+    return row ? row.value : null
+  }
+
+  setVaultMeta(key: string, value: string): void {
+    this.run(
+      `INSERT INTO vault_meta (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [key, value]
+    )
+  }
+
+  // ── Credentials (Phase 12.C.3) ───────────────────────────────────────────
+
+  getAllCredentials(profileId?: string): any[] {
+    if (profileId) {
+      return this.queryAll(
+        'SELECT * FROM credentials WHERE profile_id = ? ORDER BY label ASC',
+        [profileId]
+      )
+    }
+    return this.queryAll('SELECT * FROM credentials ORDER BY label ASC')
+  }
+
+  getCredential(id: string): any {
+    return this.queryOne('SELECT * FROM credentials WHERE id = ?', [id])
+  }
+
+  createCredential(c: {
+    id: string
+    profile_id: string | null
+    label: string
+    username_enc: string
+    password_enc: string
+    fields_enc: string | null
+  }): void {
+    this.run(
+      `INSERT INTO credentials (id, profile_id, label, username_enc, password_enc, fields_enc)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [c.id, c.profile_id, c.label, c.username_enc, c.password_enc, c.fields_enc]
+    )
+  }
+
+  updateCredential(
+    id: string,
+    data: Partial<{
+      label: string
+      username_enc: string
+      password_enc: string
+      fields_enc: string | null
+      profile_id: string | null
+    }>
+  ): void {
+    const sets: string[] = []
+    const vals: any[] = []
+    if (data.label !== undefined)        { sets.push('label = ?');        vals.push(data.label) }
+    if (data.username_enc !== undefined) { sets.push('username_enc = ?'); vals.push(data.username_enc) }
+    if (data.password_enc !== undefined) { sets.push('password_enc = ?'); vals.push(data.password_enc) }
+    if (data.fields_enc !== undefined)   { sets.push('fields_enc = ?');   vals.push(data.fields_enc) }
+    if (data.profile_id !== undefined)   { sets.push('profile_id = ?');   vals.push(data.profile_id) }
+    if (sets.length === 0) return
+    sets.push("updated_at = datetime('now')")
+    vals.push(id)
+    this.run(`UPDATE credentials SET ${sets.join(', ')} WHERE id = ?`, vals)
+  }
+
+  deleteCredential(id: string): void {
+    this.run('DELETE FROM credentials WHERE id = ?', [id])
+  }
+
+  // ── Workflow Schedules (Phase 10.2) ──────────────────────────────────────
+
+  getAllSchedules(): any[] {
+    return this.queryAll(
+      'SELECT * FROM workflow_schedules ORDER BY created_at DESC'
+    )
+  }
+
+  getSchedule(id: string): any {
+    return this.queryOne('SELECT * FROM workflow_schedules WHERE id = ?', [id])
+  }
+
+  createSchedule(s: {
+    id: string
+    name: string
+    workflow_id: string
+    profile_ids: string[]
+    cron: string
+    enabled: boolean
+    next_run_at: string | null
+  }): void {
+    this.run(
+      `INSERT INTO workflow_schedules (id, name, workflow_id, profile_ids, cron, enabled, next_run_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [s.id, s.name, s.workflow_id, JSON.stringify(s.profile_ids), s.cron, s.enabled ? 1 : 0, s.next_run_at]
+    )
+  }
+
+  updateSchedule(id: string, data: Partial<{ name: string; cron: string; enabled: boolean; profile_ids: string[]; next_run_at: string | null }>): void {
+    const sets: string[] = []
+    const vals: any[] = []
+    if (data.name !== undefined)        { sets.push('name = ?');        vals.push(data.name) }
+    if (data.cron !== undefined)        { sets.push('cron = ?');        vals.push(data.cron) }
+    if (data.enabled !== undefined)     { sets.push('enabled = ?');     vals.push(data.enabled ? 1 : 0) }
+    if (data.profile_ids !== undefined) { sets.push('profile_ids = ?'); vals.push(JSON.stringify(data.profile_ids)) }
+    if (data.next_run_at !== undefined) { sets.push('next_run_at = ?'); vals.push(data.next_run_at) }
+    if (sets.length === 0) return
+    this.run(`UPDATE workflow_schedules SET ${sets.join(', ')} WHERE id = ?`, [...vals, id])
+  }
+
+  markScheduleRun(id: string, when: string): void {
+    this.run('UPDATE workflow_schedules SET last_run_at = ? WHERE id = ?', [when, id])
+  }
+
+  deleteSchedule(id: string): void {
+    this.run('DELETE FROM workflow_schedules WHERE id = ?', [id])
+  }
+
+  // ── Profile Extensions (Phase 10.3) ──────────────────────────────────────
+
+  getProfileExtensions(profileId: string): any[] {
+    return this.queryAll(
+      'SELECT * FROM profile_extensions WHERE profile_id = ? ORDER BY created_at ASC',
+      [profileId]
+    )
+  }
+
+  addProfileExtension(ext: { id: string; profile_id: string; name: string; path: string; enabled: boolean }): void {
+    this.run(
+      'INSERT INTO profile_extensions (id, profile_id, name, path, enabled) VALUES (?, ?, ?, ?, ?)',
+      [ext.id, ext.profile_id, ext.name, ext.path, ext.enabled ? 1 : 0]
+    )
+  }
+
+  setExtensionEnabled(id: string, enabled: boolean): void {
+    this.run('UPDATE profile_extensions SET enabled = ? WHERE id = ?', [enabled ? 1 : 0, id])
+  }
+
+  removeProfileExtension(id: string): void {
+    this.run('DELETE FROM profile_extensions WHERE id = ?', [id])
+  }
+
+  // ── Profile drift / warm-up flags (Phase 11.2 / 11.3) ───────────────────
+
+  setProfileDriftEnabled(id: string, enabled: boolean): void {
+    this.run('UPDATE profiles SET drift_enabled = ? WHERE id = ?', [enabled ? 1 : 0, id])
+  }
+
+  setProfileLastDrift(id: string, when: string): void {
+    this.run('UPDATE profiles SET last_drift_at = ? WHERE id = ?', [when, id])
+  }
+
+  setProfileWarmedUp(id: string, warmed: boolean): void {
+    this.run('UPDATE profiles SET warmed_up = ? WHERE id = ?', [warmed ? 1 : 0, id])
   }
 
   // ── Profile CRUD ──────────────────────────────────────────────────────────
@@ -428,19 +656,29 @@ export class Database {
     return this.queryOne('SELECT * FROM workflows WHERE id = ?', [id])
   }
 
-  createWorkflow(workflow: { id: string; name: string; description?: string; steps: any[] }): void {
+  createWorkflow(workflow: { id: string; name: string; description?: string; steps: any[]; variables?: Record<string, string> }): void {
     this.run(
-      'INSERT INTO workflows (id, name, description, steps) VALUES (?, ?, ?, ?)',
-      [workflow.id, workflow.name, workflow.description ?? '', JSON.stringify(workflow.steps)]
+      'INSERT INTO workflows (id, name, description, steps, variables) VALUES (?, ?, ?, ?, ?)',
+      [
+        workflow.id,
+        workflow.name,
+        workflow.description ?? '',
+        JSON.stringify(workflow.steps),
+        workflow.variables ? JSON.stringify(workflow.variables) : null
+      ]
     )
   }
 
-  updateWorkflow(id: string, data: { name?: string; description?: string; steps?: any[] }): void {
+  updateWorkflow(
+    id: string,
+    data: { name?: string; description?: string; steps?: any[]; variables?: Record<string, string> }
+  ): void {
     const sets: string[] = []
     const vals: any[] = []
     if (data.name !== undefined) { sets.push('name = ?'); vals.push(data.name) }
     if (data.description !== undefined) { sets.push('description = ?'); vals.push(data.description) }
     if (data.steps !== undefined) { sets.push('steps = ?'); vals.push(JSON.stringify(data.steps)) }
+    if (data.variables !== undefined) { sets.push('variables = ?'); vals.push(JSON.stringify(data.variables)) }
     if (sets.length === 0) return
     sets.push("updated_at = datetime('now')")
     this.run(`UPDATE workflows SET ${sets.join(', ')} WHERE id = ?`, [...vals, id])

@@ -1,8 +1,29 @@
 import React, { useEffect, useState } from 'react'
-import { CheckCircle, AlertCircle, Info, RefreshCw, ChevronDown, Sliders } from 'lucide-react'
+import { CheckCircle, AlertCircle, Info, RefreshCw, ChevronDown, Sliders, AlertTriangle } from 'lucide-react'
 import { Header } from '../Layout/Header'
 import { useProfileStore } from '../../stores/profileStore'
 import type { BehaviorConfig, TimingConfig } from '../../types'
+
+// Locale → valid timezone prefixes (mirrors presets.ts validation)
+const LOCALE_TZ_MAP: Record<string, string[]> = {
+  'en-us': ['America/'],
+  'en-gb': ['Europe/London', 'Europe/Dublin'],
+  'en':    ['America/', 'Europe/', 'Australia/', 'Asia/', 'Pacific/'],
+  'vi':    ['Asia/Ho_Chi_Minh', 'Asia/Hanoi'],
+  'th':    ['Asia/Bangkok'],
+  'id':    ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'],
+}
+
+function isLocaleTzMismatch(locale: string, timezone: string): boolean {
+  const lang = locale.toLowerCase()
+  const keys = Object.keys(LOCALE_TZ_MAP).sort((a, b) => b.length - a.length)
+  for (const key of keys) {
+    if (lang === key || lang.startsWith(key)) {
+      return !LOCALE_TZ_MAP[key].some((z) => timezone.startsWith(z))
+    }
+  }
+  return false
+}
 
 const VECTORS = [
   { category: 'Browser',    name: 'User-Agent / UA-CH',        risk: 'critical', status: 'spoofed' },
@@ -203,6 +224,12 @@ export function FingerprintEditor() {
               <InfoRow label="Screen"      value={`${fp.screen.width}×${fp.screen.height} (${fp.screen.pixelRatio}x)`} />
               <InfoRow label="Timezone"    value={fp.locale.timezone} />
               <InfoRow label="Language"    value={fp.locale.language} />
+              {isLocaleTzMismatch(fp.locale.language, fp.locale.timezone) && (
+                <div className="col-span-2 flex items-center gap-2 text-amber-400 bg-amber-900/20 border border-amber-500/30 rounded-lg px-3 py-2 mt-1">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Locale/timezone mismatch — detectable by fingerprint tools</span>
+                </div>
+              )}
               <InfoRow label="Device RAM"  value={`${fp.hardware.deviceMemory} GB`} />
               <InfoRow label="CPU Cores"   value={`${fp.hardware.hardwareConcurrency}`} />
               <InfoRow label="WebGL"       value={fp.webgl.renderer} mono truncate />

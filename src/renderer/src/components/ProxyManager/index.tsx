@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Plus, Trash2, Wifi, WifiOff, Loader2, Globe } from 'lucide-react'
+import { Plus, Trash2, Wifi, WifiOff, Loader2, Globe, Upload } from 'lucide-react'
 import { useProxyStore } from '../../stores/proxyStore'
 import { Header } from '../Layout/Header'
 import type { CreateProxyInput } from '../../types'
@@ -72,10 +72,27 @@ function AddProxyForm({ onAdd, onCancel }: { onAdd: (v: CreateProxyInput) => Pro
 
 export function ProxyManager() {
   const { proxies, testing, loading, fetchProxies, createProxy, deleteProxy, testProxy } = useProxyStore()
-  const [showAdd, setShowAdd] = useState(false)
-  const [search, setSearch] = useState('')
+  const [showAdd,        setShowAdd]        = useState(false)
+  const [showBulkImport, setShowBulkImport] = useState(false)
+  const [bulkText,       setBulkText]       = useState('')
+  const [bulkResult,     setBulkResult]     = useState<{ imported: number; failed: number } | null>(null)
+  const [bulkLoading,    setBulkLoading]    = useState(false)
+  const [search,         setSearch]         = useState('')
 
   useEffect(() => { fetchProxies() }, [])
+
+  const handleBulkImport = async () => {
+    const lines = bulkText.split('\n')
+    setBulkLoading(true)
+    try {
+      const result = await window.api.proxies.importBulk(lines)
+      setBulkResult(result)
+      await fetchProxies()
+      setTimeout(() => { setShowBulkImport(false); setBulkText(''); setBulkResult(null) }, 2000)
+    } finally {
+      setBulkLoading(false)
+    }
+  }
 
   const filtered = proxies.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -90,10 +107,16 @@ export function ProxyManager() {
         search={search}
         onSearchChange={setSearch}
         actions={
-          <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2 text-sm">
-            <Plus className="w-4 h-4" />
-            Add Proxy
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowBulkImport(true)} className="btn-ghost flex items-center gap-2 text-sm">
+              <Upload className="w-4 h-4" />
+              Import List
+            </button>
+            <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2 text-sm">
+              <Plus className="w-4 h-4" />
+              Add Proxy
+            </button>
+          </div>
         }
       />
 
@@ -172,6 +195,37 @@ export function ProxyManager() {
           </div>
         )}
       </div>
+
+      {/* Bulk import modal */}
+      {showBulkImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl">
+            <h2 className="text-base font-semibold text-white mb-2">Import Proxy List</h2>
+            <p className="text-xs text-slate-400 mb-3">
+              One proxy per line: <code className="text-slate-300">type:host:port[:user[:pass]]</code>
+              <br />Example: <code className="text-slate-300">socks5:1.2.3.4:1080:user:pass</code>
+            </p>
+            <textarea
+              className="input resize-none h-48 font-mono text-xs mb-3"
+              placeholder={"http:1.2.3.4:8080\nsocks5:5.6.7.8:1080:user:pass"}
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+            />
+            {bulkResult && (
+              <p className="text-sm text-green-400 mb-3">
+                ✓ {bulkResult.imported} imported{bulkResult.failed > 0 ? ` · ${bulkResult.failed} failed` : ''}
+              </p>
+            )}
+            <div className="flex justify-end gap-3">
+              <button onClick={() => { setShowBulkImport(false); setBulkText(''); setBulkResult(null) }} className="btn-secondary text-sm">Cancel</button>
+              <button onClick={handleBulkImport} disabled={bulkLoading || !bulkText.trim()} className="btn-primary text-sm flex items-center gap-2">
+                {bulkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {bulkLoading ? 'Importing...' : 'Import'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

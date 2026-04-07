@@ -3,6 +3,8 @@ import { app } from 'electron'
 import { mkdir } from 'fs/promises'
 import puppeteer, { Browser, Page } from 'puppeteer-core'
 import { FingerprintInjector } from './fingerprint/injector'
+import { Database } from './database'
+import { getSettings } from './settings'
 import type { FingerprintConfig, ProxyConfig } from '../shared/types'
 
 interface ActiveSession {
@@ -11,16 +13,109 @@ interface ActiveSession {
   startedAt: Date
 }
 
+export interface ChromiumBinaryInfo {
+  path: string
+  fullVersion: string // e.g. "HeadlessChrome/132.0.6834.83"
+  major: number       // e.g. 132
+}
+
 export class BrowserManager {
   private static instance: BrowserManager
   private sessions = new Map<string, ActiveSession>()
   private injector = new FingerprintInjector()
+  // Phase 12.A.1 — cached Chromium binary version (detected once at startup)
+  private binaryInfo: ChromiumBinaryInfo | null = null
+  private binaryDetectPromise: Promise<ChromiumBinaryInfo> | null = null
 
   static getInstance(): BrowserManager {
     if (!BrowserManager.instance) {
       BrowserManager.instance = new BrowserManager()
     }
     return BrowserManager.instance
+  }
+
+  /**
+   * Phase 12.A.1 — Detect the actual Chromium binary version.
+   *
+   * Launches puppeteer headless once, reads `browser.version()`, parses the
+   * Chrome major, then closes. Result is cached for the rest of the app's
+   * lifetime so subsequent calls are essentially free.
+   *
+   * Concurrent callers share the same in-flight detection promise.
+   */
+  async detectBinaryVersion(): Promise<ChromiumBinaryInfo> {
+    if (this.binaryInfo) return this.binaryInfo
+    if (this.binaryDetectPromise) return this.binaryDetectPromise
+
+    this.binaryDetectPromise = (async () => {
+      const path = await this.findChromium()
+      let browser: Browser | null = null
+      try {
+        browser = await puppeteer.launch({
+          executablePath: path,
+          headless: true,
+          args: ['--no-sandbox', '--disable-dev-shm-usage', '--no-first-run', '--no-default-browser-check'],
+          defaultViewport: { width: 800, height: 600 }
+        })
+        // browser.version() returns strings like "HeadlessChrome/132.0.6834.83"
+        // or "Chrome/132.0.6834.83" depending on the binary
+        const fullVersion = await browser.version()
+        const match = fullVersion.match(/\/(\d+)\./)
+        const major = match ? parseInt(match[1], 10) : 0
+        const info: ChromiumBinaryInfo = { path, fullVersion, major }
+        this.binaryInfo = info
+        return info
+      } finally {
+        if (browser) {
+          try { await browser.close() } catch { /* ignore */ }
+        }
+      }
+    })()
+
+    try {
+      return await this.binaryDetectPromise
+    } catch (err) {
+      // Reset so a future call can retry
+      this.binaryDetectPromise = null
+      throw err
+    }
+  }
+
+  /** Synchronous accessor for the cached binary info, or null if not detected yet. */
+  getCachedBinaryInfo(): ChromiumBinaryInfo | null {
+    return this.binaryInfo
+  }
+
+  /**
+   * Phase 12.A.1 — Rewrite the spoofed UA to match the real Chromium binary major version.
+   *
+   * Returns a *new* fingerprint object with `browser.version` and `browser.userAgent`
+   * updated. The UA-Client-Hints script (`useragentdata.ts`) reads `browser.version`
+   * dynamically at injection time, so updating it here propagates to the brands array
+   * automatically.
+   *
+   * The original profile in the DB is **not** mutated — this is a per-launch transformation.
+   * If the spoofed major already matches the binary major, the input is returned unchanged.
+   * iOS / Safari profiles (no `Chrome/` token in the UA) are left untouched.
+   */
+  syncFingerprintToBinary(fp: FingerprintConfig, binaryMajor: number): FingerprintConfig {
+    if (!binaryMajor) return fp
+    if (!/Chrome\/\d+\./.test(fp.browser.userAgent)) return fp // not a Chrome UA — skip
+
+    const spoofedMajor = parseInt(fp.browser.version, 10)
+    if (spoofedMajor === binaryMajor) return fp
+
+    const newVersion = String(binaryMajor)
+    const newUA = fp.browser.userAgent.replace(/Chrome\/\d+\./, `Chrome/${binaryMajor}.`)
+
+    return {
+      ...fp,
+      browser: {
+        ...fp.browser,
+        version: newVersion,
+        userAgent: newUA
+      }
+    }
   }
 
   async launchProfile(
@@ -39,8 +134,35 @@ export class BrowserManager {
       return
     }
 
+    // Phase 12.A.1 — auto-sync the spoofed UA to the real Chromium binary major
+    // so the JS-injected userAgent matches the TLS/JA3 fingerprint of the binary.
+    // Setting is ON by default; users can disable it to pin a specific UA per profile.
+    let effectiveFingerprint = fingerprint
+    try {
+      if (getSettings().autoSyncBinaryUA !== false) {
+        const info = await this.detectBinaryVersion()
+        effectiveFingerprint = this.syncFingerprintToBinary(fingerprint, info.major)
+      }
+    } catch (err) {
+      console.warn('[browser-manager] binary version sync skipped:', (err as Error).message)
+    }
+
     const userDataDir = await this.ensureProfileDir(profileId)
-    const launchArgs = this.buildLaunchArgs(fingerprint, proxy)
+    const launchArgs = this.buildLaunchArgs(effectiveFingerprint, proxy)
+
+    // Phase 10.3 — load any per-profile Chrome extensions (unpacked)
+    try {
+      const exts = Database.getInstance().getProfileExtensions(profileId) as any[]
+      const enabled = exts.filter((e) => !!e.enabled).map((e) => e.path)
+      if (enabled.length > 0) {
+        launchArgs.push(`--load-extension=${enabled.join(',')}`)
+        launchArgs.push(`--disable-extensions-except=${enabled.join(',')}`)
+        // Extensions cannot be loaded in headless mode and need DOM Storage on
+        launchArgs.push('--enable-extensions')
+      }
+    } catch (err) {
+      console.warn('[browser-manager] failed to load extensions:', (err as Error).message)
+    }
 
     const chromiumPath = await this.findChromium()
 
@@ -58,7 +180,7 @@ export class BrowserManager {
       if (target.type() === 'page') {
         const page = await target.page()
         if (page) {
-          await this.injector.injectAll(page, fingerprint)
+          await this.injector.injectAll(page, effectiveFingerprint)
         }
       }
     })
@@ -66,7 +188,7 @@ export class BrowserManager {
     // Inject fingerprint + cookies into the initial page
     const pages = await browser.pages()
     for (const page of pages) {
-      await this.injector.injectAll(page, fingerprint)
+      await this.injector.injectAll(page, effectiveFingerprint)
       if (cookies && cookies.length > 0) {
         await page.setCookie(...cookies).catch(() => {})
       }
@@ -108,6 +230,13 @@ export class BrowserManager {
     return this.sessions.has(profileId)
   }
 
+  async getActivePage(profileId: string): Promise<import('puppeteer-core').Page | null> {
+    const session = this.sessions.get(profileId)
+    if (!session) return null
+    const pages = await session.browser.pages()
+    return pages.find((p) => !p.isClosed()) ?? null
+  }
+
   private async ensureProfileDir(profileId: string): Promise<string> {
     const profilesDir = join(app.getPath('userData'), 'profiles', profileId)
     await mkdir(profilesDir, { recursive: true })
@@ -147,7 +276,10 @@ export class BrowserManager {
     return args
   }
 
+  private chromiumPathCache: string | null = null
+
   private async findChromium(): Promise<string> {
+    if (this.chromiumPathCache) return this.chromiumPathCache
     const { access, readdir } = await import('fs/promises')
 
     // Resolve Playwright's bundled Chromium dynamically (version dir changes on update)
@@ -180,15 +312,18 @@ export class BrowserManager {
     for (const p of candidates) {
       try {
         await access(p)
+        this.chromiumPathCache = p
         return p
       } catch {
         // not found, try next
       }
     }
 
-    throw new Error(
+    const err = new Error(
       'Chrome/Chromium not found. Please install Google Chrome (or Microsoft Edge) to use Ghost Browser.'
-    )
+    ) as any
+    err.code = 'CHROMIUM_NOT_FOUND'
+    throw err
   }
 
   pickProxy(

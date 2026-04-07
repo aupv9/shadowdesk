@@ -1,4 +1,4 @@
-import type { WebGlConfig } from '../../../../shared/types'
+import type { WebGlConfig } from '../../../shared/types'
 
 /**
  * Phase 8 — WebGPU fingerprint defense.

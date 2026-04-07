@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  :root,
+  [data-theme="dark"] {
     --bg-primary:   #0f172a;
     --bg-secondary: #1e293b;
     --bg-tertiary:  #334155;
@@ -12,6 +13,27 @@
     --border:       #334155;
     --accent:       #6366f1;
   }
+
+  [data-theme="light"] {
+    --bg-primary:   #f8fafc;
+    --bg-secondary: #f1f5f9;
+    --bg-tertiary:  #e2e8f0;
+    --text-primary: #0f172a;
+    --text-muted:   #64748b;
+    --border:       #cbd5e1;
+    --accent:       #6366f1;
+  }
+
+  /* Light mode overrides for Tailwind classes */
+  [data-theme="light"] .bg-slate-900   { background-color: #f8fafc !important; }
+  [data-theme="light"] .bg-slate-800   { background-color: #f1f5f9 !important; }
+  [data-theme="light"] .bg-slate-700   { background-color: #e2e8f0 !important; }
+  [data-theme="light"] .border-slate-700 { border-color: #cbd5e1 !important; }
+  [data-theme="light"] .text-white     { color: #0f172a !important; }
+  [data-theme="light"] .text-slate-400 { color: #475569 !important; }
+  [data-theme="light"] .text-slate-300 { color: #334155 !important; }
+  [data-theme="light"] .text-slate-500 { color: #64748b !important; }
+  [data-theme="light"] .bg-slate-900\/50 { background-color: rgba(248,250,252,0.9) !important; }
 
   * {
     box-sizing: border-box;

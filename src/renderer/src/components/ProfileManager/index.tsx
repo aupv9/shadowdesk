@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Plus, RefreshCw, X, FolderPlus, CheckSquare, Trash2 } from 'lucide-react'
+import { Plus, RefreshCw, X, FolderPlus, CheckSquare, Trash2, ShieldAlert } from 'lucide-react'
 import { useProfileStore } from '../../stores/profileStore'
 import { useProxyStore } from '../../stores/proxyStore'
 import { useGroupStore } from '../../stores/groupStore'
@@ -7,7 +7,11 @@ import { ProfileCard } from './ProfileCard'
 import { CreateProfileModal } from './CreateProfileModal'
 import { EditProfileModal } from './EditProfileModal'
 import { CookieModal } from './CookieModal'
+import { StorageInspectorModal } from './StorageInspectorModal'
 import { ProfileHistory } from './ProfileHistory'
+import { ExtensionsModal } from './ExtensionsModal'
+import { WarmUpModal } from './WarmUpModal'
+import { CollisionsDrawer } from './CollisionsDrawer'
 import { Header } from '../Layout/Header'
 import type { Profile } from '../../types'
 
@@ -25,14 +29,19 @@ export function ProfileManager() {
 
   const [showCreate,     setShowCreate]     = useState(false)
   const [editProfile,    setEditProfile]    = useState<Profile | null>(null)
-  const [cookieModal,    setCookieModal]    = useState<{ profile: Profile; mode: 'import' | 'export' } | null>(null)
+  const [cookieModal,    setCookieModal]    = useState<{ profile: Profile; mode: 'browse' | 'import' | 'export' } | null>(null)
+  const [storageProfile, setStorageProfile] = useState<Profile | null>(null)
   const [historyProfile, setHistoryProfile] = useState<Profile | null>(null)
+  const [extensionsProfile, setExtensionsProfile] = useState<Profile | null>(null)
+  const [warmUpProfile,     setWarmUpProfile]     = useState<Profile | null>(null)
   const [search,         setSearch]         = useState('')
   const [activeGroup,    setActiveGroup]    = useState<string | null>(null) // null = All
   const [launching,      setLaunching]      = useState<string | null>(null)
   const [error,          setError]          = useState<string | null>(null)
   const [selected,       setSelected]       = useState<Set<string>>(new Set())
   const [selectionMode,  setSelectionMode]  = useState(false)
+  const [showCollisions, setShowCollisions] = useState(false)
+  const [highlightId,    setHighlightId]    = useState<string | null>(null)
 
   // Group creation inline state
   const [showNewGroup,  setShowNewGroup]  = useState(false)
@@ -49,13 +58,23 @@ export function ProfileManager() {
     return () => clearInterval(interval)
   }, [])
 
+  const filtered = profiles.filter((p) => {
+    const q = search.toLowerCase()
+    const matchSearch = !q ||
+      p.name.toLowerCase().includes(q) ||
+      (p.notes ?? '').toLowerCase().includes(q) ||
+      p.fingerprint.os.platform.toLowerCase().includes(q) ||
+      (p.proxy_label ?? '').toLowerCase().includes(q)
+    const matchGroup  = activeGroup === null || p.group_id === activeGroup
+    return matchSearch && matchGroup
+  })
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); setShowCreate(true) }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); document.querySelector<HTMLInputElement>('.header-search')?.focus() }
       if ((e.ctrlKey || e.metaKey) && e.key === 'r') { e.preventDefault(); fetchProfiles(); fetchActiveSessions() }
       if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !showCreate && !editProfile && !cookieModal) {
-        // Launch the first filtered profile if none are modals open
         const focusedTag = document.activeElement?.tagName.toLowerCase()
         if (focusedTag === 'input' || focusedTag === 'textarea') return
         if (filtered.length > 0 && !activeSessions.includes(filtered[0].id)) {
@@ -67,12 +86,6 @@ export function ProfileManager() {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [filtered, activeSessions, showCreate, editProfile, cookieModal])
-
-  const filtered = profiles.filter((p) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
-    const matchGroup  = activeGroup === null || p.group_id === activeGroup
-    return matchSearch && matchGroup
-  })
 
   const handleLaunch = async (id: string) => {
     setLaunching(id)
@@ -142,7 +155,10 @@ export function ProfileManager() {
     try {
       const buffer = await exportProfile(id)
       const profile = profiles.find((p) => p.id === id)
-      const blob = new Blob([buffer], { type: 'application/zip' })
+      // The IPC bridge returns a Node Buffer; copy it into a fresh Uint8Array
+      // backed by a real ArrayBuffer so it's a valid BlobPart in the renderer.
+      const bytes = new Uint8Array(buffer)
+      const blob = new Blob([bytes], { type: 'application/zip' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -152,6 +168,28 @@ export function ProfileManager() {
     } catch (e: any) {
       setError(e.message ?? 'Export failed')
     }
+  }
+
+  const handleApplyDrift = async (profile: Profile) => {
+    if (!confirm(`Apply fingerprint drift to "${profile.name}"? This bumps the Chrome version and rotates noise seeds.`)) return
+    try {
+      await window.api.drift.apply(profile.id)
+      await fetchProfiles()
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to apply drift')
+    }
+  }
+
+  const handlePickCollisionProfile = (profileId: string) => {
+    setShowCollisions(false)
+    setHighlightId(profileId)
+    // Defer scroll until the drawer unmount + DOM updates settle
+    setTimeout(() => {
+      const el = document.getElementById(`profile-card-${profileId}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 50)
+    // Auto-clear highlight after a few seconds
+    setTimeout(() => setHighlightId(null), 3000)
   }
 
   const handleImportBundle = async () => {
@@ -190,6 +228,14 @@ export function ProfileManager() {
             >
               <CheckSquare className="w-4 h-4" />
               {selectionMode ? 'Cancel' : 'Select'}
+            </button>
+            <button
+              onClick={() => setShowCollisions(true)}
+              className="btn-ghost flex items-center gap-2 text-sm"
+              title="Scan for fingerprint collisions across profiles"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              Check collisions
             </button>
             <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2 text-sm">
               <Plus className="w-4 h-4" />
@@ -302,7 +348,15 @@ export function ProfileManager() {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filtered.map((profile) => (
-                <div key={profile.id} className="relative">
+                <div
+                  key={profile.id}
+                  id={`profile-card-${profile.id}`}
+                  className={`relative transition-shadow ${
+                    highlightId === profile.id
+                      ? 'ring-2 ring-amber-400 rounded-xl shadow-lg shadow-amber-500/20'
+                      : ''
+                  }`}
+                >
                   {selectionMode && (
                     <div
                       className="absolute inset-0 z-10 flex items-start justify-end p-2 cursor-pointer"
@@ -325,11 +379,15 @@ export function ProfileManager() {
                     onEdit={() => setEditProfile(profile)}
                     onClone={() => handleClone(profile.id)}
                     onDelete={() => handleDelete(profile.id)}
-                    onImportCookies={() => setCookieModal({ profile, mode: 'import' })}
+                    onImportCookies={() => setCookieModal({ profile, mode: 'browse' })}
                     onExportCookies={() => setCookieModal({ profile, mode: 'export' })}
+                    onStorage={() => setStorageProfile(profile)}
                     onExportBundle={() => handleExportBundle(profile.id)}
                     onImportBundle={handleImportBundle}
                     onHistory={() => setHistoryProfile(profile)}
+                    onExtensions={() => setExtensionsProfile(profile)}
+                    onWarmUp={() => setWarmUpProfile(profile)}
+                    onApplyDrift={() => handleApplyDrift(profile)}
                   />
                 </div>
               ))}
@@ -365,7 +423,15 @@ export function ProfileManager() {
         <CookieModal
           profileId={cookieModal.profile.id}
           mode={cookieModal.mode}
+          isActive={activeSessions.includes(cookieModal.profile.id)}
           onClose={() => setCookieModal(null)}
+        />
+      )}
+      {storageProfile && (
+        <StorageInspectorModal
+          profileId={storageProfile.id}
+          profileName={storageProfile.name}
+          onClose={() => setStorageProfile(null)}
         />
       )}
       {historyProfile && (
@@ -373,6 +439,26 @@ export function ProfileManager() {
           profile={historyProfile}
           onClose={() => setHistoryProfile(null)}
           onRestored={() => { fetchProfiles(); setHistoryProfile(null) }}
+        />
+      )}
+      {extensionsProfile && (
+        <ExtensionsModal
+          profile={extensionsProfile}
+          onClose={() => setExtensionsProfile(null)}
+        />
+      )}
+      {warmUpProfile && (
+        <WarmUpModal
+          profile={warmUpProfile}
+          isActive={activeSessions.includes(warmUpProfile.id)}
+          onLaunch={() => handleLaunch(warmUpProfile.id)}
+          onClose={() => { setWarmUpProfile(null); fetchProfiles() }}
+        />
+      )}
+      {showCollisions && (
+        <CollisionsDrawer
+          onPickProfile={handlePickCollisionProfile}
+          onClose={() => setShowCollisions(false)}
         />
       )}
     </div>
