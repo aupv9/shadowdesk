@@ -18,6 +18,7 @@ import { pushProfiles, pullProfiles, getSyncState, getSyncManifest, markPendingC
 import type { CreateProfileInput, CreateProxyInput, TeamRole, CreateWorkflowInput, UpdateWorkflowInput, ApiServerConfig } from '../../shared/types'
 import { parseNetscapeCookies, toNetscapeFormat } from '../utils/cookies'
 import { DetectionTestRunner } from '../detection-test'
+import { ChromiumPatchManager } from '../fingerprint/chromium-patches'
 
 // ── Handler registration ───────────────────────────────────────────────────
 
@@ -557,6 +558,22 @@ export function registerIpcHandlers(): void {
     }
 
     return { total: profileIds.length, completed, failed, results }
+  })
+
+  // ── Chromium Patches (Phase 8) ────────────────────────────────────────────
+
+  const patchManager = ChromiumPatchManager.getInstance()
+
+  ipcMain.handle('patches:status', () => {
+    return patchManager.getStatus()
+  })
+
+  ipcMain.handle('patches:list', () => {
+    return patchManager.getStatus().patches
+  })
+
+  ipcMain.handle('patches:getByCategory', (_event, category: string) => {
+    return patchManager.getPatchesByCategory(category as any)
   })
 
   // ── Profile Version History (Phase 6) ─────────────────────────────────────

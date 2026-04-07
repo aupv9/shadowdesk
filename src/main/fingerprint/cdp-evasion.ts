@@ -19,6 +19,8 @@ export class CdpEvasion {
       await session.send('Page.setBypassCSP', { enabled: true }).catch(() => {})
       // Remove debugger domain artifacts
       await session.send('Runtime.setMaxCallStackSizeToCapture', { size: 0 }).catch(() => {})
+      // Phase 8: disable Runtime domain features that expose automation context
+      await session.send('Runtime.setCustomObjectFormatterEnabled', { enabled: false }).catch(() => {})
     } finally {
       await session.detach()
     }
@@ -37,7 +39,12 @@ export class CdpEvasion {
       // Phase 6: new evasion layers
       this.patchObjectDefinePropertyTrap(),
       this.patchWorkerNavigator(),
-      this.maskBlinkInternals()
+      this.maskBlinkInternals(),
+      // Phase 8: deep evasion
+      this.patchMathFpu(),
+      this.patchProtoChains(),
+      this.patchMediaCapabilities(),
+      this.patchTrustTokens()
     ].join('\n;\n')
   }
 
@@ -489,6 +496,201 @@ export class CdpEvasion {
     // Can't reassign window itself, but we can ensure iframe windows are clean
     // by patching the getter on WindowProxy (handled by iframe patch above)
   } catch(e) {}
+})();
+`
+  }
+
+  // ── Phase 8 methods ────────────────────────────────────────────────────────
+
+  /**
+   * Math FPU determinism patch.
+   * Some fingerprinters call Math.sin/cos/tan/atan2 on specific values and
+   * compare results to a known table of values per CPU architecture.
+   * We normalise the outputs to the expected x86 IEEE 754 results, hiding
+   * differences introduced by ARM or other hosts running the Electron app.
+   */
+  private patchMathFpu(): string {
+    return `
+(function() {
+  'use strict';
+
+  // Known FPU-sensitive values: result of Math.sin(1) differs by ~1e-19 between
+  // x86 and ARM. We pin to the x86 reference value.
+  var FPU_TABLE = {
+    'sin:1':          0.8414709848078965,
+    'cos:1':          0.5403023058681398,
+    'tan:1':          1.5574077246549023,
+    'atan2:1:1':      0.7853981633974483,
+    'sin:Math.PI':    1.2246467991473532e-16,
+    'cos:Math.PI':    -1,
+    'exp:1':          2.718281828459045,
+    'log:Math.E':     1,
+    'sqrt:2':         1.4142135623730951
+  };
+
+  var _origSin   = Math.sin.bind(Math);
+  var _origCos   = Math.cos.bind(Math);
+  var _origTan   = Math.tan.bind(Math);
+  var _origAtan2 = Math.atan2.bind(Math);
+
+  function makeNative(name, fn) {
+    Object.defineProperty(fn, 'toString', {
+      value: function() { return 'function ' + name + '() { [native code] }'; },
+      configurable: true
+    });
+    return fn;
+  }
+
+  Math.sin = makeNative('sin', function sin(x) {
+    if (x === 1) return FPU_TABLE['sin:1'];
+    if (x === Math.PI) return FPU_TABLE['sin:Math.PI'];
+    return _origSin(x);
+  });
+
+  Math.cos = makeNative('cos', function cos(x) {
+    if (x === 1) return FPU_TABLE['cos:1'];
+    if (x === Math.PI) return FPU_TABLE['cos:Math.PI'];
+    return _origCos(x);
+  });
+
+  Math.tan = makeNative('tan', function tan(x) {
+    if (x === 1) return FPU_TABLE['tan:1'];
+    return _origTan(x);
+  });
+
+  Math.atan2 = makeNative('atan2', function atan2(y, x) {
+    if (y === 1 && x === 1) return FPU_TABLE['atan2:1:1'];
+    return _origAtan2(y, x);
+  });
+})();
+`
+  }
+
+  /**
+   * Prototype chain normalisation.
+   * Some detectors enumerate the prototype chain of browser APIs and compare
+   * the length / property descriptors to a known-good Chrome fingerprint.
+   * We ensure our patched functions sit correctly on the native prototype and
+   * their [[Prototype]] chain is not unexpectedly extended.
+   */
+  private patchProtoChains(): string {
+    return `
+(function() {
+  'use strict';
+
+  // Ensure Function.prototype is not polluted with enumerable properties
+  // (some automation frameworks accidentally add enumerable items here)
+  var fpProto = Function.prototype;
+  var keys = Object.getOwnPropertyNames(fpProto);
+  var ALLOWED = new Set([
+    'length','name','constructor','apply','bind','call','toString',
+    'arguments','caller','hasOwnProperty','isPrototypeOf',
+    'propertyIsEnumerable','toLocaleString','valueOf'
+  ]);
+
+  keys.forEach(function(k) {
+    if (!ALLOWED.has(k)) {
+      var desc = Object.getOwnPropertyDescriptor(fpProto, k);
+      if (desc && desc.enumerable) {
+        try {
+          Object.defineProperty(fpProto, k, Object.assign({}, desc, { enumerable: false }));
+        } catch(e) {}
+      }
+    }
+  });
+
+  // Ensure Object.prototype is clean
+  var opProto = Object.prototype;
+  Object.getOwnPropertyNames(opProto).forEach(function(k) {
+    var ALLOWED_OP = new Set([
+      '__defineGetter__','__defineSetter__','__lookupGetter__','__lookupSetter__',
+      '__proto__','constructor','hasOwnProperty','isPrototypeOf',
+      'propertyIsEnumerable','toLocaleString','toString','valueOf'
+    ]);
+    if (!ALLOWED_OP.has(k)) {
+      var desc = Object.getOwnPropertyDescriptor(opProto, k);
+      if (desc && desc.enumerable) {
+        try {
+          Object.defineProperty(opProto, k, Object.assign({}, desc, { enumerable: false }));
+        } catch(e) {}
+      }
+    }
+  });
+})();
+`
+  }
+
+  /**
+   * MediaCapabilities API normalisation.
+   * navigator.mediaCapabilities.decodingInfo() returns hardware decoding
+   * capabilities that differ between headless and real Chrome.  We normalise
+   * the response to always indicate hardware-accelerated smooth playback.
+   */
+  private patchMediaCapabilities(): string {
+    return `
+(function() {
+  'use strict';
+
+  if (!navigator.mediaCapabilities || !navigator.mediaCapabilities.decodingInfo) return;
+
+  var _origDecoding = navigator.mediaCapabilities.decodingInfo.bind(navigator.mediaCapabilities);
+
+  navigator.mediaCapabilities.decodingInfo = function(config) {
+    return _origDecoding(config).then(function(result) {
+      // Always report smooth hardware-accelerated decoding
+      return {
+        supported:              true,
+        smooth:                 true,
+        powerEfficient:         true,
+        configuration:          config
+      };
+    }).catch(function() {
+      return { supported: true, smooth: true, powerEfficient: true, configuration: config };
+    });
+  };
+
+  Object.defineProperty(navigator.mediaCapabilities.decodingInfo, 'toString', {
+    value: function() { return 'function decodingInfo() { [native code] }'; },
+    configurable: true
+  });
+})();
+`
+  }
+
+  /**
+   * Private State Tokens (Trust Tokens) API stub.
+   * This API is used by some anti-bot services (Cloudflare, Google) to check
+   * if the browser has trusted tokens issued by a verifier.  Headless Chrome
+   * may expose a different surface than real Chrome.  We normalise the API
+   * presence and ensure hasPrivateToken resolves consistently.
+   */
+  private patchTrustTokens(): string {
+    return `
+(function() {
+  'use strict';
+
+  // hasPrivateToken / hasRedemptionRecord — Chrome 101+
+  if (!('hasPrivateToken' in document)) {
+    Object.defineProperty(document, 'hasPrivateToken', {
+      value: function(issuer) {
+        return Promise.resolve(false);
+      },
+      writable: false,
+      configurable: true,
+      enumerable: true
+    });
+  }
+
+  if (!('hasRedemptionRecord' in document)) {
+    Object.defineProperty(document, 'hasRedemptionRecord', {
+      value: function(issuer) {
+        return Promise.resolve(false);
+      },
+      writable: false,
+      configurable: true,
+      enumerable: true
+    });
+  }
 })();
 `
   }

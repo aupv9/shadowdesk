@@ -127,6 +127,12 @@ const api = {
     deleteResult: (resultId: string)           => ipcRenderer.invoke('detection:deleteResult', resultId),
     clearHistory: (profileId?: string)         => ipcRenderer.invoke('detection:clearHistory', profileId),
     batchTest:    (profileIds: string[])       => ipcRenderer.invoke('detection:batchTest', profileIds)
+  },
+  // Phase 8: Chromium Patch Manager
+  patches: {
+    status:        ()                  => ipcRenderer.invoke('patches:status'),
+    list:          ()                  => ipcRenderer.invoke('patches:list'),
+    getByCategory: (category: string)  => ipcRenderer.invoke('patches:getByCategory', category)
   }
 }
 

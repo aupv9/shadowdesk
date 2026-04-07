@@ -15,6 +15,10 @@ import { buildNetworkScript } from './scripts/network'
 import { buildPerformanceScript } from './scripts/performance'
 import { buildBehaviorScript } from './scripts/behavior'
 import { buildTimingScript } from './scripts/timing'
+// Phase 8: new fingerprint scripts
+import { buildIntlScript } from './scripts/intl'
+import { buildWebGPUScript } from './scripts/webgpu'
+import { buildUserAgentDataScript } from './scripts/useragentdata'
 import { CdpEvasion } from './cdp-evasion'
 
 export class FingerprintInjector {
@@ -42,7 +46,11 @@ export class FingerprintInjector {
         : null,
       fp.timing
         ? buildTimingScript(fp.timing, fp.canvas.noiseSeed ^ 0xCAFE)
-        : null
+        : null,
+      // Phase 8: Layer 4 — deep fingerprint vectors
+      buildIntlScript(fp.locale),
+      buildWebGPUScript(fp.webgl),
+      buildUserAgentDataScript(fp.browser, fp.os)
     ].filter(Boolean)
 
     const combined = scripts.join('\n;\n')
@@ -75,6 +83,37 @@ export class FingerprintInjector {
 
       // Geolocation (disabled by default — prevent sites from getting location)
       await session.send('Emulation.setGeolocationOverride', {})
+
+      // Phase 8: User-Agent Client Hints (UACH) at CDP level
+      // This sets the Sec-CH-UA HTTP headers to match the spoofed UA
+      const majorVersion = fp.browser.version
+      await session.send('Emulation.setUserAgentOverride', {
+        userAgent: fp.browser.userAgent,
+        platform: fp.browser.platform,
+        acceptLanguage: fp.locale.language,
+        userAgentMetadata: {
+          brands: [
+            { brand: 'Not/A)Brand',   version: '8' },
+            { brand: 'Chromium',      version: majorVersion },
+            { brand: 'Google Chrome', version: majorVersion }
+          ],
+          fullVersionList: [
+            { brand: 'Not/A)Brand',   version: '8.0.0.0' },
+            { brand: 'Chromium',      version: majorVersion + '.0.0.0' },
+            { brand: 'Google Chrome', version: majorVersion + '.0.0.0' }
+          ],
+          platform: fp.os.platform === 'Win32' ? 'Windows'
+                  : fp.os.platform === 'MacIntel' ? 'macOS'
+                  : fp.os.platform.startsWith('Linux') ? 'Linux'
+                  : fp.os.platform,
+          platformVersion: fp.os.version ?? '10.0.0',
+          architecture: 'x86',
+          model: '',
+          mobile: fp.hardware.maxTouchPoints > 0 && fp.os.platform !== 'Win32'
+        }
+      }).catch(() => {
+        // Fallback: older Chromium may not support userAgentMetadata field
+      })
 
       await session.detach()
     } catch (err) {

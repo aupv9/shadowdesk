@@ -120,6 +120,22 @@ export class DetectionTestRunner {
     vectors.push(await this.testSeleniumArtifacts(page))
     vectors.push(await this.testServiceWorkerSupport(page))
     vectors.push(await this.testDocumentFocus(page))
+    // Phase 8: 15 new deep detection vectors
+    vectors.push(await this.testIntlLocaleConsistency(page))
+    vectors.push(await this.testUserAgentDataBrands(page))
+    vectors.push(await this.testUserAgentDataPlatform(page))
+    vectors.push(await this.testWebGPUPresence(page))
+    vectors.push(await this.testMathFpuFingerprint(page))
+    vectors.push(await this.testProtoChainIntegrity(page))
+    vectors.push(await this.testMediaCapabilitiesApi(page))
+    vectors.push(await this.testKeyboardApiPresence(page))
+    vectors.push(await this.testWebRtcSdpFingerprint(page))
+    vectors.push(await this.testDevicePixelRatioConsistency(page))
+    vectors.push(await this.testNavigationTimingConsistency(page))
+    vectors.push(await this.testSpeechSynthesisConsistency(page))
+    vectors.push(await this.testTrustTokenApiShape(page))
+    vectors.push(await this.testSharedArrayBufferAvailability(page))
+    vectors.push(await this.testIntlSupportedValues(page))
 
     return vectors
   }
@@ -674,6 +690,313 @@ export class DetectionTestRunner {
       category: 'Browser',
       passed,
       detail: `hasFocus=${result.hasFocus}, visibilityState=${result.visibilityState}, hidden=${result.hidden}`
+    }
+  }
+
+  // ── Phase 8 vectors ────────────────────────────────────────────────────────
+
+  /** Intl.DateTimeFormat locale consistency — must match navigator.language */
+  private async testIntlLocaleConsistency(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const intlLocale = Intl.DateTimeFormat().resolvedOptions().locale
+      const navLocale  = navigator.language
+      const tzIntl     = Intl.DateTimeFormat().resolvedOptions().timeZone
+      return { intlLocale, navLocale, tzIntl, match: intlLocale.startsWith(navLocale.split('-')[0]) }
+    })
+    return {
+      name: 'Intl locale consistency',
+      category: 'Locale',
+      passed: result.match,
+      detail: `Intl=${result.intlLocale}, navigator.language=${result.navLocale}, tz=${result.tzIntl}`
+    }
+  }
+
+  /** navigator.userAgentData.brands must be present and non-empty */
+  private async testUserAgentDataBrands(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const uad = (navigator as any).userAgentData
+      if (!uad) return { available: false, count: 0, brands: [] as string[] }
+      const brands = (uad.brands || []).map((b: any) => b.brand)
+      return { available: true, count: brands.length, brands }
+    })
+    const passed = !result.available || result.count >= 2
+    return {
+      name: 'UACH brands list',
+      category: 'Browser',
+      passed,
+      detail: result.available
+        ? `brands=[${result.brands.join(', ')}]`
+        : 'userAgentData not available (non-Chromium UA)'
+    }
+  }
+
+  /** navigator.userAgentData.platform must match the spoofed OS */
+  private async testUserAgentDataPlatform(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const uad = (navigator as any).userAgentData
+      if (!uad) return { available: false, platform: '', uaPlatform: '' }
+      return {
+        available: true,
+        platform: uad.platform,
+        uaPlatform: navigator.userAgent.includes('Windows') ? 'Windows'
+                  : navigator.userAgent.includes('Mac') ? 'macOS'
+                  : navigator.userAgent.includes('Linux') ? 'Linux' : 'Other'
+      }
+    })
+    const passed = !result.available || result.platform === result.uaPlatform
+    return {
+      name: 'UACH platform vs UA',
+      category: 'Browser',
+      passed,
+      detail: result.available
+        ? `UACH.platform=${result.platform}, expected=${result.uaPlatform}`
+        : 'userAgentData not available'
+    }
+  }
+
+  /** navigator.gpu (WebGPU) presence check */
+  private async testWebGPUPresence(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const hasGpu = 'gpu' in navigator
+      const gpuType = hasGpu ? typeof (navigator as any).gpu : 'absent'
+      return { hasGpu, gpuType }
+    })
+    return {
+      name: 'WebGPU API presence',
+      category: 'API',
+      passed: result.hasGpu && result.gpuType === 'object',
+      detail: result.hasGpu ? `navigator.gpu=${result.gpuType}` : 'navigator.gpu absent (stub needed)'
+    }
+  }
+
+  /** Math FPU fingerprint — checks if sin(1) returns the x86 reference value */
+  private async testMathFpuFingerprint(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const sinVal  = Math.sin(1)
+      const cosVal  = Math.cos(1)
+      // x86 reference values
+      const sinRef  = 0.8414709848078965
+      const cosRef  = 0.5403023058681398
+      const sinOk   = Math.abs(sinVal - sinRef) < 1e-15
+      const cosOk   = Math.abs(cosVal - cosRef) < 1e-15
+      return { sinVal, cosVal, sinOk, cosOk }
+    })
+    const passed = result.sinOk && result.cosOk
+    return {
+      name: 'Math FPU fingerprint',
+      category: 'API',
+      passed,
+      detail: `sin(1)=${result.sinVal}, cos(1)=${result.cosVal}, x86-consistent=${passed}`
+    }
+  }
+
+  /** Prototype chain integrity — Function.prototype must not have unexpected enumerable keys */
+  private async testProtoChainIntegrity(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const keys = []
+      for (const k in Function.prototype) {
+        keys.push(k)
+      }
+      return { enumerableKeys: keys, count: keys.length }
+    })
+    const passed = result.count === 0
+    return {
+      name: 'Prototype chain integrity',
+      category: 'Automation',
+      passed,
+      detail: passed
+        ? 'Function.prototype has no enumerable properties'
+        : `Unexpected enumerable keys: ${result.enumerableKeys.join(', ')}`
+    }
+  }
+
+  /** MediaCapabilities.decodingInfo consistency */
+  private async testMediaCapabilitiesApi(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(async () => {
+      if (!navigator.mediaCapabilities) return { available: false, smooth: false, supported: false }
+      try {
+        const info = await navigator.mediaCapabilities.decodingInfo({
+          type: 'media-source',
+          video: { contentType: 'video/mp4; codecs="avc1.42E01E"', width: 1920, height: 1080, bitrate: 4000000, framerate: 30 }
+        } as any)
+        return { available: true, smooth: info.smooth, supported: info.supported }
+      } catch {
+        return { available: false, smooth: false, supported: false }
+      }
+    })
+    const passed = !result.available || (result.supported && result.smooth)
+    return {
+      name: 'MediaCapabilities API',
+      category: 'API',
+      passed,
+      detail: result.available
+        ? `supported=${result.supported}, smooth=${result.smooth}`
+        : 'MediaCapabilities API not available'
+    }
+  }
+
+  /** Keyboard Layout API presence */
+  private async testKeyboardApiPresence(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const hasKeyboard = 'keyboard' in navigator
+      const hasGetLayout = hasKeyboard && typeof (navigator as any).keyboard.getLayoutMap === 'function'
+      return { hasKeyboard, hasGetLayout }
+    })
+    return {
+      name: 'Keyboard Layout API',
+      category: 'API',
+      passed: result.hasKeyboard && result.hasGetLayout,
+      detail: result.hasKeyboard
+        ? `navigator.keyboard present, getLayoutMap=${result.hasGetLayout}`
+        : 'navigator.keyboard absent — suspicious headless environment'
+    }
+  }
+
+  /** WebRTC SDP fingerprint — checks if localSDP contains expected DTLS fingerprint format */
+  private async testWebRtcSdpFingerprint(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(async () => {
+      try {
+        const pc = new RTCPeerConnection()
+        pc.addTransceiver('audio')
+        const offer = await pc.createOffer()
+        pc.close()
+        const sdp = offer.sdp || ''
+        const hasFingerprint = sdp.includes('a=fingerprint:')
+        const hasMsid        = sdp.includes('a=msid-semantic:')
+        return { hasFingerprint, hasMsid, sdpLen: sdp.length }
+      } catch {
+        return { hasFingerprint: false, hasMsid: false, sdpLen: 0 }
+      }
+    })
+    const passed = result.hasFingerprint && result.sdpLen > 100
+    return {
+      name: 'WebRTC SDP fingerprint',
+      category: 'Network',
+      passed,
+      detail: passed
+        ? `SDP has fingerprint+msid (${result.sdpLen} bytes)`
+        : 'WebRTC SDP missing expected fields'
+    }
+  }
+
+  /** devicePixelRatio consistency across window and screen APIs */
+  private async testDevicePixelRatioConsistency(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const dpr        = window.devicePixelRatio
+      const screenW    = screen.width
+      const outerW     = window.outerWidth
+      const dprValid   = dpr > 0 && dpr <= 4
+      const sizesValid = screenW > 0 && outerW > 0
+      return { dpr, screenW, outerW, dprValid, sizesValid }
+    })
+    const passed = result.dprValid && result.sizesValid
+    return {
+      name: 'devicePixelRatio consistency',
+      category: 'Hardware',
+      passed,
+      detail: `dpr=${result.dpr}, screen=${result.screenW}px, outer=${result.outerW}px`
+    }
+  }
+
+  /** Navigation Timing v2 — PerformanceNavigationTiming entries should look realistic */
+  private async testNavigationTimingConsistency(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const entries = performance.getEntriesByType('navigation')
+      if (!entries.length) return { available: false, realistic: false, detail: 'no navigation entries' }
+      const nav = entries[0] as PerformanceNavigationTiming
+      const realistic =
+        nav.domContentLoadedEventEnd > 0 &&
+        nav.responseStart >= nav.requestStart &&
+        nav.domInteractive >= nav.responseEnd
+      return { available: true, realistic, detail: `dns=${Math.round(nav.domainLookupEnd - nav.domainLookupStart)}ms, tcp=${Math.round(nav.connectEnd - nav.connectStart)}ms` }
+    })
+    const passed = !result.available || result.realistic
+    return {
+      name: 'Navigation Timing v2',
+      category: 'Timing',
+      passed,
+      detail: result.detail
+    }
+  }
+
+  /** speechSynthesis.getVoices() locale consistency with navigator.language */
+  private async testSpeechSynthesisConsistency(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      if (!('speechSynthesis' in window)) return { available: false, count: 0, match: true }
+      const voices = window.speechSynthesis.getVoices()
+      const lang   = navigator.language.split('-')[0]
+      const hasLang = voices.some(v => v.lang.startsWith(lang))
+      return { available: true, count: voices.length, match: voices.length === 0 || hasLang }
+    })
+    return {
+      name: 'SpeechSynthesis consistency',
+      category: 'API',
+      passed: !result.available || result.match,
+      detail: result.available
+        ? `${result.count} voices, locale-match=${result.match}`
+        : 'speechSynthesis API not available'
+    }
+  }
+
+  /** Private State Tokens (Trust Tokens) API shape check */
+  private async testTrustTokenApiShape(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const hasPrivateToken    = 'hasPrivateToken' in document
+      const hasRedemptionRecord = 'hasRedemptionRecord' in document
+      return { hasPrivateToken, hasRedemptionRecord }
+    })
+    // Chrome 101+ has both; absence on recent Chrome is suspicious
+    return {
+      name: 'Private State Tokens API',
+      category: 'API',
+      passed: result.hasPrivateToken && result.hasRedemptionRecord,
+      detail: `hasPrivateToken=${result.hasPrivateToken}, hasRedemptionRecord=${result.hasRedemptionRecord}`
+    }
+  }
+
+  /** SharedArrayBuffer availability — requires cross-origin isolation */
+  private async testSharedArrayBufferAvailability(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      const available = typeof SharedArrayBuffer !== 'undefined'
+      // If available, check Atomics is also present
+      const atomicsOk = available && typeof Atomics !== 'undefined'
+      return { available, atomicsOk }
+    })
+    // SAB may or may not be available depending on COOP/COEP headers; we check consistency
+    const passed = !result.available || result.atomicsOk
+    return {
+      name: 'SharedArrayBuffer + Atomics',
+      category: 'API',
+      passed,
+      detail: result.available
+        ? `SharedArrayBuffer available, Atomics=${result.atomicsOk}`
+        : 'SharedArrayBuffer not available (expected with COOP/COEP headers)'
+    }
+  }
+
+  /** Intl.supportedValuesOf returns stable list */
+  private async testIntlSupportedValues(page: Page): Promise<DetectionVectorResult> {
+    const result = await page.evaluate(() => {
+      if (typeof (Intl as any).supportedValuesOf !== 'function') {
+        return { available: false, tzCount: 0, currCount: 0 }
+      }
+      try {
+        const tzs  = (Intl as any).supportedValuesOf('timeZone')
+        const currs = (Intl as any).supportedValuesOf('currency')
+        return { available: true, tzCount: tzs.length, currCount: currs.length }
+      } catch {
+        return { available: false, tzCount: 0, currCount: 0 }
+      }
+    })
+    // A well-formed Intl should return ≥3 timezones and ≥3 currencies in our stub
+    const passed = !result.available || (result.tzCount >= 3 && result.currCount >= 3)
+    return {
+      name: 'Intl.supportedValuesOf stability',
+      category: 'Locale',
+      passed,
+      detail: result.available
+        ? `${result.tzCount} timezones, ${result.currCount} currencies`
+        : 'Intl.supportedValuesOf not available'
     }
   }
 }

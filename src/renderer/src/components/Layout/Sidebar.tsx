@@ -11,7 +11,8 @@ import {
   User,
   Crown,
   Bot,
-  Shield
+  Shield,
+  Cpu
 } from 'lucide-react'
 import type { NavSection } from '../../types'
 import type { User as UserType, LicensePlan } from '../../types'
@@ -44,6 +45,7 @@ const NAV_ITEMS: { key: NavSection; icon: React.ElementType; label: string }[] =
   { key: 'proxies',     icon: Globe,        label: 'Proxies' },
   { key: 'fingerprint', icon: Fingerprint,  label: 'Fingerprint' },
   { key: 'detection',   icon: Shield,       label: 'Detection' },
+  { key: 'patches',     icon: Cpu,          label: 'Patches' },
   { key: 'automation',  icon: Bot,          label: 'Automation' },
   { key: 'team',        icon: Users,        label: 'Team' },
   { key: 'account',     icon: User,         label: 'Account' },
