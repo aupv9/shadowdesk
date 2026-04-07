@@ -1,12 +1,51 @@
 import React, { useEffect, useState } from 'react'
 import {
   User, LogOut, Key, Cloud, CloudOff, Upload, Download, Shield,
-  RefreshCw, AlertTriangle, Check, Crown, Lock
+  RefreshCw, AlertTriangle, Check, Crown, Lock, Eye, EyeOff
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useLicenseStore } from '../../stores/licenseStore'
 import { useSyncStore } from '../../stores/syncStore'
 import type { SyncStatus } from '../../types'
+
+const REMEMBERED_EMAIL_KEY = 'ghostbrowser.account.rememberedEmail'
+
+function Skeleton({ className = '' }: { className?: string }) {
+  return <div className={`bg-slate-700/60 animate-pulse rounded ${className}`} />
+}
+
+function LicenseSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-3 w-16" />
+      </div>
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-3 w-12" />
+        </div>
+        <Skeleton className="h-2 w-full" />
+      </div>
+      <div className="space-y-2 pt-2">
+        <Skeleton className="h-3 w-3/4" />
+        <Skeleton className="h-3 w-2/3" />
+      </div>
+    </div>
+  )
+}
+
+function ManifestSkeleton() {
+  return (
+    <div className="space-y-2">
+      <Skeleton className="h-3 w-3/4" />
+      <Skeleton className="h-3 w-2/3" />
+      <Skeleton className="h-3 w-1/2" />
+      <Skeleton className="h-3 w-3/5" />
+    </div>
+  )
+}
 
 const PLAN_LABELS: Record<string, { label: string; color: string }> = {
   free:         { label: 'Free',         color: 'text-slate-400' },
@@ -29,9 +68,15 @@ export function AccountPage() {
   const sync = useSyncStore()
 
   const [authTab, setAuthTab] = useState<'login' | 'register'>('login')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => {
+    try { return localStorage.getItem(REMEMBERED_EMAIL_KEY) ?? '' } catch { return '' }
+  })
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [rememberEmail, setRememberEmail] = useState(() => {
+    try { return !!localStorage.getItem(REMEMBERED_EMAIL_KEY) } catch { return false }
+  })
   const [authError, setAuthError] = useState<string | null>(null)
 
   const [licenseKey, setLicenseKey] = useState('')
@@ -40,6 +85,15 @@ export function AccountPage() {
 
   const [syncPassword, setSyncPassword] = useState('')
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
+
+  // Change-password form state (only used when authenticated)
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changePasswordError, setChangePasswordError] = useState<string | null>(null)
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
 
   useEffect(() => {
     auth.checkAuth()
@@ -51,6 +105,30 @@ export function AccountPage() {
     if (auth.authenticated) {
       sync.fetchStatus()
       sync.fetchManifest()
+      // Force a fresh license check on sign-in so plan upgrades land
+      // immediately instead of waiting for the next app restart.
+      license.refreshLicense()
+    }
+  }, [auth.authenticated])
+
+  // Auto-refresh license on window focus and every 30 minutes while open.
+  // Skips when not authenticated — there's nothing to fetch.
+  useEffect(() => {
+    if (!auth.authenticated) return
+
+    const refresh = (): void => {
+      // Throttle to at most one refresh per minute regardless of trigger.
+      const last = useLicenseStore.getState().lastRefreshedAt ?? 0
+      if (Date.now() - last < 60_000) return
+      license.refreshLicense()
+      license.fetchUsage()
+    }
+
+    window.addEventListener('focus', refresh)
+    const interval = window.setInterval(refresh, 30 * 60 * 1000)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      window.clearInterval(interval)
     }
   }, [auth.authenticated])
 
@@ -60,11 +138,23 @@ export function AccountPage() {
     return cleanup
   }, [])
 
+  const persistRememberedEmail = (value: string): void => {
+    try {
+      if (rememberEmail && value) {
+        localStorage.setItem(REMEMBERED_EMAIL_KEY, value)
+      } else {
+        localStorage.removeItem(REMEMBERED_EMAIL_KEY)
+      }
+    } catch { /* localStorage may be disabled */ }
+  }
+
   const handleLogin = async () => {
     setAuthError(null)
     try {
       await auth.login(email, password)
-      setEmail('')
+      persistRememberedEmail(email)
+      // Keep email visible if remembered, clear it otherwise.
+      if (!rememberEmail) setEmail('')
       setPassword('')
       license.fetchLicense()
       license.fetchUsage()
@@ -77,12 +167,51 @@ export function AccountPage() {
     setAuthError(null)
     try {
       await auth.register(email, password, name)
-      setEmail('')
+      persistRememberedEmail(email)
+      if (!rememberEmail) setEmail('')
       setPassword('')
       setName('')
       license.fetchLicense()
     } catch (e: any) {
       setAuthError(e.message)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    setChangePasswordError(null)
+    setChangePasswordSuccess(false)
+    if (!currentPassword || !newPassword) {
+      setChangePasswordError('Both current and new passwords are required')
+      return
+    }
+    if (newPassword.length < 8) {
+      setChangePasswordError('New password must be at least 8 characters')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setChangePasswordError('New password and confirmation do not match')
+      return
+    }
+    if (newPassword === currentPassword) {
+      setChangePasswordError('New password must differ from the current one')
+      return
+    }
+    setChangingPassword(true)
+    try {
+      await auth.updatePassword(currentPassword, newPassword)
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setChangePasswordSuccess(true)
+      // Hide the form after a brief success state so the user sees confirmation.
+      setTimeout(() => {
+        setShowChangePassword(false)
+        setChangePasswordSuccess(false)
+      }, 1500)
+    } catch (e: any) {
+      setChangePasswordError(e.message ?? 'Failed to update password')
+    } finally {
+      setChangingPassword(false)
     }
   }
 
@@ -105,6 +234,7 @@ export function AccountPage() {
     setSyncMessage(null)
     try {
       await sync.push(syncPassword)
+      await sync.fetchManifest()
       setSyncMessage('Profiles pushed to cloud successfully')
     } catch (e: any) {
       setSyncMessage(e.message)
@@ -116,6 +246,7 @@ export function AccountPage() {
     setSyncMessage(null)
     try {
       const count = await sync.pull(syncPassword)
+      await sync.fetchManifest()
       setSyncMessage(`Pulled ${count} profiles from cloud`)
     } catch (e: any) {
       setSyncMessage(e.message)
@@ -136,7 +267,7 @@ export function AccountPage() {
         <h1 className="text-lg font-semibold text-white">Account</h1>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-2xl">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 w-full max-w-5xl mx-auto">
         {/* ── Auth Section ─────────────────────────────────────────── */}
         <div className="card">
           {!auth.authenticated ? (
@@ -192,21 +323,65 @@ export function AccountPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
                     className="input w-full"
+                    autoComplete="email"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">Password</label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="input w-full"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') authTab === 'login' ? handleLogin() : handleRegister()
-                    }}
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm text-slate-400">Password</label>
+                    {authTab === 'login' && (
+                      <a
+                        href="https://ghost-browser.app/forgot-password"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-ghost-400 hover:text-ghost-300 transition-colors"
+                      >
+                        Forgot password?
+                      </a>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="input w-full pr-10"
+                      autoComplete={authTab === 'login' ? 'current-password' : 'new-password'}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') authTab === 'login' ? handleLogin() : handleRegister()
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-300 transition-colors"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
+                {authTab === 'login' && (
+                  <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberEmail}
+                      onChange={(e) => {
+                        const checked = e.target.checked
+                        setRememberEmail(checked)
+                        // If unchecking, drop the stored value immediately so the
+                        // next visit starts blank — don't wait until next login.
+                        if (!checked) {
+                          try { localStorage.removeItem(REMEMBERED_EMAIL_KEY) } catch { /* ignore */ }
+                        }
+                      }}
+                      className="accent-ghost-600"
+                    />
+                    Remember my email on this device
+                  </label>
+                )}
                 <button
                   onClick={authTab === 'login' ? handleLogin : handleRegister}
                   disabled={auth.loading}
@@ -218,34 +393,147 @@ export function AccountPage() {
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-ghost-600/20 flex items-center justify-center">
-                  <User className="w-5 h-5 text-ghost-400" />
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-ghost-600/20 flex items-center justify-center">
+                    <User className="w-5 h-5 text-ghost-400" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-white">{auth.user?.name}</div>
+                    <div className="text-xs text-slate-400">{auth.user?.email}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm font-medium text-white">{auth.user?.name}</div>
-                  <div className="text-xs text-slate-400">{auth.user?.email}</div>
-                </div>
+                <button
+                  onClick={() => auth.logout()}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </button>
               </div>
-              <button
-                onClick={() => auth.logout()}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                Sign Out
-              </button>
-            </div>
+
+              {/* ── Change Password ─────────────────────────────────── */}
+              <div className="mt-4 pt-4 border-t border-slate-700/60">
+                {!showChangePassword ? (
+                  <button
+                    onClick={() => {
+                      setShowChangePassword(true)
+                      setChangePasswordError(null)
+                      setChangePasswordSuccess(false)
+                    }}
+                    className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    Change password
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                        <Key className="w-4 h-4" />
+                        Change Password
+                      </h3>
+                      <button
+                        onClick={() => {
+                          setShowChangePassword(false)
+                          setCurrentPassword('')
+                          setNewPassword('')
+                          setConfirmPassword('')
+                          setChangePasswordError(null)
+                          setChangePasswordSuccess(false)
+                        }}
+                        className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    {changePasswordError && (
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg bg-red-500/10 text-red-400 text-xs">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        {changePasswordError}
+                      </div>
+                    )}
+                    {changePasswordSuccess && (
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg bg-green-500/10 text-green-400 text-xs">
+                        <Check className="w-3.5 h-3.5 shrink-0" />
+                        Password updated successfully
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Current password</label>
+                      <input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="input w-full"
+                        autoComplete="current-password"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">New password</label>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="input w-full"
+                        autoComplete="new-password"
+                        placeholder="At least 8 characters"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Confirm new password</label>
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="input w-full"
+                        autoComplete="new-password"
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleChangePassword() }}
+                      />
+                    </div>
+                    <button
+                      onClick={handleChangePassword}
+                      disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+                      className="btn-primary w-full flex items-center justify-center gap-2 text-sm"
+                    >
+                      {changingPassword && <RefreshCw className="w-4 h-4 animate-spin" />}
+                      Update Password
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
 
+        {/* ── License + Sync grid (side-by-side on xl screens) ───── */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* ── License Section ──────────────────────────────────────── */}
         <div className="card">
-          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Crown className="w-4 h-4" />
-            License & Plan
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Crown className="w-4 h-4" />
+              License & Plan
+            </h2>
+            {auth.authenticated && (
+              <button
+                onClick={() => { license.refreshLicense(); license.fetchUsage() }}
+                disabled={license.refreshing}
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors disabled:opacity-50"
+                title="Refresh license from server"
+              >
+                <RefreshCw className={`w-3 h-3 ${license.refreshing ? 'animate-spin' : ''}`} />
+                {license.refreshing ? 'Refreshing…' : 'Refresh'}
+              </button>
+            )}
+          </div>
 
+          {license.loading && !license.license ? (
+            <LicenseSkeleton />
+          ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-400">Current Plan</span>
@@ -320,6 +608,7 @@ export function AccountPage() {
               </button>
             )}
           </div>
+          )}
         </div>
 
         {/* ── Cloud Sync Section ───────────────────────────────────── */}
@@ -369,6 +658,59 @@ export function AccountPage() {
                 </div>
               )}
 
+              {/* ── Remote manifest snapshot ────────────────────────── */}
+              <div className="rounded-lg bg-slate-800/60 border border-slate-700/60 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500">
+                    <Cloud className="w-3.5 h-3.5" />
+                    Remote Backup
+                  </div>
+                  <button
+                    onClick={() => sync.fetchManifest()}
+                    className="text-xs text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1"
+                    title="Refresh manifest"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Refresh
+                  </button>
+                </div>
+                {sync.manifestLoading && !sync.manifestLoaded ? (
+                  <ManifestSkeleton />
+                ) : sync.manifest ? (
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Profiles in cloud</span>
+                      <span className="text-slate-200 font-medium">
+                        {sync.manifest.profile_ids.length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Last modified</span>
+                      <span className="text-slate-300">
+                        {new Date(sync.manifest.last_modified).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Manifest version</span>
+                      <span className="text-slate-300">v{sync.manifest.version}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Integrity</span>
+                      <span
+                        className="text-slate-400 font-mono text-xs"
+                        title={sync.manifest.checksum}
+                      >
+                        {sync.manifest.checksum.slice(0, 12)}…
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    No backup found in the cloud yet — push to create one.
+                  </p>
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm text-slate-400 mb-1.5">Encryption Password</label>
                 <input
@@ -414,6 +756,7 @@ export function AccountPage() {
               )}
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>
