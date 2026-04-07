@@ -49,10 +49,11 @@ const api = {
   },
   // Phase 12.B.2 — Visual selector recorder
   recorder: {
-    start:        (profileId: string) => ipcRenderer.invoke('recorder:start', profileId),
-    stop:         (profileId: string) => ipcRenderer.invoke('recorder:stop', profileId),
-    state:        (profileId: string) => ipcRenderer.invoke('recorder:state', profileId),
-    isRecording:  (profileId: string) => ipcRenderer.invoke('recorder:isRecording', profileId)
+    start:             (profileId: string, captureScreenshots?: boolean) => ipcRenderer.invoke('recorder:start', profileId, captureScreenshots),
+    stop:              (profileId: string) => ipcRenderer.invoke('recorder:stop', profileId),
+    state:             (profileId: string) => ipcRenderer.invoke('recorder:state', profileId),
+    isRecording:       (profileId: string) => ipcRenderer.invoke('recorder:isRecording', profileId),
+    validateSelectors: (profileId: string) => ipcRenderer.invoke('recorder:validateSelectors', profileId)
   },
   // Phase 12.C.2 — Per-profile storage inspector (read-only)
   storage: {
@@ -182,6 +183,13 @@ const api = {
     stopAll:   (workflowId: string)                                   => ipcRenderer.invoke('workflows:stopAll', workflowId),
     isRunning: (workflowId: string, profileId: string)                => ipcRenderer.invoke('workflows:isRunning', workflowId, profileId),
     runs:      (workflowId: string)                                   => ipcRenderer.invoke('workflows:runs', workflowId),
+    // Tier 3 — Workflow versioning
+    versions: {
+      list:    (workflowId: string)                      => ipcRenderer.invoke('workflows:versions', workflowId),
+      save:    (workflowId: string, label?: string)       => ipcRenderer.invoke('workflows:versions:save', workflowId, label),
+      restore: (versionId: string)                       => ipcRenderer.invoke('workflows:versions:restore', versionId),
+      delete:  (versionId: string)                       => ipcRenderer.invoke('workflows:versions:delete', versionId)
+    },
     // Tier 2 — Run history dashboard, metrics, dry-run, debugger
     recentRuns:    (limit?: number)                                    => ipcRenderer.invoke('workflows:recentRuns', limit),
     metrics:       (workflowId?: string)                               => ipcRenderer.invoke('workflows:metrics', workflowId),

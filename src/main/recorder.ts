@@ -24,7 +24,7 @@
 
 import type { Page } from 'puppeteer-core'
 import { BrowserManager } from './browser-manager'
-import type { AutomationStep } from '../shared/types'
+import type { AutomationStep, RecordedScreenshot } from '../shared/types'
 import { v4 as uuidv4 } from 'uuid'
 
 export type RecordedEventType = 'click' | 'input' | 'change' | 'submit' | 'navigate'
@@ -47,6 +47,10 @@ interface RecorderSession {
   profileId: string
   page: Page
   events: RecordedEvent[]
+  /** Tier 3: screenshots keyed by event timestamp */
+  screenshots: RecordedScreenshot[]
+  /** Tier 3: whether to capture a screenshot after each recorded event */
+  captureScreenshots: boolean
   startedAt: number
   /** Last URL we observed — used to dedupe rapid framenav events. */
   lastUrl: string
@@ -67,8 +71,9 @@ export class Recorder {
     return this.sessions.has(profileId)
   }
 
-  /** Start (or resume) recording for the given profile. */
-  async start(profileId: string): Promise<void> {
+  /** Start (or resume) recording for the given profile.
+   *  Pass `captureScreenshots: true` to enable the Tier 3 screenshot trail. */
+  async start(profileId: string, captureScreenshots = false): Promise<void> {
     if (this.sessions.has(profileId)) return // already recording
 
     const bm = BrowserManager.getInstance()
@@ -79,6 +84,8 @@ export class Recorder {
       profileId,
       page,
       events: [],
+      screenshots: [],
+      captureScreenshots,
       startedAt: Date.now(),
       lastUrl: page.url()
     }
@@ -110,14 +117,23 @@ export class Recorder {
     })
   }
 
-  /** Stop recording and return the captured events + generated steps. */
-  stop(profileId: string): { events: RecordedEvent[]; steps: AutomationStep[] } {
+  /** Stop recording and return the captured events + generated steps.
+   *  Tier 3: also returns screenshots (base64 PNGs) and selector validation. */
+  async stop(profileId: string): Promise<{
+    events: RecordedEvent[]
+    steps: AutomationStep[]
+    screenshots: RecordedScreenshot[]
+    selectorIssues: { selector: string; found: boolean }[]
+  }> {
     const session = this.sessions.get(profileId)
-    if (!session) return { events: [], steps: [] }
+    if (!session) return { events: [], steps: [], screenshots: [], selectorIssues: [] }
     this.sessions.delete(profileId)
     const events = session.events
     const steps = this.eventsToSteps(events)
-    return { events, steps }
+    const screenshots = session.screenshots
+    // Tier 3: validate selectors still exist in the current page
+    const selectorIssues = await this.validateSelectors(session.page, steps)
+    return { events, steps, screenshots, selectorIssues }
   }
 
   /** Snapshot of the current recording (for live UI updates). */
@@ -125,14 +141,41 @@ export class Recorder {
     recording: boolean
     events: RecordedEvent[]
     steps: AutomationStep[]
+    screenshots: RecordedScreenshot[]
   } {
     const session = this.sessions.get(profileId)
-    if (!session) return { recording: false, events: [], steps: [] }
+    if (!session) return { recording: false, events: [], steps: [], screenshots: [] }
     return {
       recording: true,
       events: session.events.slice(),
-      steps: this.eventsToSteps(session.events)
+      steps: this.eventsToSteps(session.events),
+      screenshots: session.screenshots.slice()
     }
+  }
+
+  // ── Tier 3: Selector validation ─────────────────────────────────────────
+
+  /** Check whether each step's selector still resolves in the current page DOM.
+   *  Returns a list of { selector, found } pairs for steps that have selectors. */
+  private async validateSelectors(
+    page: Page,
+    steps: AutomationStep[]
+  ): Promise<{ selector: string; found: boolean }[]> {
+    const selectorActions = new Set([
+      'click', 'doubleClick', 'rightClick', 'hover', 'type', 'waitForSelector',
+      'extractText', 'select', 'setAttribute', 'upload'
+    ])
+    const issues: { selector: string; found: boolean }[] = []
+    for (const step of steps) {
+      if (!selectorActions.has(step.action) || !step.params?.selector) continue
+      try {
+        const el = await page.$(step.params.selector)
+        issues.push({ selector: step.params.selector, found: el !== null })
+      } catch {
+        issues.push({ selector: step.params.selector, found: false })
+      }
+    }
+    return issues
   }
 
   // ── Internals ───────────────────────────────────────────────────────────
@@ -212,6 +255,20 @@ export class Recorder {
       session.events.pop()
     }
     session.events.push(ev)
+
+    // Tier 3: capture screenshot after each event when the option is enabled.
+    // Non-blocking — failures are silently ignored so recording never breaks.
+    if (session.captureScreenshots) {
+      const ts = ev.timestamp
+      session.page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 60 })
+        .then((buf) => {
+          const dataUrl = `data:image/jpeg;base64,${buf as string}`
+          session.screenshots.push({ eventTimestamp: ts, dataUrl })
+          // Keep at most 50 screenshots to bound memory usage
+          if (session.screenshots.length > 50) session.screenshots.shift()
+        })
+        .catch(() => { /* non-fatal */ })
+    }
   }
 
   /** Convert the recorded event stream into AutomationStep[]. */

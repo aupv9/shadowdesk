@@ -428,8 +428,8 @@ export function registerIpcHandlers(): void {
 
   // ── Visual recorder (Phase 12.B.2) ────────────────────────────────────────
 
-  ipcMain.handle('recorder:start', async (_event, profileId: string) => {
-    await Recorder.getInstance().start(profileId)
+  ipcMain.handle('recorder:start', async (_event, profileId: string, captureScreenshots?: boolean) => {
+    await Recorder.getInstance().start(profileId, captureScreenshots ?? false)
     return { recording: true }
   })
 
@@ -439,6 +439,19 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('recorder:state', async (_event, profileId: string) => {
     return Recorder.getInstance().state(profileId)
+  })
+
+  ipcMain.handle('recorder:validateSelectors', async (_event, profileId: string) => {
+    const recorder = Recorder.getInstance()
+    if (!recorder.isRecording(profileId)) throw new Error('No active recording for profile')
+    const snapshot = recorder.state(profileId)
+    // Expose validateSelectors indirectly via stop-then-re-check would break
+    // the session. Instead we re-use the state's steps and run checks against
+    // the live page without stopping.
+    const bm = BrowserManager.getInstance()
+    const page = await bm.getActivePage(profileId)
+    if (!page) throw new Error('Profile page not available')
+    return (recorder as any).validateSelectors(page, snapshot.steps)
   })
 
   ipcMain.handle('recorder:isRecording', async (_event, profileId: string) => {
@@ -920,6 +933,19 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('workflows:update', (_event, id: string, data: UpdateWorkflowInput) => {
+    // Tier 3: auto-snapshot the current state before overwriting
+    const existing = db.getWorkflow(id)
+    if (existing && data.steps !== undefined) {
+      db.saveWorkflowVersion({
+        id: uuidv4(),
+        workflowId: id,
+        name: existing.name,
+        description: existing.description ?? '',
+        steps: JSON.parse(existing.steps),
+        variables: existing.variables ? JSON.parse(existing.variables) : undefined,
+        label: `Auto-save ${new Date().toLocaleTimeString()}`
+      })
+    }
     db.updateWorkflow(id, data)
     return hydrateWorkflow(db.getWorkflow(id))
   })
@@ -962,6 +988,55 @@ export function registerIpcHandlers(): void {
       step_results: JSON.parse(r.step_results),
       variables: r.variables ? JSON.parse(r.variables) : null
     }))
+  })
+
+  // ── Tier 3: Workflow versioning ───────────────────────────────────────
+
+  ipcMain.handle('workflows:versions', (_event, workflowId: string) => {
+    return db.getWorkflowVersions(workflowId)
+  })
+
+  ipcMain.handle('workflows:versions:save', (_event, workflowId: string, label?: string) => {
+    const row = db.getWorkflow(workflowId)
+    if (!row) throw new Error(`Workflow ${workflowId} not found`)
+    const id = uuidv4()
+    db.saveWorkflowVersion({
+      id,
+      workflowId,
+      name: row.name,
+      description: row.description ?? '',
+      steps: JSON.parse(row.steps),
+      variables: row.variables ? JSON.parse(row.variables) : undefined,
+      label: label ?? `Manual save ${new Date().toLocaleTimeString()}`
+    })
+    return db.getWorkflowVersion(id)
+  })
+
+  ipcMain.handle('workflows:versions:restore', (_event, versionId: string) => {
+    const version = db.getWorkflowVersion(versionId)
+    if (!version) throw new Error(`Version ${versionId} not found`)
+    // Snapshot the current state before restoring so the user can undo the restore
+    const current = db.getWorkflow(version.workflow_id)
+    if (current) {
+      db.saveWorkflowVersion({
+        id: uuidv4(),
+        workflowId: version.workflow_id,
+        name: current.name,
+        description: current.description ?? '',
+        steps: JSON.parse(current.steps),
+        variables: current.variables ? JSON.parse(current.variables) : undefined,
+        label: `Before restore ${new Date().toLocaleTimeString()}`
+      })
+    }
+    db.updateWorkflow(version.workflow_id, {
+      steps: version.steps,
+      variables: version.variables
+    })
+    return hydrateWorkflow(db.getWorkflow(version.workflow_id))
+  })
+
+  ipcMain.handle('workflows:versions:delete', (_event, versionId: string) => {
+    db.deleteWorkflowVersion(versionId)
   })
 
   // ── Tier 2: Run history dashboard, metrics, dry-run, debugger ─────────
