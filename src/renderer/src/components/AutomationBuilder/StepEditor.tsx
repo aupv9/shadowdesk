@@ -34,7 +34,8 @@ import {
   Layers,
   CornerDownRight,
   ShieldOff,
-  Cookie
+  Cookie,
+  CheckCircle
 } from 'lucide-react'
 import type { AutomationStep, AutomationActionType } from '../../types'
 
@@ -71,7 +72,9 @@ const ACTION_META: Record<AutomationActionType, { icon: React.ElementType; label
   clearIntercepts:    { icon: ShieldOff,          label: 'Clear Intercepts',     color: 'text-rose-200' },
   getCookies:         { icon: Cookie,             label: 'Get Cookies',          color: 'text-amber-200' },
   setCookies:         { icon: Cookie,             label: 'Set Cookies',          color: 'text-amber-300' },
-  deleteCookies:      { icon: Cookie,             label: 'Delete Cookies',       color: 'text-amber-400' }
+  deleteCookies:      { icon: Cookie,             label: 'Delete Cookies',       color: 'text-amber-400' },
+  // Tier 3 RPA — assertions
+  assert:             { icon: CheckCircle,        label: 'Assert',               color: 'text-green-300' }
 }
 
 const ALL_ACTIONS: AutomationActionType[] = [
@@ -85,7 +88,8 @@ const ALL_ACTIONS: AutomationActionType[] = [
   // Tier 1 RPA additions
   'callWorkflow', 'parallelSteps', 'jumpToStep',
   'interceptRequest', 'clearIntercepts',
-  'getCookies', 'setCookies', 'deleteCookies'
+  'getCookies', 'setCookies', 'deleteCookies',
+  'assert'
 ]
 
 interface StepEditorProps {
@@ -132,6 +136,7 @@ function getDefaultParams(action: AutomationActionType): Record<string, any> {
     case 'getCookies':         return { url: '', saveAs: '' }
     case 'setCookies':         return { name: '', value: '', domain: '', path: '/' }
     case 'deleteCookies':      return { name: '', all: false }
+    case 'assert':             return { assertType: 'element-exists', selector: '', expected: '', variable: '', operator: 'eq', script: '', onFail: 'stop' }
     default:                   return {}
   }
 }
