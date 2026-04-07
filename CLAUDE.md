@@ -49,6 +49,7 @@ src/
 │   │       ├── storage.ts      — Storage quota fingerprint defense
 │   │       ├── network.ts      — Network Information API spoofing
 │   │       └── performance.ts  — Performance API timing sanitization
+│   ├── ai-assistant.ts    # Phase 16 — AI service (generateWorkflow, analyzeDetection, healSelector, archetypes)
 │   └── ipc/handlers.ts    # All ipcMain.handle() registrations
 ├── preload/index.ts       # contextBridge — exposes window.api to renderer
 ├── shared/types.ts        # Shared TypeScript interfaces (Profile, ProxyConfig, FingerprintConfig, User, Team, License, Sync…)
@@ -154,7 +155,8 @@ Adding a new IPC channel requires updating all three files.
 - **Phase 5** (Weeks 29–34): Advanced CDP evasion, detection testing, iOS presets, new vectors ✅
 - **Phase 6** (Weeks 35–40): Behavior simulation, timing defenses, profile versioning, 10 new detection vectors ✅
 - **Phase 7** (Weeks 41–46): Batch detection testing, result management, behavior/timing config UI ✅
-- **Phase 8** (Weeks 47–54): 45 detection vectors, Chromium patch catalog (30 patches), Layer 4 scripts (Intl/WebGPU/UACH), Phase 8 CDP evasion (MathFPU/ProtoChain/MediaCap/TrustTokens), PatchManager UI ✅ **current**
+- **Phase 8** (Weeks 47–54): 45 detection vectors, Chromium patch catalog (30 patches), Layer 4 scripts (Intl/WebGPU/UACH), Phase 8 CDP evasion (MathFPU/ProtoChain/MediaCap/TrustTokens), PatchManager UI ✅
+- **Phase 16** (Weeks 81–90): AI-Assisted Automation — NL Workflow Builder (16.A), AI Detection Advisor (16.B), Smart Selector Healing (16.C), Behaviour Pattern Library 10 archetypes (16.D) ✅ **current**
 
 ## Common Gotchas
 

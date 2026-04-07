@@ -255,6 +255,25 @@ const api = {
     const handler = (_ipcEvent: any, appEvent: any) => cb(appEvent)
     ipcRenderer.on('app:error', handler)
     return () => { ipcRenderer.removeListener('app:error', handler) }
+  },
+
+  // Phase 16 — AI-Assisted Automation
+  ai: {
+    // Status & configuration
+    status:              ()                                                                  => ipcRenderer.invoke('ai:status'),
+    setApiKey:           (apiKey: string)                                                   => ipcRenderer.invoke('ai:setApiKey', apiKey),
+    setEnabled:          (enabled: boolean)                                                 => ipcRenderer.invoke('ai:setEnabled', enabled),
+    // 16.A — Natural Language Workflow Builder
+    generateWorkflow:    (prompt: string, pageHtml?: string)                               => ipcRenderer.invoke('ai:generateWorkflow', prompt, pageHtml),
+    explainStep:         (step: unknown)                                                   => ipcRenderer.invoke('ai:explainStep', step),
+    fixStep:             (step: unknown, errorMessage: string)                             => ipcRenderer.invoke('ai:fixStep', step, errorMessage),
+    // 16.B — Detection Advisor
+    analyzeDetection:    (vectors: unknown[], overallScore: number)                        => ipcRenderer.invoke('ai:analyzeDetection', vectors, overallScore),
+    // 16.C — Smart Selector Healing
+    healSelector:        (selector: string, pageHtml: string, context?: string)            => ipcRenderer.invoke('ai:healSelector', selector, pageHtml, context),
+    // 16.D — Behaviour Pattern Library
+    behaviorArchetypes:  ()                                                                => ipcRenderer.invoke('ai:behaviorArchetypes'),
+    behaviorArchetype:   (id: string)                                                      => ipcRenderer.invoke('ai:behaviorArchetype', id)
   }
 }
 

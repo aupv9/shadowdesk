@@ -10,6 +10,7 @@ import { AccountPage } from './components/Account'
 import { TeamManager } from './components/TeamManager'
 import { PatchManager } from './components/PatchManager'
 import { Marketplace } from './components/Marketplace'
+import { AIAssistant } from './components/AIAssistant'
 import { ErrorBoundary } from './components/UI/ErrorBoundary'
 import { ToastContainer } from './components/UI/Toast'
 import { ConfirmDialog } from './components/UI/ConfirmDialog'
@@ -94,6 +95,9 @@ export default function App() {
         </ErrorBoundary>
         <ErrorBoundary section="Settings">
           {section === 'settings'    && <SettingsPage />}
+        </ErrorBoundary>
+        <ErrorBoundary section="AI Assistant">
+          {section === 'ai'          && <AIAssistant onNavigate={setSection} />}
         </ErrorBoundary>
       </main>
       <ToastContainer />
