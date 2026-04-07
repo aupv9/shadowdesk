@@ -57,7 +57,12 @@ export type {
   // Phase 12.C.4
   CollisionGroup,
   CollisionReport,
-  CollisionKind
+  CollisionKind,
+  // Phase 14.A
+  RemoteBrowserNode,
+  CreateNodeInput,
+  NodeHealth,
+  NodeStatus
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
