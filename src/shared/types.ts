@@ -490,6 +490,8 @@ export type AutomationActionType =
   | 'readFile'
   | 'writeFile'
   | 'waitForDownload'
+  // Tier 7 RPA — Error recovery & resilience
+  | 'tryCatch'
 
 export interface AutomationStep {
   id: string
@@ -500,8 +502,22 @@ export interface AutomationStep {
   retries?: number
   /** Delay in ms between retries (default 1000) */
   retryDelay?: number
+  /** Tier 7: Backoff strategy between retries. Default 'fixed'. */
+  retryBackoff?: 'fixed' | 'linear' | 'exponential'
+  /** Tier 7: Only retry when error message matches one of these substrings/regex.
+   *  If absent, retries on any error. */
+  retryOn?: string[]
+  /** Tier 7: On final failure, jump to the step with this id (skipping the
+   *  rest of the current step list). The targeted step is reached even if
+   *  it sits later in the parent. Mark step as soft-failed (recorded as
+   *  failed but doesn't bubble up the failure status). */
+  onErrorGoto?: string
+  /** Tier 7: Per-step timeout (ms). When set, the action is racing against
+   *  this timer and will be marked failed if it exceeds. */
+  timeoutMs?: number
   // For conditional: { conditionType?, selector, expected?, script?, thenSteps, elseSteps }
   // For loop: { times: number, steps: AutomationStep[] }
+  // For tryCatch: { tryBlock: AutomationStep[], catchBlock: AutomationStep[], finallyBlock?: AutomationStep[], errorPrefix?: string }
   // For extractText/evaluate/httpRequest: add saveAs to write result to a variable
 }
 

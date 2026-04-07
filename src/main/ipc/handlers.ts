@@ -954,8 +954,15 @@ export function registerIpcHandlers(): void {
     db.deleteWorkflow(id)
   })
 
-  ipcMain.handle('workflows:run', async (event, workflowId: string, profileId: string, variables?: Record<string, string>) => {
-    return automation.executeWorkflow(workflowId, profileId, variables, event.sender)
+  ipcMain.handle('workflows:run', async (
+    event,
+    workflowId: string,
+    profileId: string,
+    variables?: Record<string, string>,
+    // Tier 7: optional resilience opts (global timeout + auto-screenshot dir)
+    opts?: { maxDurationMs?: number; screenshotOnFailureDir?: string }
+  ) => {
+    return automation.executeWorkflow(workflowId, profileId, variables, event.sender, opts)
   })
 
   // Phase 10.1 — parallel execution against many profiles at once
