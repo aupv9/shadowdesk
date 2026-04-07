@@ -35,7 +35,13 @@ import {
   CornerDownRight,
   ShieldOff,
   Cookie,
-  CheckCircle
+  CheckCircle,
+  Plus,
+  ArrowLeftRight,
+  X,
+  LayoutList,
+  Shuffle,
+  ScanText
 } from 'lucide-react'
 import type { AutomationStep, AutomationActionType } from '../../types'
 
@@ -74,7 +80,16 @@ const ACTION_META: Record<AutomationActionType, { icon: React.ElementType; label
   setCookies:         { icon: Cookie,             label: 'Set Cookies',          color: 'text-amber-300' },
   deleteCookies:      { icon: Cookie,             label: 'Delete Cookies',       color: 'text-amber-400' },
   // Tier 3 RPA — assertions
-  assert:             { icon: CheckCircle,        label: 'Assert',               color: 'text-green-300' }
+  assert:             { icon: CheckCircle,        label: 'Assert',               color: 'text-green-300' },
+  // Tier 4 RPA — multi-tab
+  openTab:            { icon: Plus,               label: 'Open Tab',             color: 'text-blue-300' },
+  switchTab:          { icon: ArrowLeftRight,     label: 'Switch Tab',           color: 'text-blue-400' },
+  closeTab:           { icon: X,                  label: 'Close Tab',            color: 'text-blue-200' },
+  getTabs:            { icon: LayoutList,         label: 'Get Tabs',             color: 'text-sky-300' },
+  // Tier 4 RPA — proxy rotation
+  switchProxy:        { icon: Shuffle,            label: 'Switch Proxy',         color: 'text-orange-300' },
+  // Tier 4 RPA — text click
+  clickByText:        { icon: ScanText,           label: 'Click by Text',        color: 'text-teal-300' }
 }
 
 const ALL_ACTIONS: AutomationActionType[] = [
@@ -89,7 +104,11 @@ const ALL_ACTIONS: AutomationActionType[] = [
   'callWorkflow', 'parallelSteps', 'jumpToStep',
   'interceptRequest', 'clearIntercepts',
   'getCookies', 'setCookies', 'deleteCookies',
-  'assert'
+  'assert',
+  // Tier 4 RPA
+  'openTab', 'switchTab', 'closeTab', 'getTabs',
+  'switchProxy',
+  'clickByText'
 ]
 
 interface StepEditorProps {
@@ -137,6 +156,12 @@ function getDefaultParams(action: AutomationActionType): Record<string, any> {
     case 'setCookies':         return { name: '', value: '', domain: '', path: '/' }
     case 'deleteCookies':      return { name: '', all: false }
     case 'assert':             return { assertType: 'element-exists', selector: '', expected: '', variable: '', operator: 'eq', script: '', onFail: 'stop' }
+    case 'openTab':            return { url: '', waitUntil: 'networkidle2', saveAs: '' }
+    case 'switchTab':          return { index: 0, urlPattern: '', titlePattern: '', saveAs: '' }
+    case 'closeTab':           return { index: undefined }
+    case 'getTabs':            return { saveAs: 'tabs' }
+    case 'switchProxy':        return { strategy: 'round-robin', proxyId: '', prefix: 'proxy', persistToProfile: true }
+    case 'clickByText':        return { text: '', exact: false, visible: true, clickCount: 1, button: 'left', timeout: 10000, saveAs: '' }
     default:                   return {}
   }
 }

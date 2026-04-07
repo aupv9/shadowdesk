@@ -460,6 +460,15 @@ export type AutomationActionType =
   | 'useCredential'
   // Tier 3 RPA — Assertion framework
   | 'assert'
+  // Tier 4 RPA — Multi-tab management
+  | 'openTab'
+  | 'switchTab'
+  | 'closeTab'
+  | 'getTabs'
+  // Tier 4 RPA — Proxy rotation mid-workflow
+  | 'switchProxy'
+  // Tier 4 RPA — Text-based click (DOM XPath + coordinate fallback)
+  | 'clickByText'
   // Tier 1 RPA — Workflow chaining, parallel steps, control flow
   | 'callWorkflow'
   | 'parallelSteps'

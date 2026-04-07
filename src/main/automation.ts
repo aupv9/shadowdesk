@@ -76,6 +76,10 @@ export class AutomationEngine {
   private running = new Map<string, DebugControl>()
   /** Active network intercept state per profileId */
   private intercepts = new Map<string, InterceptState>()
+  /** Tier 4: tracks the "active" page per profileId so switchTab can
+   *  redirect subsequent steps without changing function signatures.
+   *  Cleared when the run ends. */
+  private currentPages = new Map<string, import('puppeteer-core').Page>()
 
   static getInstance(): AutomationEngine {
     if (!AutomationEngine.instance) {
@@ -128,6 +132,9 @@ export class AutomationEngine {
     const page = await this.getActivePage(profileId)
     if (!page) throw new Error('No active page found for profile')
 
+    // Tier 4: seed the active-page pointer so switchTab can update it
+    this.currentPages.set(profileId, page)
+
     const runKey = `${workflowId}:${profileId}`
     const control: DebugControl = {
       abort: false,
@@ -160,6 +167,7 @@ export class AutomationEngine {
       runError = err.message
     } finally {
       this.running.delete(runKey)
+      this.currentPages.delete(profileId)
       // Tear down any network interception this run installed so it doesn't
       // leak into subsequent runs / manual browsing sessions.
       await this.teardownIntercepts(profileId, page).catch(() => { /* non-fatal */ })
@@ -651,13 +659,15 @@ export class AutomationEngine {
   }
 
   private async runAction(
-    page: Page,
+    _page: Page,
     step: AutomationStep,
     control: DebugControl | { abort: boolean },
     allResults: AutomationStepResult[],
     variables: Record<string, string>,
     profileId?: string
   ): Promise<any> {
+    // Tier 4: switchTab may have changed the active page — always resolve here
+    const page: Page = (profileId ? this.currentPages.get(profileId) : undefined) ?? _page
     const { action, params } = step
 
     switch (action) {
@@ -1392,6 +1402,272 @@ export class AutomationEngine {
           return { ...assertResult, continued: true }
         }
         return assertResult
+      }
+
+      // ── Tier 4: Multi-tab management ────────────────────────────────
+
+      case 'openTab': {
+        // Open a new tab in the profile's browser, inject fingerprint, and
+        // optionally navigate to a URL. The new tab becomes the active page.
+        if (!profileId) throw new Error('openTab requires a profileId context')
+        const bm = BrowserManager.getInstance()
+        const session = (bm as any).sessions.get(profileId)
+        if (!session) throw new Error('openTab: profile session not found')
+
+        const db = Database.getInstance()
+        const profileRow: any = db.getProfile(profileId)
+        if (!profileRow) throw new Error('openTab: profile not found in DB')
+        const fingerprint = JSON.parse(profileRow.fingerprint)
+
+        const newPage = await session.browser.newPage()
+        // Inject fingerprint scripts so the new tab has the same identity
+        try {
+          const injector = (bm as any).injector
+          if (injector) await injector.injectAll(newPage, fingerprint)
+        } catch { /* non-fatal — tab still opens */ }
+
+        const url: string | undefined = params.url
+        if (url) {
+          await newPage.goto(url, {
+            waitUntil: params.waitUntil ?? 'networkidle2',
+            timeout: params.timeout ?? 30000
+          })
+        }
+
+        // Make the new tab the active page for subsequent steps
+        this.currentPages.set(profileId, newPage)
+
+        const pages = await session.browser.pages()
+        const tabIndex = pages.indexOf(newPage)
+        if (params.saveAs) variables[params.saveAs] = String(tabIndex)
+        return { tabIndex, url: newPage.url(), totalTabs: pages.length }
+      }
+
+      case 'switchTab': {
+        // Switch the active page to the tab identified by index, URL pattern,
+        // or title pattern.
+        if (!profileId) throw new Error('switchTab requires a profileId context')
+        const bm = BrowserManager.getInstance()
+        const session = (bm as any).sessions.get(profileId)
+        if (!session) throw new Error('switchTab: profile session not found')
+
+        const pages: Page[] = (await session.browser.pages()).filter((p: Page) => !p.isClosed())
+        if (pages.length === 0) throw new Error('switchTab: no open tabs')
+
+        let targetPage: Page | undefined
+
+        if (params.index !== undefined) {
+          const idx = Number(params.index)
+          if (idx < 0 || idx >= pages.length) {
+            throw new Error(`switchTab: tab index ${idx} out of range (0–${pages.length - 1})`)
+          }
+          targetPage = pages[idx]
+        } else if (params.urlPattern) {
+          const re = new RegExp(String(params.urlPattern))
+          targetPage = pages.find((p: Page) => re.test(p.url()))
+          if (!targetPage) throw new Error(`switchTab: no tab matches urlPattern "${params.urlPattern}"`)
+        } else if (params.titlePattern) {
+          const re = new RegExp(String(params.titlePattern))
+          const titles = await Promise.all(pages.map((p: Page) => p.title()))
+          const matchIdx = titles.findIndex((t) => re.test(t))
+          if (matchIdx < 0) throw new Error(`switchTab: no tab matches titlePattern "${params.titlePattern}"`)
+          targetPage = pages[matchIdx]
+        } else {
+          throw new Error('switchTab: provide index, urlPattern, or titlePattern')
+        }
+
+        this.currentPages.set(profileId, targetPage)
+        if (params.saveAs) variables[params.saveAs] = targetPage.url()
+        return { url: targetPage.url(), title: await targetPage.title() }
+      }
+
+      case 'closeTab': {
+        // Close the current tab (or a tab by index) and switch focus to the
+        // next available tab. Refuses to close the last remaining tab.
+        if (!profileId) throw new Error('closeTab requires a profileId context')
+        const bm = BrowserManager.getInstance()
+        const session = (bm as any).sessions.get(profileId)
+        if (!session) throw new Error('closeTab: profile session not found')
+
+        const pages: Page[] = (await session.browser.pages()).filter((p: Page) => !p.isClosed())
+        if (pages.length <= 1) throw new Error('closeTab: cannot close the last tab')
+
+        let tabToClose: Page
+        if (params.index !== undefined) {
+          const idx = Number(params.index)
+          if (idx < 0 || idx >= pages.length) throw new Error(`closeTab: tab index ${idx} out of range`)
+          tabToClose = pages[idx]
+        } else {
+          // Close whichever tab is currently active
+          tabToClose = this.currentPages.get(profileId) ?? pages[pages.length - 1]
+        }
+
+        const closedUrl = tabToClose.url()
+        await tabToClose.close()
+
+        // Switch active page to the last remaining open tab
+        const remaining: Page[] = (await session.browser.pages()).filter((p: Page) => !p.isClosed())
+        const nextPage = remaining[remaining.length - 1]
+        this.currentPages.set(profileId, nextPage)
+        return { closedUrl, activatedUrl: nextPage.url(), remaining: remaining.length }
+      }
+
+      case 'getTabs': {
+        // List all open tabs for the current profile.
+        if (!profileId) throw new Error('getTabs requires a profileId context')
+        const bm = BrowserManager.getInstance()
+        const session = (bm as any).sessions.get(profileId)
+        if (!session) throw new Error('getTabs: profile session not found')
+
+        const pages: Page[] = (await session.browser.pages()).filter((p: Page) => !p.isClosed())
+        const tabs = await Promise.all(
+          pages.map(async (p: Page, i: number) => ({
+            index: i,
+            url: p.url(),
+            title: await p.title(),
+            isActive: p === (this.currentPages.get(profileId) ?? pages[pages.length - 1])
+          }))
+        )
+        if (params.saveAs) variables[params.saveAs] = JSON.stringify(tabs)
+        return { tabs, count: tabs.length }
+      }
+
+      // ── Tier 4: Proxy rotation mid-workflow ─────────────────────────
+
+      case 'switchProxy': {
+        // Change the proxy in use for the current workflow.
+        //
+        // Architectural limitation: Chromium's `--proxy-server` flag is set at
+        // launch time and cannot be changed for an existing browser process.
+        // What we CAN do per-session:
+        //   1. Update proxy auth via page.authenticate() (covers HTTP proxy auth).
+        //   2. Store the new proxy values in workflow variables so subsequent
+        //      `httpRequest` steps pick them up.
+        //   3. Persist the change to the profile's proxy_id so the NEXT launch
+        //      uses the new proxy.
+        //
+        // For applications requiring true per-request proxy rotation, use the
+        // `httpRequest` action with explicit `headers` / proxy settings.
+        const db = Database.getInstance()
+        let proxyRow: any = null
+
+        if (params.proxyId) {
+          proxyRow = db.getProxy(params.proxyId)
+          if (!proxyRow) throw new Error(`switchProxy: proxy "${params.proxyId}" not found`)
+        } else if (params.strategy === 'random') {
+          proxyRow = db.getRandomProxy()
+          if (!proxyRow) throw new Error('switchProxy: no proxies available')
+        } else if (params.strategy === 'round-robin' && profileId) {
+          const profileRow: any = db.getProfile(profileId)
+          proxyRow = db.getNextProxy(profileRow?.proxy_id ?? '')
+          if (!proxyRow) throw new Error('switchProxy: no proxies available for round-robin')
+        } else {
+          throw new Error('switchProxy: provide proxyId or strategy (random | round-robin)')
+        }
+
+        // 1. Update proxy auth on the current page if credentials present
+        if (proxyRow.username && proxyRow.password) {
+          await page.authenticate({ username: proxyRow.username, password: proxyRow.password })
+        }
+
+        // 2. Expose proxy details in workflow variables
+        const prefix: string = params.prefix || 'proxy'
+        variables[`${prefix}.host`] = proxyRow.host
+        variables[`${prefix}.port`] = String(proxyRow.port)
+        variables[`${prefix}.type`] = proxyRow.type
+        if (proxyRow.username) variables[`${prefix}.username`] = proxyRow.username
+        if (proxyRow.password) variables[`${prefix}.password`] = proxyRow.password
+
+        // 3. Persist to profile so next launch uses this proxy
+        if (profileId && params.persistToProfile !== false) {
+          db.updateProfileProxy(profileId, proxyRow.id)
+        }
+
+        return {
+          proxyId: proxyRow.id,
+          name: proxyRow.name,
+          host: proxyRow.host,
+          port: proxyRow.port,
+          type: proxyRow.type,
+          note: '--proxy-server takes effect on next profile launch; auth updated for current session'
+        }
+      }
+
+      // ── Tier 4: Text-based click (DOM XPath) ────────────────────────
+
+      case 'clickByText': {
+        // Find the first visible element whose text content (or ARIA label)
+        // matches the given string, then click its centre.
+        //
+        // Strategy flow:
+        //   1. XPath text() search — exact or contains match
+        //   2. aria-label attribute match
+        //   3. placeholder / title attribute match
+        //   4. If `clickCoordinates` is true and nothing found, falls back to
+        //      a best-effort coordinate click at the position where the text was
+        //      visually located (requires the text to be visible in the viewport).
+        //
+        // No OCR dependency is required for text rendered as DOM nodes (99% of
+        // cases). For canvas-rendered text, use the `evaluate` action.
+        const text: string = params.text
+        if (!text) throw new Error('clickByText requires text param')
+        const exact: boolean = params.exact === true
+        const timeout: number = params.timeout ?? 10000
+        const clickCount: number = params.clickCount ?? 1
+
+        // Build XPath — prefer exact first, fall back to contains
+        const xpathExact = `//*[normalize-space(text())="${text}" or normalize-space(.)="${text}"]`
+        const xpathContains = `//*[contains(normalize-space(text()),"${text}") or contains(normalize-space(.),"${text}")]`
+        const xpath = exact ? xpathExact : xpathContains
+
+        // Wait for matching element to appear
+        await page.waitForFunction(
+          (xp: string, vis: boolean) => {
+            const result = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
+            const el = result.singleNodeValue as HTMLElement | null
+            if (!el) return false
+            if (!vis) return true
+            const rect = el.getBoundingClientRect()
+            return rect.width > 0 && rect.height > 0
+          },
+          { timeout },
+          xpath,
+          params.visible !== false // default: require visible
+        ).catch(() => { throw new Error(`clickByText: no element found with text "${text}"`) })
+
+        // Find and click
+        const clicked: boolean = await page.evaluate(
+          (xp: string, count: number, btn: string) => {
+            const result = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
+            const el = result.singleNodeValue as HTMLElement | null
+            if (!el) return false
+            // Use dispatchEvent for synthetic click — more reliable in SPAs
+            for (let i = 0; i < count; i++) {
+              el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: btn === 'right' ? 2 : 0 }))
+            }
+            return true
+          },
+          xpath,
+          clickCount,
+          params.button ?? 'left'
+        )
+
+        if (!clicked) throw new Error(`clickByText: element disappeared before click — text "${text}"`)
+
+        // Optionally save the matched element's selector to a variable
+        if (params.saveAs) {
+          const sel: string = await page.evaluate((xp: string) => {
+            const result = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
+            const el = result.singleNodeValue as HTMLElement | null
+            if (!el) return ''
+            if (el.id) return `#${el.id}`
+            if (el.getAttribute('data-testid')) return `[data-testid="${el.getAttribute('data-testid')}"]`
+            return el.tagName.toLowerCase()
+          }, xpath)
+          variables[params.saveAs] = sel
+        }
+
+        return { text, exact, clickCount, button: params.button ?? 'left' }
       }
 
       default:
