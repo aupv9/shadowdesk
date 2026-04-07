@@ -957,7 +957,64 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('workflows:runs', (_event, workflowId: string) => {
     const rows = db.getWorkflowRuns(workflowId)
-    return rows.map((r: any) => ({ ...r, step_results: JSON.parse(r.step_results) }))
+    return rows.map((r: any) => ({
+      ...r,
+      step_results: JSON.parse(r.step_results),
+      variables: r.variables ? JSON.parse(r.variables) : null
+    }))
+  })
+
+  // ── Tier 2: Run history dashboard, metrics, dry-run, debugger ─────────
+
+  ipcMain.handle('workflows:recentRuns', (_event, limit?: number) => {
+    const rows = db.getRecentWorkflowRuns(limit ?? 100)
+    return rows.map((r: any) => ({
+      ...r,
+      step_results: JSON.parse(r.step_results),
+      variables: r.variables ? JSON.parse(r.variables) : null
+    }))
+  })
+
+  ipcMain.handle('workflows:metrics', (_event, workflowId?: string) => {
+    return db.getWorkflowRunMetrics(workflowId)
+  })
+
+  ipcMain.handle('workflows:dryRun', (_event, workflowId: string, variables?: Record<string, string>) => {
+    return automation.dryRunWorkflow(workflowId, variables)
+  })
+
+  ipcMain.handle('workflows:debug:run', async (
+    event,
+    workflowId: string,
+    profileId: string,
+    breakpoints?: string[],
+    variables?: Record<string, string>,
+    pauseAtStart?: boolean
+  ) => {
+    return automation.executeWorkflow(workflowId, profileId, variables, event.sender, {
+      breakpoints,
+      pauseAtStart
+    })
+  })
+
+  ipcMain.handle('workflows:debug:pause', (_event, workflowId: string, profileId: string) => {
+    return automation.pauseWorkflow(workflowId, profileId)
+  })
+
+  ipcMain.handle('workflows:debug:resume', (_event, workflowId: string, profileId: string) => {
+    return automation.resumeWorkflow(workflowId, profileId)
+  })
+
+  ipcMain.handle('workflows:debug:stepOver', (_event, workflowId: string, profileId: string) => {
+    return automation.stepOverWorkflow(workflowId, profileId)
+  })
+
+  ipcMain.handle('workflows:debug:setBreakpoints', (_event, workflowId: string, profileId: string, stepIds: string[]) => {
+    return automation.setBreakpoints(workflowId, profileId, stepIds)
+  })
+
+  ipcMain.handle('workflows:debug:state', (_event, workflowId: string, profileId: string) => {
+    return automation.getDebugState(workflowId, profileId)
   })
 
   // ── Schedules (Phase 10.2) ────────────────────────────────────────────────
