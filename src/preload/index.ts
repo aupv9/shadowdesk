@@ -193,6 +193,16 @@ const api = {
     // Tier 2 — Run history dashboard, metrics, dry-run, debugger
     recentRuns:    (limit?: number)                                    => ipcRenderer.invoke('workflows:recentRuns', limit),
     metrics:       (workflowId?: string)                               => ipcRenderer.invoke('workflows:metrics', workflowId),
+    // Tier 5 — detailed action metrics + hooks
+    actionMetrics: (workflowId?: string, limit?: number)              => ipcRenderer.invoke('workflows:metrics:actions', workflowId, limit),
+    hooks: {
+      on: (workflowId: string, profileId: string, event: string) => ipcRenderer.invoke('workflows:hooks:on', workflowId, profileId, event),
+      onHookFired: (cb: (data: any) => void): (() => void) => {
+        const handler = (_event: any, data: any) => cb(data)
+        ipcRenderer.on('automation:hook-fired', handler)
+        return () => { ipcRenderer.removeListener('automation:hook-fired', handler) }
+      }
+    },
     dryRun:        (workflowId: string, variables?: Record<string, string>) => ipcRenderer.invoke('workflows:dryRun', workflowId, variables),
     debug: {
       run:            (workflowId: string, profileId: string, breakpoints?: string[], variables?: Record<string, string>, pauseAtStart?: boolean) =>

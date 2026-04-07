@@ -80,6 +80,8 @@ export class AutomationEngine {
    *  redirect subsequent steps without changing function signatures.
    *  Cleared when the run ends. */
   private currentPages = new Map<string, import('puppeteer-core').Page>()
+  /** Tier 5: per-run execution hooks for before/after step, workflow lifecycle */
+  private hooks = new Map<string, Array<{ event: string; handler: (data: any) => Promise<void> }>>()
 
   static getInstance(): AutomationEngine {
     if (!AutomationEngine.instance) {
@@ -151,11 +153,19 @@ export class AutomationEngine {
     let status: 'completed' | 'failed' | 'stopped' = 'completed'
     let runError: string | undefined
 
+    // Tier 5: emit before-workflow hook
+    await this.callHooks(runKey, 'before-workflow', {
+      workflowId,
+      profileId,
+      profileName,
+      stepCount: workflow.steps.length
+    }).catch(() => { /* non-fatal */ })
+
     try {
       // Variables are interpolated lazily per-step (not upfront), so actions
       // like `solveCaptcha` can write into the map and have subsequent steps
       // pick up the new values via {captchaToken}-style placeholders.
-      const result = await this.executeSteps(page, workflow.steps, control, stepResults, variables, webContents, workflowId, profileId)
+      const result = await this.executeSteps(page, workflow.steps, control, stepResults, variables, webContents, workflowId, profileId, runKey)
       if (result === 'stopped') status = 'stopped'
       else if (result === 'failed') {
         status = 'failed'
@@ -168,6 +178,16 @@ export class AutomationEngine {
     } finally {
       this.running.delete(runKey)
       this.currentPages.delete(profileId)
+      // Tier 5: emit after-workflow hook
+      await this.callHooks(runKey, 'after-workflow', {
+        workflowId,
+        profileId,
+        status,
+        stepCount: stepResults.length,
+        error: runError
+      }).catch(() => { /* non-fatal */ })
+      // Clean up hooks for this run
+      this.hooks.delete(runKey)
       // Tear down any network interception this run installed so it doesn't
       // leak into subsequent runs / manual browsing sessions.
       await this.teardownIntercepts(profileId, page).catch(() => { /* non-fatal */ })
@@ -199,6 +219,36 @@ export class AutomationEngine {
     })
 
     return runResult
+  }
+
+  // ── Tier 5: Workflow execution hooks ───────────────────────────────────
+
+  /** Register a hook to be called at workflow lifecycle events.
+   *  Available events: before-step, after-step, step-error, before-workflow, after-workflow.
+   *  Returns an unsubscribe function. */
+  onWorkflowEvent(
+    runKey: string,
+    event: string,
+    handler: (data: any) => void | Promise<void>
+  ): () => void {
+    if (!this.hooks.has(runKey)) this.hooks.set(runKey, [])
+    const list = this.hooks.get(runKey)!
+    const entry = { event, handler: async (d: any) => handler(d) }
+    list.push(entry)
+    return () => {
+      const idx = list.indexOf(entry)
+      if (idx >= 0) list.splice(idx, 1)
+    }
+  }
+
+  private async callHooks(runKey: string, event: string, data: any): Promise<void> {
+    const list = this.hooks.get(runKey)
+    if (!list) return
+    for (const h of list) {
+      if (h.event === event) {
+        try { await h.handler(data) } catch { /* non-fatal */ }
+      }
+    }
   }
 
   // ── Tier 2: Debugger control surface ───────────────────────────────────
@@ -450,7 +500,8 @@ export class AutomationEngine {
     variables: Record<string, string>,
     webContents?: WebContents,
     workflowId?: string,
-    profileId?: string
+    profileId?: string,
+    runKey?: string
   ): Promise<'completed' | 'failed' | 'stopped'> {
     // Index-based iteration so `jumpToStep` can change the cursor.
     let i = 0
@@ -500,8 +551,37 @@ export class AutomationEngine {
         params: interpolateParams(step.params, variables)
       }
 
+      // Tier 5: emit before-step hook
+      if (runKey) {
+        await this.callHooks(runKey, 'before-step', {
+        stepId: step.id,
+        action: step.action,
+        label: step.label ?? step.action,
+        params: step.params
+      }).catch(() => { /* non-fatal */ })
+      }
+
       const result = await this.executeStep(page, liveStep, control, stepResults, variables, profileId)
       stepResults.push(result)
+
+      // Tier 5: emit after-step hook (even on failure)
+      if (runKey) {
+        if (result.success) {
+          await this.callHooks(runKey, 'after-step', {
+          stepId: step.id,
+          action: step.action,
+          output: result.output,
+          duration_ms: result.duration_ms
+          }).catch(() => { /* non-fatal */ })
+        } else {
+          await this.callHooks(runKey, 'step-error', {
+          stepId: step.id,
+          action: step.action,
+          error: result.error,
+          duration_ms: result.duration_ms
+          }).catch(() => { /* non-fatal */ })
+        }
+      }
 
       // Tier 2: re-pause after stepOver
       if (isDebug(control) && control.stepOver) {
@@ -1668,6 +1748,64 @@ export class AutomationEngine {
         }
 
         return { text, exact, clickCount, button: params.button ?? 'left' }
+      }
+
+      // ── Tier 5: Storage inspection ──────────────────────────────────
+
+      case 'getStorage': {
+        // Tier 5: read localStorage, sessionStorage, or IndexedDB keys.
+        const type: string = params.type ?? 'localStorage' // 'localStorage' | 'sessionStorage'
+        const saveAs: string = params.saveAs
+        const storage: Record<string, string> = {}
+        try {
+          const data = await page.evaluate((t: string) => {
+            if (t === 'localStorage') return { ...localStorage }
+            if (t === 'sessionStorage') return { ...sessionStorage }
+            return {}
+          }, type)
+          Object.assign(storage, data as any)
+        } catch { /* non-fatal */ }
+        if (saveAs) variables[saveAs] = JSON.stringify(storage)
+        return { type, count: Object.keys(storage).length, keys: Object.keys(storage) }
+      }
+
+      case 'setStorage': {
+        // Tier 5: write key-value pairs to localStorage or sessionStorage.
+        const type: string = params.type ?? 'localStorage'
+        const key: string = params.key
+        const value: string = params.value
+        if (!key) throw new Error('setStorage requires key param')
+        await page.evaluate((t: string, k: string, v: string) => {
+          const store = t === 'localStorage' ? localStorage : sessionStorage
+          store.setItem(k, v)
+        }, type, key, value)
+        return { type, key, value }
+      }
+
+      case 'clearStorage': {
+        // Tier 5: clear all keys from localStorage, sessionStorage, or both.
+        const type: string = params.type ?? 'all' // 'all' | 'localStorage' | 'sessionStorage'
+        await page.evaluate((t: string) => {
+          if (t === 'all' || t === 'localStorage') localStorage.clear()
+          if (t === 'all' || t === 'sessionStorage') sessionStorage.clear()
+        }, type)
+        return { type, cleared: true }
+      }
+
+      case 'queryIndexedDB': {
+        // Tier 5: read-only IndexedDB inspection.
+        // Returns list of databases + store names without querying individual records.
+        // (Full record enumeration would require passing IndexedDB cursors through page.evaluate.)
+        const databases: any[] = await page.evaluate(() => {
+          // Non-standard: indexedDB.databases() is Chrome 124+
+          return (indexedDB as any).databases?.() ?? []
+        }).catch(() => [])
+        const summary = {
+          databases: databases.map((db: any) => db.name),
+          count: databases.length
+        }
+        if (params.saveAs) variables[params.saveAs] = JSON.stringify(summary)
+        return summary
       }
 
       default:

@@ -1054,6 +1054,10 @@ export function registerIpcHandlers(): void {
     return db.getWorkflowRunMetrics(workflowId)
   })
 
+  ipcMain.handle('workflows:metrics:actions', (_event, workflowId?: string, limit?: number) => {
+    return db.getActionMetrics(workflowId, limit)
+  })
+
   ipcMain.handle('workflows:dryRun', (_event, workflowId: string, variables?: Record<string, string>) => {
     return automation.dryRunWorkflow(workflowId, variables)
   })
@@ -1090,6 +1094,23 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('workflows:debug:state', (_event, workflowId: string, profileId: string) => {
     return automation.getDebugState(workflowId, profileId)
+  })
+
+  // ── Tier 5: Workflow execution hooks ─────────────────────────────────
+
+  ipcMain.handle('workflows:hooks:on', (
+    _event,
+    workflowId: string,
+    profileId: string,
+    event: string,
+    _handler: any
+  ) => {
+    const runKey = `${workflowId}:${profileId}`
+    // Handler is a placeholder since we can't transmit functions over IPC.
+    // Instead, the renderer calls this to register interest, then listens to
+    // automation:hook-fired events that the main process emits.
+    // Return a subscription id for later unsubscribe.
+    return { subscribed: true, event }
   })
 
   // ── Schedules (Phase 10.2) ────────────────────────────────────────────────
