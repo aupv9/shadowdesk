@@ -492,6 +492,13 @@ export type AutomationActionType =
   | 'waitForDownload'
   // Tier 7 RPA — Error recovery & resilience
   | 'tryCatch'
+  // Tier 9 RPA — Advanced element interactions
+  | 'dragAndDrop'
+  | 'keyCombo'
+  | 'selectContextMenu'
+  | 'setRangeInput'
+  | 'scrollIntoView'
+  | 'switchFrame'
 
 export interface AutomationStep {
   id: string

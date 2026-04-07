@@ -146,6 +146,8 @@ export class AutomationEngine {
   /** Tier 7: when set, every step that fails (after retries are exhausted)
    *  captures a screenshot to this directory. Set per run by executeWorkflow. */
   private failureScreenshotDir: string | null = null
+  /** Active iframe context set by `switchFrame` action; null = main frame. */
+  private activeFrame: import('puppeteer-core').Frame | null = null
 
   static getInstance(): AutomationEngine {
     if (!AutomationEngine.instance) {
@@ -484,7 +486,9 @@ export class AutomationEngine {
       'getStorage', 'setStorage', 'clearStorage', 'queryIndexedDB',
       'forEachRow', 'readFile', 'writeFile', 'waitForDownload',
       // Tier 7
-      'tryCatch'
+      'tryCatch',
+      // Tier 9
+      'dragAndDrop', 'keyCombo', 'selectContextMenu', 'setRangeInput', 'scrollIntoView', 'switchFrame'
     ])
 
     // Pre-collect ids that produce variables so {var} references resolve.
@@ -993,7 +997,9 @@ export class AutomationEngine {
         return { key: params.key }
 
       case 'evaluate': {
-        const result = await page.evaluate(params.script)
+        // If switchFrame was called earlier, run in that frame's context.
+        const evalCtx = this.activeFrame ?? page
+        const result = await evalCtx.evaluate(params.script)
         if (params.saveAs) variables[params.saveAs] = String(result ?? '')
         return { result }
       }
@@ -1168,6 +1174,183 @@ export class AutomationEngine {
           catchStepCount: catchBlock.length,
           finallyStepCount: finallyBlock.length
         }
+      }
+
+      // ── Tier 9 RPA: Advanced element interactions ────────────────────
+
+      case 'dragAndDrop': {
+        // Smooth CDP mouse drag from `params.selector` to `params.targetSelector`.
+        // Optional `params.steps` (default 20) controls trajectory granularity.
+        // Optional `params.offsetX` / `params.offsetY` shift the drop point
+        // relative to the target's centre.
+        const srcEl = await page.$(params.selector)
+        if (!srcEl) throw new Error(`dragAndDrop: source "${params.selector}" not found`)
+        const tgtEl = await page.$(params.targetSelector)
+        if (!tgtEl) throw new Error(`dragAndDrop: target "${params.targetSelector}" not found`)
+
+        const srcBox = await srcEl.boundingBox()
+        const tgtBox = await tgtEl.boundingBox()
+        if (!srcBox || !tgtBox) throw new Error('dragAndDrop: element has no bounding box')
+
+        const srcX = srcBox.x + srcBox.width / 2
+        const srcY = srcBox.y + srcBox.height / 2
+        const tgtX = tgtBox.x + tgtBox.width / 2 + (params.offsetX ?? 0)
+        const tgtY = tgtBox.y + tgtBox.height / 2 + (params.offsetY ?? 0)
+        const moveSteps = Math.max(5, Number(params.steps ?? 20))
+
+        await page.mouse.move(srcX, srcY)
+        await page.mouse.down()
+        // Interpolate mouse movement for smooth drag trajectory
+        for (let i = 1; i <= moveSteps; i++) {
+          const x = srcX + (tgtX - srcX) * (i / moveSteps)
+          const y = srcY + (tgtY - srcY) * (i / moveSteps)
+          await page.mouse.move(x, y, { steps: 1 })
+        }
+        await page.mouse.up()
+        return { from: { x: srcX, y: srcY }, to: { x: tgtX, y: tgtY }, steps: moveSteps }
+      }
+
+      case 'keyCombo': {
+        // Send a keyboard shortcut such as "Control+a", "Control+Shift+t",
+        // "Meta+v".  Keys are split on '+'; all but the last are held as
+        // modifiers, the last is pressed then all modifiers are released in
+        // reverse order — matching OS behaviour.
+        if (!params.keys) throw new Error('keyCombo: `keys` param required (e.g. "Control+a")')
+        const parts: string[] = (params.keys as string).split('+').map((k: string) => k.trim())
+        if (parts.length === 0) throw new Error('keyCombo: empty key sequence')
+        const modifiers = parts.slice(0, -1)
+        const mainKey = parts[parts.length - 1]
+
+        for (const mod of modifiers) await page.keyboard.down(mod as any)
+        await page.keyboard.press(mainKey as any)
+        for (const mod of [...modifiers].reverse()) await page.keyboard.up(mod as any)
+
+        return { keys: params.keys }
+      }
+
+      case 'selectContextMenu': {
+        // Right-click `params.selector`, wait for a context menu to appear,
+        // then click the first visible element whose text matches
+        // `params.menuItemText` (exact match by default; set `exact: false`
+        // for a contains check).
+        if (!params.selector) throw new Error('selectContextMenu: `selector` required')
+        if (!params.menuItemText) throw new Error('selectContextMenu: `menuItemText` required')
+        const exact: boolean = params.exact !== false
+
+        await page.click(params.selector, { button: 'right' })
+        // Brief pause for context menu animation / DOM insertion
+        await new Promise((r) => setTimeout(r, params.menuDelay ?? 300))
+
+        const menuItem: ElementHandle | null = await page.evaluateHandle(
+          (text: string, exactMatch: boolean) => {
+            const candidates = Array.from(
+              document.querySelectorAll<HTMLElement>('li, a, button, [role="menuitem"], [role="option"]')
+            )
+            return (
+              candidates.find((el) => {
+                const t = (el.textContent ?? '').trim()
+                const visible = !!(el.offsetParent || el.getBoundingClientRect().width)
+                return visible && (exactMatch ? t === text : t.includes(text))
+              }) ?? null
+            )
+          },
+          params.menuItemText as string,
+          exact
+        ).then((h) => (h.asElement() as ElementHandle | null))
+
+        if (!menuItem) {
+          throw new Error(`selectContextMenu: menu item "${params.menuItemText}" not found`)
+        }
+        await menuItem.click()
+        return { clicked: params.menuItemText }
+      }
+
+      case 'setRangeInput': {
+        // Set an <input type="range"> (slider) to a precise numeric value and
+        // dispatch the events React / Vue / vanilla handlers expect.
+        if (!params.selector) throw new Error('setRangeInput: `selector` required')
+        const value = Number(params.value ?? 0)
+
+        await page.$eval(
+          params.selector,
+          (el: Element, val: number) => {
+            const input = el as HTMLInputElement
+            // Use the native setter to bypass React's controlled-input guard
+            const nativeSetter = Object.getOwnPropertyDescriptor(
+              HTMLInputElement.prototype,
+              'value'
+            )?.set
+            if (nativeSetter) nativeSetter.call(input, val)
+            else input.value = String(val)
+            input.dispatchEvent(new Event('input', { bubbles: true }))
+            input.dispatchEvent(new Event('change', { bubbles: true }))
+          },
+          value
+        )
+        if (params.saveAs) variables[params.saveAs] = String(value)
+        return { value }
+      }
+
+      case 'scrollIntoView': {
+        // Scroll an element into the viewport.  Uses `scrollIntoView` with
+        // `block: 'center'` so the element lands in the middle of the screen
+        // rather than at the edge — more reliable for subsequent interactions.
+        if (!params.selector) throw new Error('scrollIntoView: `selector` required')
+        await page.waitForSelector(params.selector, { timeout: params.timeout ?? 30000 })
+        const behavior: string = params.behavior ?? 'smooth'
+        await page.$eval(
+          params.selector,
+          (el: Element, beh: string) => {
+            el.scrollIntoView({ behavior: beh as ScrollBehavior, block: 'center', inline: 'center' })
+          },
+          behavior
+        )
+        // Allow CSS scroll animation to finish before the next step
+        if (behavior === 'smooth') await new Promise((r) => setTimeout(r, 350))
+        return { scrolled: params.selector }
+      }
+
+      case 'switchFrame': {
+        // Enter or exit an iframe context.
+        //
+        // To enter:  supply `selector` (CSS/XPath for the <iframe> element),
+        //            `index` (0-based position in page.frames()), or
+        //            `urlPattern` (regex string matched against frame.url()).
+        // To exit:   set `exit: true` → restores the main-frame context.
+        //
+        // The resolved frame is stored in `this.activeFrame`.  Subsequent
+        // `evaluate` steps automatically run inside the active frame context.
+        if (params.exit) {
+          this.activeFrame = null
+          return { frame: 'main' }
+        }
+
+        let targetFrame: import('puppeteer-core').Frame | null = null
+
+        if (params.selector) {
+          const frameEl = await page.waitForSelector(params.selector, {
+            timeout: params.timeout ?? 10000
+          })
+          if (!frameEl) throw new Error(`switchFrame: selector "${params.selector}" not found`)
+          targetFrame = await (frameEl as ElementHandle).contentFrame()
+        } else if (params.index !== undefined) {
+          const frames = page.frames()
+          const idx = Number(params.index)
+          if (idx >= frames.length) {
+            throw new Error(`switchFrame: index ${idx} out of range (${frames.length} frames)`)
+          }
+          targetFrame = frames[idx]
+        } else if (params.urlPattern) {
+          const regex = new RegExp(params.urlPattern as string)
+          targetFrame = page.frames().find((f) => regex.test(f.url())) ?? null
+        } else {
+          throw new Error('switchFrame: supply `selector`, `index`, `urlPattern`, or `exit: true`')
+        }
+
+        if (!targetFrame) throw new Error('switchFrame: no matching frame found')
+        this.activeFrame = targetFrame
+        if (params.saveAs) variables[params.saveAs] = targetFrame.url()
+        return { frameUrl: targetFrame.url() }
       }
 
       // ── Tier 6 RPA: Data-driven automation & file handling ──────────
