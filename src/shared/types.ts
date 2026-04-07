@@ -760,3 +760,81 @@ export interface CreateWebhookInput {
   events: WebhookEvent[]
   secret?: string
 }
+
+// ─── Phase 16 — AI-Assisted Automation ───────────────────────────────────────
+
+/** Status of the in-session AI call budget */
+export interface AiUsageStatus {
+  /** Calls consumed this session */
+  callsUsed: number
+  /** Hard cap per session (default 20) */
+  callsMax: number
+  /** API key is configured */
+  configured: boolean
+  /** AI features are enabled */
+  enabled: boolean
+}
+
+/** A single actionable recommendation produced by the detection advisor */
+export interface AiRecommendation {
+  /** Short headline, e.g. "Switch WebGL renderer" */
+  title: string
+  /** Detailed explanation of why this vector looks suspicious */
+  explanation: string
+  /** Importance ranking: 1 = most urgent */
+  priority: 1 | 2 | 3
+  /** If set, the profile field path to change, e.g. "webgl.renderer" */
+  fieldPath?: string
+  /** Suggested replacement value (string or JSON-serialisable) */
+  suggestedValue?: any
+}
+
+/** Full detection advice payload returned by 16.B */
+export interface AiDetectionAdvice {
+  overallSummary: string
+  recommendations: AiRecommendation[]
+  riskLevel: 'low' | 'medium' | 'high'
+}
+
+/** Result of 16.A — Natural Language Workflow Builder */
+export interface AiWorkflowResult {
+  /** Human-readable summary of what was generated */
+  summary: string
+  /** The generated steps ready to be imported into a workflow */
+  steps: AutomationStep[]
+  /** Any caveats or notes from the model */
+  notes?: string
+}
+
+/** Result of 16.C — Smart Selector Healing */
+export interface AiSelectorHealResult {
+  /** The original broken selector */
+  originalSelector: string
+  /** The new selector suggested by the model */
+  suggestedSelector: string
+  /** Confidence level: high / medium / low */
+  confidence: 'high' | 'medium' | 'low'
+  /** Why the original likely broke */
+  reasoning: string
+}
+
+/** Phase 16.D — Behaviour archetype definition */
+export interface BehaviorArchetype {
+  id: string
+  name: string
+  description: string
+  /** Typing WPM range */
+  typingWpm: [number, number]
+  /** Mouse speed multiplier (1 = normal) */
+  mouseSpeed: number
+  /** Scroll step in px */
+  scrollStep: number
+  /** Pause between actions in ms [min, max] */
+  actionPause: [number, number]
+  /** Idle drift enabled */
+  idleDrift: boolean
+  /** Icon name (lucide) */
+  icon: string
+  /** Sample tags */
+  tags: string[]
+}

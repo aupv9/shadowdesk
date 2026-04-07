@@ -70,14 +70,21 @@ export type {
   WebhookConfig,
   TelegramConfig,
   CreateWebhookInput,
-  WebhookEvent
+  WebhookEvent,
+  // Phase 16
+  AiUsageStatus,
+  AiRecommendation,
+  AiDetectionAdvice,
+  AiWorkflowResult,
+  AiSelectorHealResult,
+  BehaviorArchetype
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
 
 // Renderer-only types
 
-export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'detection' | 'settings' | 'team' | 'account' | 'automation' | 'patches' | 'marketplace'
+export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'detection' | 'settings' | 'team' | 'account' | 'automation' | 'patches' | 'marketplace' | 'ai'
 
 export interface Toast {
   id: string

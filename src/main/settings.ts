@@ -11,6 +11,16 @@ export interface CaptchaConfig {
   apiKeys: Record<CaptchaProviderId, string>
 }
 
+// Phase 16 — AI assistant configuration
+export interface AiConfig {
+  /** Anthropic API key (stored in plain settings, never sent to renderer) */
+  apiKey: string
+  /** Enable/disable all AI-assisted features */
+  enabled: boolean
+  /** Hard cap on LLM calls per app session (default 20) */
+  maxCallsPerSession: number
+}
+
 export interface AppSettings {
   defaultPreset: string
   language: 'en' | 'vi' | 'th' | 'id'
@@ -25,6 +35,8 @@ export interface AppSettings {
   autoSyncBinaryUA: boolean
   /** Phase 12.B.1 — Captcha solver configuration. */
   captcha: CaptchaConfig
+  /** Phase 16 — AI assistant configuration. */
+  ai: AiConfig
 }
 
 const DEFAULT_CAPTCHA: CaptchaConfig = {
@@ -36,13 +48,20 @@ const DEFAULT_CAPTCHA: CaptchaConfig = {
   }
 }
 
+const DEFAULT_AI: AiConfig = {
+  apiKey: '',
+  enabled: true,
+  maxCallsPerSession: 20
+}
+
 const DEFAULTS: AppSettings = {
   defaultPreset: 'win10-chrome120',
   language: 'en',
   theme: 'dark',
   autoLaunchLastSession: false,
   autoSyncBinaryUA: true,
-  captcha: DEFAULT_CAPTCHA
+  captcha: DEFAULT_CAPTCHA,
+  ai: DEFAULT_AI
 }
 
 let cached: AppSettings | null = null
@@ -63,7 +82,7 @@ export function getSettings(): AppSettings {
       // corrupt file — reset
     }
   }
-  cached = { ...DEFAULTS, captcha: { ...DEFAULT_CAPTCHA, apiKeys: { ...DEFAULT_CAPTCHA.apiKeys } } }
+  cached = { ...DEFAULTS, captcha: { ...DEFAULT_CAPTCHA, apiKeys: { ...DEFAULT_CAPTCHA.apiKeys } }, ai: { ...DEFAULT_AI } }
   return cached
 }
 
@@ -75,7 +94,11 @@ function mergeWithDefaults(raw: any): AppSettings {
       ...(raw?.captcha?.apiKeys ?? {})
     }
   }
-  return { ...DEFAULTS, ...raw, captcha }
+  const ai: AiConfig = {
+    ...DEFAULT_AI,
+    ...(raw?.ai ?? {})
+  }
+  return { ...DEFAULTS, ...raw, captcha, ai }
 }
 
 export function updateSettings(partial: Partial<AppSettings>): AppSettings {
