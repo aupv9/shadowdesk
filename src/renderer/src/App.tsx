@@ -58,7 +58,7 @@ export default function App() {
           {section === 'fingerprint' && <FingerprintEditor />}
         </ErrorBoundary>
         <ErrorBoundary section="Detection">
-          {section === 'detection'   && <DetectionDashboard />}
+          {section === 'detection'   && <DetectionDashboard onNavigate={setSection} />}
         </ErrorBoundary>
         <ErrorBoundary section="Automation">
           {section === 'automation'  && <AutomationBuilder />}

@@ -12,6 +12,7 @@ const api = {
     active:             ()                                    => ipcRenderer.invoke('profiles:active'),
     setGroup:           (profileId: string, groupId: string | null) => ipcRenderer.invoke('profiles:setGroup', profileId, groupId),
     rerollFingerprint:  (id: string)                          => ipcRenderer.invoke('profiles:rerollFingerprint', id),
+    changePreset:       (id: string, presetKey: string)       => ipcRenderer.invoke('profiles:changePreset', id, presetKey),
     export:             (id: string)                          => ipcRenderer.invoke('profiles:export', id),
     import:             (buffer: Buffer)                      => ipcRenderer.invoke('profiles:import', buffer),
     // Phase 6: version history

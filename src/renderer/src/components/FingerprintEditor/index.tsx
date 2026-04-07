@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { CheckCircle, AlertCircle, Info, RefreshCw, ChevronDown, Sliders, AlertTriangle } from 'lucide-react'
+import { CheckCircle, AlertCircle, Info, RefreshCw, ChevronDown, Sliders, AlertTriangle, Layers } from 'lucide-react'
 import { Header } from '../Layout/Header'
 import { useProfileStore } from '../../stores/profileStore'
 import type { BehaviorConfig, TimingConfig } from '../../types'
@@ -87,17 +87,23 @@ const score = Math.round((spoofedCount / VECTORS.length) * 100)
 
 export function FingerprintEditor() {
   const { profiles, fetchProfiles, rerollFingerprint } = useProfileStore()
-  const [selectedId,  setSelectedId]  = useState<string>('')
-  const [rolling,     setRolling]     = useState(false)
-  const [rolledMsg,   setRolledMsg]   = useState(false)
-  const [savingBehavior, setSavingBehavior] = useState(false)
-  const [behaviorMsg,    setBehaviorMsg]    = useState(false)
+  const [selectedId,      setSelectedId]      = useState<string>('')
+  const [rolling,         setRolling]         = useState(false)
+  const [rolledMsg,       setRolledMsg]       = useState(false)
+  const [savingBehavior,  setSavingBehavior]  = useState(false)
+  const [behaviorMsg,     setBehaviorMsg]     = useState(false)
+  const [presetKeys,      setPresetKeys]      = useState<string[]>([])
+  const [switchingPreset, setSwitchingPreset] = useState(false)
+  const [presetMsg,       setPresetMsg]       = useState(false)
   // Local editable copies of behavior/timing
   const [behavior, setBehavior] = useState<BehaviorConfig | null>(null)
   const [timing,   setTiming]   = useState<TimingConfig | null>(null)
 
   useEffect(() => {
     if (profiles.length === 0) fetchProfiles()
+    window.api.fingerprint.presets().then((p: Record<string, any>) => {
+      setPresetKeys(Object.keys(p))
+    }).catch(() => {})
   }, [])
 
   const selectedProfile = profiles.find((p) => p.id === selectedId) ?? null
@@ -138,6 +144,19 @@ export function FingerprintEditor() {
       setTimeout(() => setBehaviorMsg(false), 2000)
     } finally {
       setSavingBehavior(false)
+    }
+  }
+
+  const handleChangePreset = async (presetKey: string) => {
+    if (!selectedId || !presetKey || switchingPreset) return
+    setSwitchingPreset(true)
+    try {
+      await (window.api.profiles as any).changePreset(selectedId, presetKey)
+      await fetchProfiles()
+      setPresetMsg(true)
+      setTimeout(() => setPresetMsg(false), 2500)
+    } finally {
+      setSwitchingPreset(false)
     }
   }
 
@@ -214,6 +233,32 @@ export function FingerprintEditor() {
 
           {rolledMsg && (
             <p className="text-xs text-green-400 mb-3">✓ New fingerprint generated and saved</p>
+          )}
+          {presetMsg && (
+            <p className="text-xs text-green-400 mb-3">✓ Preset applied — fingerprint updated</p>
+          )}
+
+          {/* Inline preset switcher — only when a profile is selected */}
+          {selectedProfile && presetKeys.length > 0 && (
+            <div className="flex items-center gap-2 mb-4">
+              <Layers className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <div className="relative flex-1">
+                <select
+                  className="input appearance-none pr-8 text-xs"
+                  value={fp?.preset ?? ''}
+                  onChange={(e) => handleChangePreset(e.target.value)}
+                  disabled={switchingPreset}
+                >
+                  {presetKeys.map((key) => (
+                    <option key={key} value={key}>{key}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+              </div>
+              {switchingPreset && (
+                <RefreshCw className="w-3.5 h-3.5 text-ghost-400 animate-spin shrink-0" />
+              )}
+            </div>
           )}
 
           {fp ? (
