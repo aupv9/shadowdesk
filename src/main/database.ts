@@ -907,6 +907,50 @@ export class Database {
     }
   }
 
+  /** Tier 5: detailed per-action metrics. Returns slowest/fastest/avg per action. */
+  getActionMetrics(workflowId?: string, limit = 100): {
+    action: string
+    count: number
+    avg_ms: number
+    min_ms: number
+    max_ms: number
+    failure_rate: number
+  }[] {
+    const where = workflowId ? 'WHERE workflow_id = ?' : ''
+    const params = workflowId ? [workflowId] : []
+
+    // SQL can't easily parse JSON arrays, so we compute this in JS
+    const last = this.queryAll(
+      `SELECT step_results FROM workflow_runs ${where} ORDER BY started_at DESC LIMIT ?`,
+      [...params, limit]
+    )
+
+    const metrics = new Map<string, { count: number; times: number[]; failures: number }>()
+    for (const row of last) {
+      try {
+        const steps = JSON.parse(row.step_results || '[]')
+        for (const s of steps) {
+          if (!s || !s.action) continue
+          const key = s.action
+          if (!metrics.has(key)) metrics.set(key, { count: 0, times: [], failures: 0 })
+          const m = metrics.get(key)!
+          m.count++
+          if (s.duration_ms) m.times.push(s.duration_ms)
+          if (!s.success) m.failures++
+        }
+      } catch { /* skip malformed */ }
+    }
+
+    return Array.from(metrics.entries()).map(([action, m]) => ({
+      action,
+      count: m.count,
+      avg_ms: m.times.length > 0 ? Math.round(m.times.reduce((a, b) => a + b, 0) / m.times.length) : 0,
+      min_ms: m.times.length > 0 ? Math.min(...m.times) : 0,
+      max_ms: m.times.length > 0 ? Math.max(...m.times) : 0,
+      failure_rate: Math.round((m.failures / m.count) * 100)
+    }))
+  }
+
   // ── Detection Tests ───────────────────────────────────────────────────────
 
   saveDetectionTestResult(result: {
