@@ -42,7 +42,11 @@ import {
   LayoutList,
   Shuffle,
   ScanText,
-  Database
+  Database,
+  GripVertical,
+  Frame,
+  Sliders,
+  FocusIcon
 } from 'lucide-react'
 import type { AutomationStep, AutomationActionType } from '../../types'
 
@@ -102,7 +106,14 @@ const ACTION_META: Record<AutomationActionType, { icon: React.ElementType; label
   writeFile:          { icon: FileText,           label: 'Write File',           color: 'text-sky-500' },
   waitForDownload:    { icon: Download,           label: 'Wait For Download',    color: 'text-amber-300' },
   // Tier 7 RPA — error recovery & resilience
-  tryCatch:           { icon: ShieldCheck,        label: 'Try / Catch',          color: 'text-pink-400' }
+  tryCatch:           { icon: ShieldCheck,        label: 'Try / Catch',          color: 'text-pink-400' },
+  // Tier 9 RPA — advanced element interactions
+  dragAndDrop:        { icon: GripVertical,       label: 'Drag & Drop',          color: 'text-violet-400' },
+  keyCombo:           { icon: Keyboard,           label: 'Key Combo',            color: 'text-amber-500' },
+  selectContextMenu:  { icon: List,               label: 'Context Menu',         color: 'text-rose-300' },
+  setRangeInput:      { icon: Sliders,            label: 'Set Range Input',      color: 'text-teal-400' },
+  scrollIntoView:     { icon: FocusIcon,          label: 'Scroll Into View',     color: 'text-sky-300' },
+  switchFrame:        { icon: Frame,              label: 'Switch Frame',         color: 'text-indigo-300' }
 }
 
 const ALL_ACTIONS: AutomationActionType[] = [
@@ -127,7 +138,9 @@ const ALL_ACTIONS: AutomationActionType[] = [
   // Tier 6 RPA
   'forEachRow', 'readFile', 'writeFile', 'waitForDownload',
   // Tier 7 RPA
-  'tryCatch'
+  'tryCatch',
+  // Tier 9 RPA
+  'dragAndDrop', 'keyCombo', 'selectContextMenu', 'setRangeInput', 'scrollIntoView', 'switchFrame'
 ]
 
 interface StepEditorProps {
@@ -190,6 +203,12 @@ function getDefaultParams(action: AutomationActionType): Record<string, any> {
     case 'writeFile':          return { filePath: '', content: '', append: false, encoding: 'utf-8' }
     case 'waitForDownload':    return { directory: '', pattern: '', filePath: '', timeout: 60000, pollInterval: 500, saveAs: 'downloadedFile' }
     case 'tryCatch':           return { tryBlock: [], catchBlock: [], finallyBlock: [], errorPrefix: 'error' }
+    case 'dragAndDrop':        return { selector: '', targetSelector: '', steps: 20, offsetX: 0, offsetY: 0 }
+    case 'keyCombo':           return { keys: 'Control+a' }
+    case 'selectContextMenu':  return { selector: '', menuItemText: '', exact: true, menuDelay: 300 }
+    case 'setRangeInput':      return { selector: '', value: 50, saveAs: '' }
+    case 'scrollIntoView':     return { selector: '', behavior: 'smooth', timeout: 30000 }
+    case 'switchFrame':        return { selector: '', index: undefined, urlPattern: '', exit: false, saveAs: '' }
     default:                   return {}
   }
 }
