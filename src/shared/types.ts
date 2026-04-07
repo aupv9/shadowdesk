@@ -685,3 +685,78 @@ export interface NodeHealth {
   error?: string
 }
 
+// ─── Phase 15.A — Workflow Marketplace ───────────────────────────────────────
+
+export type MarketplaceCategory =
+  | 'social'
+  | 'ecommerce'
+  | 'scraping'
+  | 'testing'
+  | 'utility'
+  | 'finance'
+
+export interface MarketplaceWorkflow {
+  id: string
+  name: string
+  description: string
+  author: string
+  category: MarketplaceCategory
+  tags: string[]
+  stars: number
+  downloads: number
+  version: string
+  publishedAt: string
+  /** Full step definitions — present when fetching a single item */
+  steps?: any[]
+}
+
+// ─── Phase 15.B — Community Fingerprint Presets ───────────────────────────────
+
+export interface CommunityPreset {
+  id: string
+  name: string
+  os: string
+  browser: string
+  submittedBy: string
+  qualityScore: number       // 0–100 (rarity + detection-resistance)
+  downloadCount: number
+  publishedAt: string
+  /** Raw FingerprintConfig JSON — present when fetching a single preset */
+  fingerprint?: any
+}
+
+// ─── Phase 15.C — Outbound Webhooks ──────────────────────────────────────────
+
+export type WebhookEvent =
+  | 'profile.created'
+  | 'profile.launched'
+  | 'profile.closed'
+  | 'detection.completed'
+  | 'schedule.completed'
+  | 'license.expiring'
+
+export interface WebhookConfig {
+  id: string
+  name: string
+  url: string
+  events: WebhookEvent[]
+  secret?: string            // used to sign payload (HMAC-SHA256 X-Signature header)
+  enabled: boolean
+  createdAt: string
+  lastTriggeredAt?: string
+  lastStatus?: number        // HTTP status of last delivery
+}
+
+export interface TelegramConfig {
+  enabled: boolean
+  botToken: string
+  chatId: string
+  events: WebhookEvent[]
+}
+
+export interface CreateWebhookInput {
+  name: string
+  url: string
+  events: WebhookEvent[]
+  secret?: string
+}

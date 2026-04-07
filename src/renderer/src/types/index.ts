@@ -62,14 +62,22 @@ export type {
   RemoteBrowserNode,
   CreateNodeInput,
   NodeHealth,
-  NodeStatus
+  NodeStatus,
+  // Phase 15
+  MarketplaceWorkflow,
+  MarketplaceCategory,
+  CommunityPreset,
+  WebhookConfig,
+  TelegramConfig,
+  CreateWebhookInput,
+  WebhookEvent
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
 
 // Renderer-only types
 
-export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'detection' | 'settings' | 'team' | 'account' | 'automation' | 'patches'
+export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'detection' | 'settings' | 'team' | 'account' | 'automation' | 'patches' | 'marketplace'
 
 export interface Toast {
   id: string
