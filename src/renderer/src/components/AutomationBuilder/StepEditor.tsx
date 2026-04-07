@@ -41,7 +41,8 @@ import {
   X,
   LayoutList,
   Shuffle,
-  ScanText
+  ScanText,
+  Database
 } from 'lucide-react'
 import type { AutomationStep, AutomationActionType } from '../../types'
 
@@ -89,7 +90,12 @@ const ACTION_META: Record<AutomationActionType, { icon: React.ElementType; label
   // Tier 4 RPA — proxy rotation
   switchProxy:        { icon: Shuffle,            label: 'Switch Proxy',         color: 'text-orange-300' },
   // Tier 4 RPA — text click
-  clickByText:        { icon: ScanText,           label: 'Click by Text',        color: 'text-teal-300' }
+  clickByText:        { icon: ScanText,           label: 'Click by Text',        color: 'text-teal-300' },
+  // Tier 5 RPA — storage inspection
+  getStorage:         { icon: Database,           label: 'Get Storage',          color: 'text-cyan-400' },
+  setStorage:         { icon: Database,           label: 'Set Storage',          color: 'text-cyan-500' },
+  clearStorage:       { icon: Trash2,             label: 'Clear Storage',        color: 'text-red-400' },
+  queryIndexedDB:     { icon: Database,           label: 'Query IndexedDB',      color: 'text-indigo-400' }
 }
 
 const ALL_ACTIONS: AutomationActionType[] = [
@@ -108,7 +114,9 @@ const ALL_ACTIONS: AutomationActionType[] = [
   // Tier 4 RPA
   'openTab', 'switchTab', 'closeTab', 'getTabs',
   'switchProxy',
-  'clickByText'
+  'clickByText',
+  // Tier 5 RPA
+  'getStorage', 'setStorage', 'clearStorage', 'queryIndexedDB'
 ]
 
 interface StepEditorProps {
@@ -162,6 +170,10 @@ function getDefaultParams(action: AutomationActionType): Record<string, any> {
     case 'getTabs':            return { saveAs: 'tabs' }
     case 'switchProxy':        return { strategy: 'round-robin', proxyId: '', prefix: 'proxy', persistToProfile: true }
     case 'clickByText':        return { text: '', exact: false, visible: true, clickCount: 1, button: 'left', timeout: 10000, saveAs: '' }
+    case 'getStorage':         return { type: 'localStorage', saveAs: 'storage' }
+    case 'setStorage':         return { type: 'localStorage', key: '', value: '' }
+    case 'clearStorage':       return { type: 'all' }
+    case 'queryIndexedDB':     return { saveAs: 'idb' }
     default:                   return {}
   }
 }

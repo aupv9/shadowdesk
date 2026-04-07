@@ -469,6 +469,11 @@ export type AutomationActionType =
   | 'switchProxy'
   // Tier 4 RPA — Text-based click (DOM XPath + coordinate fallback)
   | 'clickByText'
+  // Tier 5 RPA — Storage inspection
+  | 'getStorage'
+  | 'setStorage'
+  | 'clearStorage'
+  | 'queryIndexedDB'
   // Tier 1 RPA — Workflow chaining, parallel steps, control flow
   | 'callWorkflow'
   | 'parallelSteps'
@@ -586,6 +591,19 @@ export interface WorkflowVersion {
 }
 
 // ─── Assert Action Result (Tier 3) ──────────────────────────────────────────
+
+// Tier 5: Workflow execution hooks
+export type WorkflowHookEvent =
+  | 'before-step'
+  | 'after-step'
+  | 'before-workflow'
+  | 'after-workflow'
+  | 'step-error'
+
+export interface WorkflowHook {
+  event: WorkflowHookEvent
+  handler: (data: any) => void | Promise<void>
+}
 
 export type AssertType =
   | 'element-exists'
