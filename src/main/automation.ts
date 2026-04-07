@@ -143,6 +143,9 @@ export class AutomationEngine {
   private currentPages = new Map<string, import('puppeteer-core').Page>()
   /** Tier 5: per-run execution hooks for before/after step, workflow lifecycle */
   private hooks = new Map<string, Array<{ event: string; handler: (data: any) => Promise<void> }>>()
+  /** Tier 7: when set, every step that fails (after retries are exhausted)
+   *  captures a screenshot to this directory. Set per run by executeWorkflow. */
+  private failureScreenshotDir: string | null = null
 
   static getInstance(): AutomationEngine {
     if (!AutomationEngine.instance) {
@@ -156,7 +159,14 @@ export class AutomationEngine {
     profileId: string,
     runtimeVars?: Record<string, string>,
     webContents?: WebContents,
-    debugOpts?: { breakpoints?: string[]; pauseAtStart?: boolean }
+    debugOpts?: {
+      breakpoints?: string[]
+      pauseAtStart?: boolean
+      // Tier 7: global wall-clock cap; aborts the run if exceeded.
+      maxDurationMs?: number
+      // Tier 7: enable auto-screenshot on step failure to this directory.
+      screenshotOnFailureDir?: string
+    }
   ): Promise<AutomationRunResult> {
     const db = Database.getInstance()
     const bm = BrowserManager.getInstance()
@@ -214,6 +224,20 @@ export class AutomationEngine {
     let status: 'completed' | 'failed' | 'stopped' = 'completed'
     let runError: string | undefined
 
+    // Tier 7: enable failure-screenshot capture for this run.
+    this.failureScreenshotDir = debugOpts?.screenshotOnFailureDir ?? null
+
+    // Tier 7: global workflow timeout — schedule an abort timer that flips
+    // control.abort when the wall-clock budget is exhausted.
+    let globalTimer: NodeJS.Timeout | null = null
+    let globalTimedOut = false
+    if (debugOpts?.maxDurationMs && debugOpts.maxDurationMs > 0) {
+      globalTimer = setTimeout(() => {
+        globalTimedOut = true
+        control.abort = true
+      }, debugOpts.maxDurationMs)
+    }
+
     // Tier 5: emit before-workflow hook
     await this.callHooks(runKey, 'before-workflow', {
       workflowId,
@@ -237,6 +261,12 @@ export class AutomationEngine {
       status = 'failed'
       runError = err.message
     } finally {
+      if (globalTimer) clearTimeout(globalTimer)
+      if (globalTimedOut) {
+        status = 'failed'
+        runError = `Workflow exceeded global timeout of ${debugOpts?.maxDurationMs}ms`
+      }
+      this.failureScreenshotDir = null
       this.running.delete(runKey)
       this.currentPages.delete(profileId)
       // Tier 5: emit after-workflow hook
@@ -446,7 +476,15 @@ export class AutomationEngine {
       'useCredential', 'conditional', 'loop',
       'callWorkflow', 'parallelSteps', 'jumpToStep',
       'interceptRequest', 'clearIntercepts',
-      'getCookies', 'setCookies', 'deleteCookies'
+      'getCookies', 'setCookies', 'deleteCookies',
+      // Tier 3-6 additions
+      'assert',
+      'openTab', 'switchTab', 'closeTab', 'getTabs',
+      'switchProxy', 'clickByText',
+      'getStorage', 'setStorage', 'clearStorage', 'queryIndexedDB',
+      'forEachRow', 'readFile', 'writeFile', 'waitForDownload',
+      // Tier 7
+      'tryCatch'
     ])
 
     // Pre-collect ids that produce variables so {var} references resolve.
@@ -463,6 +501,10 @@ export class AutomationEngine {
         if (Array.isArray(s.params?.thenSteps)) collectProduced(s.params.thenSteps)
         if (Array.isArray(s.params?.elseSteps)) collectProduced(s.params.elseSteps)
         if (Array.isArray(s.params?.steps)) collectProduced(s.params.steps)
+        // Tier 7: tryCatch sub-blocks
+        if (Array.isArray(s.params?.tryBlock))     collectProduced(s.params.tryBlock)
+        if (Array.isArray(s.params?.catchBlock))   collectProduced(s.params.catchBlock)
+        if (Array.isArray(s.params?.finallyBlock)) collectProduced(s.params.finallyBlock)
       }
     }
     collectProduced(steps)
@@ -540,6 +582,10 @@ export class AutomationEngine {
         if (Array.isArray(step.params?.thenSteps)) validateStepList(step.params.thenSteps, nextParents)
         if (Array.isArray(step.params?.elseSteps)) validateStepList(step.params.elseSteps, nextParents)
         if (Array.isArray(step.params?.steps)) validateStepList(step.params.steps, nextParents)
+        // Tier 7: tryCatch sub-blocks
+        if (Array.isArray(step.params?.tryBlock))     validateStepList(step.params.tryBlock, nextParents)
+        if (Array.isArray(step.params?.catchBlock))   validateStepList(step.params.catchBlock, nextParents)
+        if (Array.isArray(step.params?.finallyBlock)) validateStepList(step.params.finallyBlock, nextParents)
       }
     }
 
@@ -657,7 +703,28 @@ export class AutomationEngine {
         } catch { /* non-fatal */ }
       }
 
-      if (!result.success) return 'failed'
+      if (!result.success) {
+        // Tier 7: per-step onErrorGoto fallback — convert the failure into a
+        // jump to the configured target step. The failed step is still
+        // recorded in stepResults (auditable) but the run continues. Errors
+        // are exposed via {error.message} so the recovery path can react.
+        if (step.onErrorGoto) {
+          const targetIdx = steps.findIndex((s) => s.id === step.onErrorGoto)
+          if (targetIdx >= 0) {
+            variables['error.message'] = result.error ?? 'Unknown error'
+            variables['error.action'] = step.action
+            variables['error.stepId'] = step.id
+            jumpsUsed++
+            if (jumpsUsed > MAX_JUMPS) {
+              return 'failed'
+            }
+            i = targetIdx
+            continue
+          }
+          // Target not found — fall through to normal failure
+        }
+        return 'failed'
+      }
 
       // Handle jumpToStep — the action stores the target step id in
       // `result.output.jumpTo` (or null if the condition wasn't met).
@@ -766,28 +833,75 @@ export class AutomationEngine {
   ): Promise<AutomationStepResult> {
     const start = Date.now()
     const maxAttempts = Math.max(1, (step.retries ?? 0) + 1)
-    const retryDelay = step.retryDelay ?? 1000
+    const baseDelay = step.retryDelay ?? 1000
+    const backoff: 'fixed' | 'linear' | 'exponential' = step.retryBackoff ?? 'fixed'
+    const retryOn: string[] | undefined = Array.isArray(step.retryOn) && step.retryOn.length > 0
+      ? step.retryOn
+      : undefined
     let lastError: string = ''
+    let attemptsTaken = 0
+
+    // Tier 7: Match an error against retryOn patterns. Each entry is treated
+    // as a substring first, falling back to a regex if it parses.
+    const matchesRetryOn = (msg: string): boolean => {
+      if (!retryOn) return true
+      for (const pat of retryOn) {
+        if (!pat) continue
+        if (msg.includes(pat)) return true
+        try {
+          if (new RegExp(pat, 'i').test(msg)) return true
+        } catch { /* invalid regex — fall through */ }
+      }
+      return false
+    }
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      attemptsTaken = attempt + 1
       if (control.abort) {
         return { stepId: step.id, action: step.action, success: false, duration_ms: Date.now() - start, error: 'Workflow stopped' }
       }
       try {
-        const output = await this.runAction(page, step, control, allResults, variables, profileId)
+        // Tier 7: per-step timeout — race the action against a timer.
+        const actionPromise = this.runAction(page, step, control, allResults, variables, profileId)
+        const output = step.timeoutMs && step.timeoutMs > 0
+          ? await Promise.race([
+              actionPromise,
+              new Promise((_, rej) => setTimeout(
+                () => rej(new Error(`Step timed out after ${step.timeoutMs}ms`)),
+                step.timeoutMs
+              ))
+            ])
+          : await actionPromise
         return {
           stepId: step.id,
           action: step.action,
           success: true,
           duration_ms: Date.now() - start,
-          output: attempt > 0 ? { ...output, retriedAfter: attempt } : output
+          output: attempt > 0 ? { ...(output as any), retriedAfter: attempt } : output
         }
       } catch (err: any) {
-        lastError = err.message
+        lastError = err.message ?? String(err)
+        // If retryOn is set and the error doesn't match, abort retries early.
+        if (!matchesRetryOn(lastError)) break
         if (attempt < maxAttempts - 1) {
-          await new Promise((r) => setTimeout(r, retryDelay))
+          let delay = baseDelay
+          if (backoff === 'linear')      delay = baseDelay * (attempt + 1)
+          if (backoff === 'exponential') delay = baseDelay * Math.pow(2, attempt)
+          await new Promise((r) => setTimeout(r, delay))
         }
       }
+    }
+
+    // Tier 7: Auto-screenshot on final failure if the workflow opted in.
+    let failureScreenshot: string | undefined
+    if (this.failureScreenshotDir) {
+      try {
+        const fname = `${step.id}-${Date.now()}.png`
+        const target = pathResolve(this.failureScreenshotDir, fname)
+        await mkdir(dirname(target), { recursive: true })
+        await page.screenshot({ path: target as `${string}.png`, fullPage: false })
+        failureScreenshot = target
+      } catch { /* non-fatal */ }
     }
 
     return {
@@ -795,7 +909,8 @@ export class AutomationEngine {
       action: step.action,
       success: false,
       duration_ms: Date.now() - start,
-      error: maxAttempts > 1 ? `Failed after ${maxAttempts} attempts: ${lastError}` : lastError
+      error: attemptsTaken > 1 ? `Failed after ${attemptsTaken} attempts: ${lastError}` : lastError,
+      output: failureScreenshot ? { failureScreenshot } : undefined
     }
   }
 
@@ -980,6 +1095,79 @@ export class AutomationEngine {
           iterations++
         }
         return { iterations, totalSteps: loopSteps.length * times }
+      }
+
+      // ── Tier 7 RPA: Try / catch / finally block ─────────────────────
+
+      case 'tryCatch': {
+        // Execute params.tryBlock; on failure, expose the error in
+        // variables (via configurable prefix, default 'error') and run
+        // params.catchBlock. params.finallyBlock always runs at the end,
+        // success or failure. Mirrors the JS try/catch/finally semantics.
+        const tryBlock: AutomationStep[] = params.tryBlock ?? []
+        const catchBlock: AutomationStep[] = params.catchBlock ?? []
+        const finallyBlock: AutomationStep[] = params.finallyBlock ?? []
+        const prefix: string = (params.errorPrefix ?? 'error').replace(/\.$/, '')
+
+        // Snapshot the position in `allResults` so the catch/finally can see
+        // the try block's results but the parent run's success status isn't
+        // polluted by sub-failures the user explicitly opted to handle.
+        const tryStartIdx = allResults.length
+        let caught: string | null = null
+        let tryStatus: 'completed' | 'failed' | 'stopped' = 'completed'
+
+        try {
+          tryStatus = await this.executeSteps(page, tryBlock, control, allResults, variables)
+          if (tryStatus === 'stopped') throw new Error('Workflow stopped')
+          if (tryStatus === 'failed') {
+            // Pull the most recent failed result from the try-block window
+            // for a meaningful error message.
+            const failed = allResults.slice(tryStartIdx).findLast((r) => !r.success)
+            caught = failed?.error ?? 'Unknown error in try block'
+          }
+        } catch (err: any) {
+          tryStatus = 'failed'
+          caught = err.message ?? String(err)
+        }
+
+        // Stop propagates immediately, even past finally
+        if (control.abort) throw new Error('Workflow stopped')
+
+        if (caught !== null) {
+          // Inject {error.*} variables for the catch block
+          variables[`${prefix}.message`] = caught
+          variables[`${prefix}.caughtAt`] = new Date().toISOString()
+          try {
+            const catchStatus = await this.executeSteps(page, catchBlock, control, allResults, variables)
+            if (catchStatus === 'stopped') throw new Error('Workflow stopped')
+            // If the catch block ALSO fails, we re-throw — uncaught.
+            if (catchStatus === 'failed') {
+              const failedInCatch = allResults.findLast((r) => !r.success)
+              throw new Error(`Catch block failed: ${failedInCatch?.error ?? 'unknown'}`)
+            }
+          } finally {
+            // Cleanup the injected error variables once catch completes.
+            delete variables[`${prefix}.message`]
+            delete variables[`${prefix}.caughtAt`]
+          }
+        }
+
+        if (finallyBlock.length > 0) {
+          const finallyStatus = await this.executeSteps(page, finallyBlock, control, allResults, variables)
+          if (finallyStatus === 'stopped') throw new Error('Workflow stopped')
+          if (finallyStatus === 'failed') {
+            const failedInFinally = allResults.findLast((r) => !r.success)
+            throw new Error(`Finally block failed: ${failedInFinally?.error ?? 'unknown'}`)
+          }
+        }
+
+        return {
+          caught: caught !== null,
+          error: caught,
+          tryStepCount: tryBlock.length,
+          catchStepCount: catchBlock.length,
+          finallyStepCount: finallyBlock.length
+        }
       }
 
       // ── Tier 6 RPA: Data-driven automation & file handling ──────────
