@@ -29,7 +29,12 @@ import {
   KeyRound,
   Lock,
   Navigation,
-  RefreshCw
+  RefreshCw,
+  Workflow,
+  Layers,
+  CornerDownRight,
+  ShieldOff,
+  Cookie
 } from 'lucide-react'
 import type { AutomationStep, AutomationActionType } from '../../types'
 
@@ -57,7 +62,16 @@ const ACTION_META: Record<AutomationActionType, { icon: React.ElementType; label
   download:           { icon: Download,           label: 'Download File',        color: 'text-emerald-300' },
   solveCaptcha:       { icon: ShieldCheck,        label: 'Solve Captcha',        color: 'text-yellow-300' },
   injectCaptchaToken: { icon: KeyRound,           label: 'Inject Captcha Token', color: 'text-amber-300' },
-  useCredential:      { icon: Lock,               label: 'Use Credential',       color: 'text-emerald-400' }
+  useCredential:      { icon: Lock,               label: 'Use Credential',       color: 'text-emerald-400' },
+  // Tier 1 RPA additions
+  callWorkflow:       { icon: Workflow,           label: 'Call Workflow',        color: 'text-indigo-300' },
+  parallelSteps:      { icon: Layers,             label: 'Parallel Steps',       color: 'text-violet-300' },
+  jumpToStep:         { icon: CornerDownRight,    label: 'Jump to Step',         color: 'text-amber-300' },
+  interceptRequest:   { icon: ShieldCheck,        label: 'Intercept Request',    color: 'text-rose-300' },
+  clearIntercepts:    { icon: ShieldOff,          label: 'Clear Intercepts',     color: 'text-rose-200' },
+  getCookies:         { icon: Cookie,             label: 'Get Cookies',          color: 'text-amber-200' },
+  setCookies:         { icon: Cookie,             label: 'Set Cookies',          color: 'text-amber-300' },
+  deleteCookies:      { icon: Cookie,             label: 'Delete Cookies',       color: 'text-amber-400' }
 }
 
 const ALL_ACTIONS: AutomationActionType[] = [
@@ -67,7 +81,11 @@ const ALL_ACTIONS: AutomationActionType[] = [
   'upload', 'download',
   'solveCaptcha', 'injectCaptchaToken',
   'useCredential',
-  'conditional', 'loop'
+  'conditional', 'loop',
+  // Tier 1 RPA additions
+  'callWorkflow', 'parallelSteps', 'jumpToStep',
+  'interceptRequest', 'clearIntercepts',
+  'getCookies', 'setCookies', 'deleteCookies'
 ]
 
 interface StepEditorProps {
@@ -106,6 +124,14 @@ function getDefaultParams(action: AutomationActionType): Record<string, any> {
     case 'useCredential':      return { label: '', prefix: 'cred' }
     case 'conditional':        return { conditionType: 'selector-exists', selector: '', expected: '', script: '', thenSteps: [], elseSteps: [] }
     case 'loop':               return { times: 3, steps: [] }
+    case 'callWorkflow':       return { workflowId: '', inputVars: {}, outputPrefix: '' }
+    case 'parallelSteps':      return { steps: [], failFast: true }
+    case 'jumpToStep':         return { conditionType: 'var-equals', variable: '', expected: '', targetStepId: '' }
+    case 'interceptRequest':   return { urlPattern: '*', action: 'block', status: 200, contentType: 'application/json', body: '', headers: {}, replace: false }
+    case 'clearIntercepts':    return {}
+    case 'getCookies':         return { url: '', saveAs: '' }
+    case 'setCookies':         return { name: '', value: '', domain: '', path: '/' }
+    case 'deleteCookies':      return { name: '', all: false }
     default:                   return {}
   }
 }

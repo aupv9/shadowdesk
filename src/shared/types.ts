@@ -458,6 +458,17 @@ export type AutomationActionType =
   | 'injectCaptchaToken'
   // Phase 12.C.3 — Encrypted credential vault
   | 'useCredential'
+  // Tier 1 RPA — Workflow chaining, parallel steps, control flow
+  | 'callWorkflow'
+  | 'parallelSteps'
+  | 'jumpToStep'
+  // Tier 1 RPA — Network interception
+  | 'interceptRequest'
+  | 'clearIntercepts'
+  // Tier 1 RPA — Cookie management
+  | 'getCookies'
+  | 'setCookies'
+  | 'deleteCookies'
 
 export interface AutomationStep {
   id: string
