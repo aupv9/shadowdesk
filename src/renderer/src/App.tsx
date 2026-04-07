@@ -8,6 +8,7 @@ import { AutomationBuilder } from './components/AutomationBuilder'
 import { SettingsPage } from './components/Settings'
 import { AccountPage } from './components/Account'
 import { TeamManager } from './components/TeamManager'
+import { PatchManager } from './components/PatchManager'
 import { useProfileStore } from './stores/profileStore'
 import { useAuthStore } from './stores/authStore'
 import { useLicenseStore } from './stores/licenseStore'
@@ -41,6 +42,7 @@ export default function App() {
         {section === 'detection'   && <DetectionDashboard />}
         {section === 'automation'  && <AutomationBuilder />}
         {section === 'team'        && <TeamManager />}
+        {section === 'patches'     && <PatchManager />}
         {section === 'account'     && <AccountPage />}
         {section === 'settings'    && <SettingsPage />}
       </main>

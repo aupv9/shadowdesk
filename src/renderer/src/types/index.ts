@@ -38,14 +38,20 @@ export type {
   BatchTestStatus,
   ProfileVersion,
   BehaviorConfig,
-  TimingConfig
+  TimingConfig,
+  // Phase 8
+  ChromiumPatch,
+  ChromiumPatchStatus,
+  ChromiumPatchCategory,
+  ChromiumPatchLevel,
+  Phase8Config
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
 
 // Renderer-only types
 
-export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'detection' | 'settings' | 'team' | 'account' | 'automation'
+export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'detection' | 'settings' | 'team' | 'account' | 'automation' | 'patches'
 
 export interface Toast {
   id: string

@@ -19,6 +19,8 @@ export interface FingerprintConfig {
   // Phase 6
   behavior?: BehaviorConfig
   timing?: TimingConfig
+  // Phase 8
+  phase8?: Phase8Config
 }
 
 export interface OsConfig {
@@ -465,4 +467,53 @@ export interface BatchTestStatus {
   completed: number
   failed: number
   results: DetectionTestResult[]
+}
+
+// ─── Phase 8: Chromium Patch System ───────────────────────────────────────────
+
+/** Implementation level of a patch */
+export type ChromiumPatchLevel =
+  | 'js-shim'        // Implemented as JS override (works without custom Chromium)
+  | 'cdp-override'   // Implemented via Chrome DevTools Protocol
+  | 'requires-build' // Requires custom Chromium C++ patch to fully implement
+
+export type ChromiumPatchCategory =
+  | 'fingerprint'   // Fingerprint API spoofing
+  | 'automation'    // Automation/bot signal removal
+  | 'timing'        // Timing attack defense
+  | 'network'       // Network-level fingerprint
+  | 'gpu'           // GPU fingerprint defense
+  | 'locale'        // Locale/Intl API normalization
+
+export interface ChromiumPatch {
+  id: string
+  name: string
+  description: string
+  category: ChromiumPatchCategory
+  level: ChromiumPatchLevel
+  active: boolean
+  impact: 'low' | 'medium' | 'high'
+  /** Short technical note on what the patch changes */
+  technicalNote?: string
+}
+
+export interface ChromiumPatchStatus {
+  total: number
+  active: number
+  jsShims: number
+  cdpOverrides: number
+  requiresBuild: number
+  patches: ChromiumPatch[]
+}
+
+// Phase 8: extended fingerprint config
+export interface Phase8Config {
+  /** Intl API locale normalization */
+  intlSpoofing: boolean
+  /** navigator.userAgentData (UACH) high-entropy spoofing */
+  uachSpoofing: boolean
+  /** navigator.gpu WebGPU stub */
+  webGPUStub: boolean
+  /** Math FPU result normalization (deterministic per profile) */
+  mathFpuNoise: boolean
 }

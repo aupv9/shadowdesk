@@ -153,8 +153,8 @@ Adding a new IPC channel requires updating all three files.
 - **Phase 4** (Weeks 23–28): Automation API, RPA builder, mobile presets, workflow templates ✅
 - **Phase 5** (Weeks 29–34): Advanced CDP evasion, detection testing, iOS presets, new vectors ✅
 - **Phase 6** (Weeks 35–40): Behavior simulation, timing defenses, profile versioning, 10 new detection vectors ✅
-- **Phase 7** (Weeks 41–46): Batch detection testing, result management, behavior/timing config UI ✅ **current**
-- **Phase 8** (Future): Custom Chromium build (C++ patches), advanced detection framework integration
+- **Phase 7** (Weeks 41–46): Batch detection testing, result management, behavior/timing config UI ✅
+- **Phase 8** (Weeks 47–54): 45 detection vectors, Chromium patch catalog (30 patches), Layer 4 scripts (Intl/WebGPU/UACH), Phase 8 CDP evasion (MathFPU/ProtoChain/MediaCap/TrustTokens), PatchManager UI ✅ **current**
 
 ## Common Gotchas
 
