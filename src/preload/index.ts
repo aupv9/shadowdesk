@@ -225,6 +225,12 @@ const api = {
     status:        ()                  => ipcRenderer.invoke('patches:status'),
     list:          ()                  => ipcRenderer.invoke('patches:list'),
     getByCategory: (category: string)  => ipcRenderer.invoke('patches:getByCategory', category)
+  },
+  // Phase 13.E — Structured error events from main process
+  onError: (cb: (event: { category: string; message: string; timestamp: string }) => void): (() => void) => {
+    const handler = (_ipcEvent: any, appEvent: any) => cb(appEvent)
+    ipcRenderer.on('app:error', handler)
+    return () => { ipcRenderer.removeListener('app:error', handler) }
   }
 }
 

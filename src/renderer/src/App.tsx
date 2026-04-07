@@ -11,9 +11,13 @@ import { TeamManager } from './components/TeamManager'
 import { PatchManager } from './components/PatchManager'
 import { ErrorBoundary } from './components/UI/ErrorBoundary'
 import { ToastContainer } from './components/UI/Toast'
+import { ConfirmDialog } from './components/UI/ConfirmDialog'
+import { OfflineBanner } from './components/UI/OfflineBanner'
+import { WelcomeWizard, useWelcomeWizard } from './components/WelcomeWizard'
 import { useProfileStore } from './stores/profileStore'
 import { useAuthStore } from './stores/authStore'
 import { useLicenseStore } from './stores/licenseStore'
+import { useToastStore } from './stores/toastStore'
 import type { NavSection } from './types'
 
 export default function App() {
@@ -21,6 +25,8 @@ export default function App() {
   const { profiles, activeSessions } = useProfileStore()
   const auth = useAuthStore()
   const license = useLicenseStore()
+  const { show: showWizard, dismiss: dismissWizard } = useWelcomeWizard()
+  const pushToast = useToastStore((s) => s.push)
 
   useEffect(() => {
     auth.checkAuth()
@@ -35,10 +41,20 @@ export default function App() {
         document.documentElement.setAttribute('data-theme', theme)
       }
     })
+
+    // Phase 13.E — Subscribe to structured error events from main process
+    const unsubError = (window.api as any).onError?.((event: { category: string; message: string }) => {
+      pushToast(`[${event.category}] ${event.message}`, 'error', 5000)
+    })
+    return () => { unsubError?.() }
   }, [])
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-900">
+    <div className="flex flex-col h-screen overflow-hidden bg-slate-900">
+      {/* Phase 13.E — Offline status banner */}
+      <OfflineBanner />
+
+      <div className="flex flex-1 overflow-hidden">
       <Sidebar
         active={section}
         onChange={setSection}
@@ -77,6 +93,13 @@ export default function App() {
         </ErrorBoundary>
       </main>
       <ToastContainer />
+      </div>
+
+      {/* Phase 13.C — Confirm dialog (mounts once, imperative API) */}
+      <ConfirmDialog />
+
+      {/* Phase 13.C — Welcome wizard for first-time users */}
+      {showWizard && <WelcomeWizard onDismiss={dismissWizard} />}
     </div>
   )
 }
