@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { CheckCircle, AlertCircle, Info, RefreshCw, ChevronDown, Sliders, AlertTriangle, Layers } from 'lucide-react'
 import { Header } from '../Layout/Header'
 import { useProfileStore } from '../../stores/profileStore'
+import { FingerprintLivePreview } from './FingerprintLivePreview'
 import type { BehaviorConfig, TimingConfig } from '../../types'
 
 // Locale → valid timezone prefixes (mirrors presets.ts validation)
@@ -264,7 +265,6 @@ export function FingerprintEditor() {
           {fp ? (
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
               <InfoRow label="Preset"      value={fp.preset} />
-              <InfoRow label="User-Agent"  value={fp.browser.userAgent} mono truncate />
               <InfoRow label="Platform"    value={fp.browser.platform} />
               <InfoRow label="Screen"      value={`${fp.screen.width}×${fp.screen.height} (${fp.screen.pixelRatio}x)`} />
               <InfoRow label="Timezone"    value={fp.locale.timezone} />
@@ -286,6 +286,13 @@ export function FingerprintEditor() {
             <p className="text-xs text-slate-500">Select a profile above to view its fingerprint values</p>
           )}
         </div>
+
+        {/* Phase 13.D — Live UA Preview + Uniqueness Score */}
+        {fp && (
+          <div className="mb-6">
+            <FingerprintLivePreview fingerprint={fp} />
+          </div>
+        )}
 
         {/* Behavior & Timing Configuration (Phase 6) */}
         {fp && behavior && timing && (
