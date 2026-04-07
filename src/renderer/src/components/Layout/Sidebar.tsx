@@ -13,7 +13,8 @@ import {
   Bot,
   Shield,
   Cpu,
-  Store
+  Store,
+  Sparkles
 } from 'lucide-react'
 import type { NavSection } from '../../types'
 import type { User as UserType, LicensePlan } from '../../types'
@@ -48,6 +49,7 @@ const NAV_ITEMS: { key: NavSection; icon: React.ElementType; label: string }[] =
   { key: 'detection',   icon: Shield,       label: 'Detection' },
   { key: 'patches',     icon: Cpu,          label: 'Patches' },
   { key: 'automation',  icon: Bot,          label: 'Automation' },
+  { key: 'ai',         icon: Sparkles,     label: 'AI Assistant' },
   { key: 'marketplace', icon: Store,        label: 'Marketplace' },
   { key: 'team',        icon: Users,        label: 'Team' },
   { key: 'account',     icon: User,         label: 'Account' },

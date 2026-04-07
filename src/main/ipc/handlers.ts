@@ -38,7 +38,14 @@ import { getVault } from '../vault'
 import { getNodeManager } from '../remote-nodes'
 import { getMarketplace } from '../marketplace'
 import { getWebhookManager } from '../webhooks'
+import {
+  getAiStatus, setAiApiKey, setAiEnabled,
+  generateWorkflow, explainStep, fixStep,
+  analyzeDetection, healSelector,
+  getBehaviorArchetypes, getBehaviorArchetype
+} from '../ai-assistant'
 import type { CreateNodeInput, CreateWebhookInput, TelegramConfig, MarketplaceCategory, WebhookConfig } from '../../shared/types'
+import type { AutomationStep, DetectionVectorResult } from '../../shared/types'
 
 // ── Handler registration ───────────────────────────────────────────────────
 
@@ -1228,4 +1235,47 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('webhooks:dispatch', (_e, event: string, payload: Record<string, any>) =>
     wh.dispatch(event as any, payload)
   )
+
+  // ── AI Assistant (Phase 16) ───────────────────────────────────────────────
+
+  // 16.A — status & configuration
+  ipcMain.handle('ai:status', () => getAiStatus())
+
+  ipcMain.handle('ai:setApiKey', (_e, apiKey: string) => {
+    setAiApiKey(apiKey)
+    return getAiStatus()
+  })
+
+  ipcMain.handle('ai:setEnabled', (_e, enabled: boolean) => {
+    setAiEnabled(enabled)
+    return getAiStatus()
+  })
+
+  // 16.A — Natural Language Workflow Builder
+  ipcMain.handle('ai:generateWorkflow', (_e, prompt: string, pageHtml?: string) =>
+    generateWorkflow(prompt, pageHtml)
+  )
+
+  ipcMain.handle('ai:explainStep', (_e, step: AutomationStep) =>
+    explainStep(step)
+  )
+
+  ipcMain.handle('ai:fixStep', (_e, step: AutomationStep, errorMessage: string) =>
+    fixStep(step, errorMessage)
+  )
+
+  // 16.B — AI Detection Advisor
+  ipcMain.handle('ai:analyzeDetection', (_e, vectors: DetectionVectorResult[], overallScore: number) =>
+    analyzeDetection(vectors, overallScore)
+  )
+
+  // 16.C — Smart Selector Healing
+  ipcMain.handle('ai:healSelector', (_e, originalSelector: string, pageHtml: string, context?: string) =>
+    healSelector(originalSelector, pageHtml, context)
+  )
+
+  // 16.D — Behaviour Pattern Library
+  ipcMain.handle('ai:behaviorArchetypes', () => getBehaviorArchetypes())
+
+  ipcMain.handle('ai:behaviorArchetype', (_e, id: string) => getBehaviorArchetype(id))
 }
