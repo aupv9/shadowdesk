@@ -31,9 +31,35 @@ function interpolateParams(
   )
 }
 
+/** Per-profile network interception state. Each entry holds the rules and a
+ *  reference to the handler so we can detach it on `clearIntercepts` or when
+ *  the workflow ends. */
+interface InterceptRule {
+  urlPattern: string // glob-ish: '*' wildcards
+  action: 'block' | 'mock' | 'modify'
+  status?: number
+  contentType?: string
+  body?: string
+  headers?: Record<string, string>
+}
+
+interface InterceptState {
+  rules: InterceptRule[]
+  handler: (req: any) => void
+  enabled: boolean
+}
+
+/** Convert a glob pattern (`*` wildcards) to a RegExp. */
+function globToRegex(glob: string): RegExp {
+  const escaped = glob.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')
+  return new RegExp('^' + escaped + '$')
+}
+
 export class AutomationEngine {
   private static instance: AutomationEngine
   private running = new Map<string, { abort: boolean }>()
+  /** Active network intercept state per profileId */
+  private intercepts = new Map<string, InterceptState>()
 
   static getInstance(): AutomationEngine {
     if (!AutomationEngine.instance) {
@@ -110,6 +136,9 @@ export class AutomationEngine {
       runError = err.message
     } finally {
       this.running.delete(runKey)
+      // Tear down any network interception this run installed so it doesn't
+      // leak into subsequent runs / manual browsing sessions.
+      await this.teardownIntercepts(profileId, page).catch(() => { /* non-fatal */ })
     }
 
     const completedAt = new Date().toISOString()
@@ -148,8 +177,13 @@ export class AutomationEngine {
     workflowId?: string,
     profileId?: string
   ): Promise<'completed' | 'failed' | 'stopped'> {
-    for (const step of steps) {
+    // Index-based iteration so `jumpToStep` can change the cursor.
+    let i = 0
+    let jumpsUsed = 0
+    const MAX_JUMPS = 1000 // safety: prevent infinite jump loops
+    while (i < steps.length) {
       if (control.abort) return 'stopped'
+      const step = steps[i]
 
       // Interpolate this step's params lazily — variables may have been
       // mutated by an earlier step (e.g. solveCaptcha → {captchaToken}).
@@ -158,7 +192,7 @@ export class AutomationEngine {
         params: interpolateParams(step.params, variables)
       }
 
-      const result = await this.executeStep(page, liveStep, control, stepResults, variables)
+      const result = await this.executeStep(page, liveStep, control, stepResults, variables, profileId)
       stepResults.push(result)
 
       // Stream live progress to renderer
@@ -169,6 +203,35 @@ export class AutomationEngine {
       }
 
       if (!result.success) return 'failed'
+
+      // Handle jumpToStep — the action stores the target step id in
+      // `result.output.jumpTo` (or null if the condition wasn't met).
+      const jumpTarget: string | undefined = result.output?.jumpTo
+      if (jumpTarget) {
+        const targetIdx = steps.findIndex((s) => s.id === jumpTarget)
+        if (targetIdx < 0) {
+          // Convert into a failed run so users notice the bad reference.
+          stepResults[stepResults.length - 1] = {
+            ...result,
+            success: false,
+            error: `jumpToStep target "${jumpTarget}" not found in workflow`
+          }
+          return 'failed'
+        }
+        jumpsUsed++
+        if (jumpsUsed > MAX_JUMPS) {
+          stepResults[stepResults.length - 1] = {
+            ...result,
+            success: false,
+            error: `jumpToStep exceeded ${MAX_JUMPS} jumps (possible infinite loop)`
+          }
+          return 'failed'
+        }
+        i = targetIdx
+        continue
+      }
+
+      i++
     }
     return 'completed'
   }
@@ -243,7 +306,8 @@ export class AutomationEngine {
     step: AutomationStep,
     control: { abort: boolean },
     allResults: AutomationStepResult[],
-    variables: Record<string, string>
+    variables: Record<string, string>,
+    profileId?: string
   ): Promise<AutomationStepResult> {
     const start = Date.now()
     const maxAttempts = Math.max(1, (step.retries ?? 0) + 1)
@@ -255,7 +319,7 @@ export class AutomationEngine {
         return { stepId: step.id, action: step.action, success: false, duration_ms: Date.now() - start, error: 'Workflow stopped' }
       }
       try {
-        const output = await this.runAction(page, step, control, allResults, variables)
+        const output = await this.runAction(page, step, control, allResults, variables, profileId)
         return {
           stepId: step.id,
           action: step.action,
@@ -285,7 +349,8 @@ export class AutomationEngine {
     step: AutomationStep,
     control: { abort: boolean },
     allResults: AutomationStepResult[],
-    variables: Record<string, string>
+    variables: Record<string, string>,
+    profileId?: string
   ): Promise<any> {
     const { action, params } = step
 
@@ -593,6 +658,308 @@ export class AutomationEngine {
         })
         return { waitUntil: params.waitUntil ?? 'networkidle2' }
 
+      // ── Tier 1: Workflow chaining ───────────────────────────────────
+      case 'callWorkflow': {
+        // Execute another workflow's steps inline using the current page
+        // and variables map. Useful for building reusable sub-workflows
+        // (login, cookie check, retry helpers).
+        const targetId: string = params.workflowId
+        if (!targetId) throw new Error('callWorkflow requires workflowId')
+
+        const db = Database.getInstance()
+        const row = db.getWorkflow(targetId)
+        if (!row) throw new Error(`callWorkflow: workflow ${targetId} not found`)
+        const subSteps: AutomationStep[] = JSON.parse(row.steps)
+        const subVars: Record<string, string> =
+          row.variables ? JSON.parse(row.variables) : {}
+
+        // Optional input variables provided by the caller override the
+        // sub-workflow's stored defaults but live in a scoped copy so
+        // they don't leak back into the parent.
+        const inputVars: Record<string, string> = params.inputVars ?? {}
+        const childVars: Record<string, string> = {
+          ...subVars,
+          ...variables, // parent variables visible by default
+          ...inputVars
+        }
+
+        const childResults: AutomationStepResult[] = []
+        const childStatus = await this.executeSteps(
+          page, subSteps, control, childResults, childVars
+        )
+
+        // Merge selected outputs back into parent variables under a prefix.
+        const outputPrefix: string | undefined = params.outputPrefix
+        if (outputPrefix) {
+          for (const [k, v] of Object.entries(childVars)) {
+            // Only export keys that didn't exist in the parent — these were
+            // produced by the sub-workflow.
+            if (!(k in variables)) {
+              variables[`${outputPrefix}.${k}`] = v
+            }
+          }
+        }
+
+        if (childStatus === 'stopped') throw new Error('Sub-workflow stopped')
+        if (childStatus === 'failed') {
+          const failed = childResults.findLast((r) => !r.success)
+          throw new Error(
+            `Sub-workflow "${row.name}" failed${failed ? `: ${failed.error}` : ''}`
+          )
+        }
+        return {
+          workflowId: targetId,
+          name: row.name,
+          steps: childResults.length,
+          status: childStatus
+        }
+      }
+
+      // ── Tier 1: Parallel step execution ─────────────────────────────
+      case 'parallelSteps': {
+        // Run a list of independent steps concurrently against the same
+        // page. The caller is responsible for ensuring the steps don't
+        // race on the same DOM nodes — typical usage is N independent
+        // extractText / httpRequest steps.
+        const branchSteps: AutomationStep[] = params.steps ?? []
+        if (branchSteps.length === 0) return { ran: 0 }
+
+        const settled = await Promise.allSettled(
+          branchSteps.map((s) => {
+            const liveStep: AutomationStep = {
+              ...s,
+              params: interpolateParams(s.params, variables)
+            }
+            return this.executeStep(page, liveStep, control, allResults, variables, profileId)
+          })
+        )
+
+        const results: AutomationStepResult[] = []
+        let failures = 0
+        for (let idx = 0; idx < settled.length; idx++) {
+          const r = settled[idx]
+          if (r.status === 'fulfilled') {
+            results.push(r.value)
+            if (!r.value.success) failures++
+          } else {
+            failures++
+            results.push({
+              stepId: branchSteps[idx].id,
+              action: branchSteps[idx].action,
+              success: false,
+              duration_ms: 0,
+              error: String(r.reason?.message ?? r.reason)
+            })
+          }
+        }
+
+        // Append child results to the parent results trail for visibility.
+        for (const r of results) allResults.push(r)
+
+        const failFast = params.failFast !== false // default true
+        if (failures > 0 && failFast) {
+          throw new Error(`parallelSteps: ${failures}/${results.length} step(s) failed`)
+        }
+        return { ran: results.length, failures }
+      }
+
+      // ── Tier 1: Output-driven branching ─────────────────────────────
+      case 'jumpToStep': {
+        // Conditionally instruct the runner to jump the cursor to another
+        // step by id. Returns `jumpTo` in `output` which the executor
+        // inspects to perform the jump.
+        const conditionType: string =
+          params.conditionType ?? 'var-equals'
+        const variable: string = params.variable ?? ''
+        const value: string = String(variables[variable] ?? '')
+        const expected: string = String(params.expected ?? '')
+        let matched = false
+
+        switch (conditionType) {
+          case 'always':
+            matched = true
+            break
+          case 'var-equals':
+            matched = value === expected
+            break
+          case 'var-not-equals':
+            matched = value !== expected
+            break
+          case 'var-contains':
+            matched = value.includes(expected)
+            break
+          case 'var-truthy':
+            matched = value !== '' && value !== '0' && value !== 'false'
+            break
+          case 'var-empty':
+            matched = value === '' || value === 'undefined' || value === 'null'
+            break
+          case 'var-gt':
+            matched = Number(value) > Number(expected)
+            break
+          case 'var-lt':
+            matched = Number(value) < Number(expected)
+            break
+          default:
+            throw new Error(`Unknown jumpToStep conditionType: ${conditionType}`)
+        }
+
+        return {
+          conditionType,
+          variable,
+          value,
+          expected,
+          matched,
+          jumpTo: matched ? params.targetStepId : undefined
+        }
+      }
+
+      // ── Tier 1: Network interception ────────────────────────────────
+      case 'interceptRequest': {
+        // Install a request interceptor for the active page. Multiple
+        // rules can be added; each call appends a rule unless `replace`
+        // is true. Tear down via `clearIntercepts` or workflow end.
+        const rule: InterceptRule = {
+          urlPattern: params.urlPattern ?? '*',
+          action: params.action ?? 'block',
+          status: params.status ?? 200,
+          contentType: params.contentType ?? 'application/json',
+          body: params.body ?? '',
+          headers: params.headers ?? {}
+        }
+        const replace: boolean = params.replace === true
+
+        const pid = profileId ?? '_anon'
+        let state = this.intercepts.get(pid)
+
+        if (!state || replace) {
+          // Detach previous handler before re-installing
+          if (state) {
+            try { page.off('request', state.handler as any) } catch { /* noop */ }
+          }
+          await page.setRequestInterception(true).catch((err) => {
+            throw new Error(`Failed to enable request interception: ${err.message}`)
+          })
+
+          const handler = (req: any) => {
+            try {
+              const url: string = req.url()
+              const current = this.intercepts.get(pid)
+              if (!current || !current.enabled) {
+                req.continue().catch(() => { /* noop */ })
+                return
+              }
+              // First matching rule wins
+              const matched = current.rules.find((r) => globToRegex(r.urlPattern).test(url))
+              if (!matched) {
+                req.continue().catch(() => { /* noop */ })
+                return
+              }
+              if (matched.action === 'block') {
+                req.abort('blockedbyclient').catch(() => { /* noop */ })
+              } else if (matched.action === 'mock') {
+                req.respond({
+                  status: matched.status ?? 200,
+                  contentType: matched.contentType ?? 'application/json',
+                  headers: matched.headers ?? {},
+                  body: matched.body ?? ''
+                }).catch(() => { /* noop */ })
+              } else if (matched.action === 'modify') {
+                // Forward but with modified headers
+                req.continue({
+                  headers: { ...req.headers(), ...(matched.headers ?? {}) }
+                }).catch(() => { /* noop */ })
+              } else {
+                req.continue().catch(() => { /* noop */ })
+              }
+            } catch {
+              try { req.continue() } catch { /* noop */ }
+            }
+          }
+
+          state = { rules: replace ? [rule] : [rule], handler, enabled: true }
+          page.on('request', handler)
+          this.intercepts.set(pid, state)
+        } else {
+          state.rules.push(rule)
+        }
+        return { rules: state.rules.length, urlPattern: rule.urlPattern, action: rule.action }
+      }
+
+      case 'clearIntercepts': {
+        const pid = profileId ?? '_anon'
+        await this.teardownIntercepts(pid, page)
+        return { cleared: true }
+      }
+
+      // ── Tier 1: Cookie management ───────────────────────────────────
+      case 'getCookies': {
+        const url: string | undefined = params.url
+        const cookies = url
+          ? await page.cookies(url)
+          : await page.cookies()
+        if (params.saveAs) {
+          variables[params.saveAs] = JSON.stringify(cookies)
+        }
+        return { count: cookies.length, cookies }
+      }
+
+      case 'setCookies': {
+        // Accept either a `cookies` array param or a JSON string in `json`
+        let list: any[] = []
+        if (Array.isArray(params.cookies)) list = params.cookies
+        else if (typeof params.json === 'string' && params.json.trim()) {
+          try { list = JSON.parse(params.json) } catch (err: any) {
+            throw new Error(`setCookies: invalid JSON — ${err.message}`)
+          }
+        } else if (params.name) {
+          list = [{
+            name: params.name,
+            value: params.value ?? '',
+            domain: params.domain,
+            path: params.path ?? '/',
+            url: params.url,
+            secure: params.secure,
+            httpOnly: params.httpOnly,
+            sameSite: params.sameSite,
+            expires: params.expires
+          }]
+        }
+        if (list.length === 0) throw new Error('setCookies: no cookies provided')
+        // Strip undefined fields so puppeteer accepts the payload
+        const cleaned = list.map((c) => {
+          const out: Record<string, any> = {}
+          for (const [k, v] of Object.entries(c)) if (v !== undefined) out[k] = v
+          return out
+        })
+        await page.setCookie(...(cleaned as any[]))
+        return { set: cleaned.length }
+      }
+
+      case 'deleteCookies': {
+        // Delete by name (single or array). If `all` is true, clear every
+        // cookie visible to the current page.
+        if (params.all) {
+          const all = await page.cookies()
+          if (all.length > 0) await page.deleteCookie(...all)
+          return { deleted: all.length, mode: 'all' }
+        }
+        const names: string[] = Array.isArray(params.names)
+          ? params.names
+          : params.name
+            ? [params.name]
+            : []
+        if (names.length === 0) throw new Error('deleteCookies: provide name, names[], or all=true')
+        const targets = names.map((n) => ({
+          name: n,
+          url: params.url,
+          domain: params.domain,
+          path: params.path
+        }))
+        await page.deleteCookie(...(targets as any[]))
+        return { deleted: targets.length, names }
+      }
+
       default:
         throw new Error(`Unknown action: ${action}`)
     }
@@ -705,6 +1072,19 @@ export class AutomationEngine {
 
     const { status, bytes } = await followRedirect(url, 5)
     return { url, savePath, bytes, status }
+  }
+
+  /** Detach the request handler and disable interception on the page.
+   *  Safe to call multiple times. */
+  private async teardownIntercepts(profileId: string, page: Page | null): Promise<void> {
+    const state = this.intercepts.get(profileId)
+    if (!state) return
+    state.enabled = false
+    if (page) {
+      try { page.off('request', state.handler as any) } catch { /* noop */ }
+      try { await page.setRequestInterception(false) } catch { /* noop */ }
+    }
+    this.intercepts.delete(profileId)
   }
 
   private async getActivePage(profileId: string): Promise<Page | null> {
