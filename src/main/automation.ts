@@ -1,15 +1,34 @@
 import { v4 as uuidv4 } from 'uuid'
 import { BrowserManager } from './browser-manager'
 import { Database } from './database'
+import { getSettings } from './settings'
+import { getSolver, type CaptchaProviderId, type SolveResult } from './captcha'
+import { getVault } from './vault'
 import type {
   AutomationStep,
   AutomationStepResult,
   AutomationRunResult,
   AutomationWorkflow
 } from '../shared/types'
-import type { Page } from 'puppeteer-core'
+import type { Page, ElementHandle } from 'puppeteer-core'
 import http from 'http'
 import https from 'https'
+import { createWriteStream } from 'fs'
+import { mkdir, stat } from 'fs/promises'
+import { dirname } from 'path'
+import { URL } from 'url'
+
+/** Replace {key} placeholders in step params with variable values.
+ *  Keys may include dots for namespaced lookups (e.g. `{cred.username}`). */
+function interpolateParams(
+  params: Record<string, any>,
+  vars: Record<string, string>
+): Record<string, any> {
+  if (Object.keys(vars).length === 0) return params
+  return JSON.parse(
+    JSON.stringify(params).replace(/\{([\w.]+)\}/g, (_, k) => vars[k] ?? `{${k}}`)
+  )
+}
 
 export class AutomationEngine {
   private static instance: AutomationEngine
@@ -24,7 +43,8 @@ export class AutomationEngine {
 
   async executeWorkflow(
     workflowId: string,
-    profileId: string
+    profileId: string,
+    runtimeVars?: Record<string, string>
   ): Promise<AutomationRunResult> {
     const db = Database.getInstance()
     const bm = BrowserManager.getInstance()
@@ -34,8 +54,12 @@ export class AutomationEngine {
 
     const workflow: AutomationWorkflow = {
       ...workflowRow,
-      steps: JSON.parse(workflowRow.steps)
+      steps: JSON.parse(workflowRow.steps),
+      variables: workflowRow.variables ? JSON.parse(workflowRow.variables) : undefined
     }
+
+    // Merge stored variables with runtime overrides
+    const variables: Record<string, string> = { ...(workflow.variables ?? {}), ...(runtimeVars ?? {}) }
 
     if (!bm.isRunning(profileId)) {
       throw new Error('Profile must be launched before running automation')
@@ -54,7 +78,10 @@ export class AutomationEngine {
     let runError: string | undefined
 
     try {
-      const result = await this.executeSteps(page, workflow.steps, control, stepResults)
+      // Variables are interpolated lazily per-step (not upfront), so actions
+      // like `solveCaptcha` can write into the map and have subsequent steps
+      // pick up the new values via {captchaToken}-style placeholders.
+      const result = await this.executeSteps(page, workflow.steps, control, stepResults, variables)
       if (result === 'stopped') status = 'stopped'
       else if (result === 'failed') {
         status = 'failed'
@@ -98,12 +125,20 @@ export class AutomationEngine {
     page: Page,
     steps: AutomationStep[],
     control: { abort: boolean },
-    stepResults: AutomationStepResult[]
+    stepResults: AutomationStepResult[],
+    variables: Record<string, string>
   ): Promise<'completed' | 'failed' | 'stopped'> {
     for (const step of steps) {
       if (control.abort) return 'stopped'
 
-      const result = await this.executeStep(page, step, control, stepResults)
+      // Interpolate this step's params lazily — variables may have been
+      // mutated by an earlier step (e.g. solveCaptcha → {captchaToken}).
+      const liveStep: AutomationStep = {
+        ...step,
+        params: interpolateParams(step.params, variables)
+      }
+
+      const result = await this.executeStep(page, liveStep, control, stepResults, variables)
       stepResults.push(result)
 
       if (!result.success) return 'failed'
@@ -121,15 +156,70 @@ export class AutomationEngine {
     return this.running.has(`${workflowId}:${profileId}`)
   }
 
+  /**
+   * Phase 10.1 — Run a workflow against multiple profiles in parallel.
+   * Each profile must already be launched. Failures on one profile do not
+   * stop execution on the others — every profile produces an independent
+   * AutomationRunResult.
+   */
+  async executeWorkflowParallel(
+    workflowId: string,
+    profileIds: string[],
+    runtimeVars?: Record<string, string>,
+    concurrency: number = 5
+  ): Promise<AutomationRunResult[]> {
+    if (profileIds.length === 0) return []
+
+    const results: AutomationRunResult[] = []
+    // Run in batches of `concurrency` so we don't overwhelm the host with
+    // many simultaneous browser sessions.
+    for (let i = 0; i < profileIds.length; i += concurrency) {
+      const batch = profileIds.slice(i, i + concurrency)
+      const settled = await Promise.allSettled(
+        batch.map((pid) => this.executeWorkflow(workflowId, pid, runtimeVars))
+      )
+      for (let j = 0; j < settled.length; j++) {
+        const r = settled[j]
+        if (r.status === 'fulfilled') {
+          results.push(r.value)
+        } else {
+          results.push({
+            workflowId,
+            profileId: batch[j],
+            status: 'failed',
+            startedAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
+            stepResults: [],
+            error: String(r.reason?.message ?? r.reason)
+          })
+        }
+      }
+    }
+    return results
+  }
+
+  /** Stop a parallel run by aborting all active controls for the workflow. */
+  stopWorkflowAll(workflowId: string): number {
+    let stopped = 0
+    for (const [key, control] of this.running.entries()) {
+      if (key.startsWith(`${workflowId}:`)) {
+        control.abort = true
+        stopped++
+      }
+    }
+    return stopped
+  }
+
   private async executeStep(
     page: Page,
     step: AutomationStep,
     control: { abort: boolean },
-    allResults: AutomationStepResult[]
+    allResults: AutomationStepResult[],
+    variables: Record<string, string>
   ): Promise<AutomationStepResult> {
     const start = Date.now()
     try {
-      const output = await this.runAction(page, step, control, allResults)
+      const output = await this.runAction(page, step, control, allResults, variables)
       return {
         stepId: step.id,
         action: step.action,
@@ -152,7 +242,8 @@ export class AutomationEngine {
     page: Page,
     step: AutomationStep,
     control: { abort: boolean },
-    allResults: AutomationStepResult[]
+    allResults: AutomationStepResult[],
+    variables: Record<string, string>
   ): Promise<any> {
     const { action, params } = step
 
@@ -257,12 +348,37 @@ export class AutomationEngine {
         return response
       }
 
+      // ── Phase 12.B.3: File transfer ──────────────────────────────────
+
+      case 'upload': {
+        // Upload a local file into a <input type="file"> element
+        await page.waitForSelector(params.selector, { timeout: params.timeout ?? 10000 })
+        const handle = (await page.$(params.selector)) as ElementHandle<HTMLInputElement> | null
+        if (!handle) throw new Error(`Element not found: ${params.selector}`)
+        // Verify the file exists before handing it to puppeteer (clearer error)
+        try {
+          await stat(params.filePath)
+        } catch {
+          throw new Error(`File not found: ${params.filePath}`)
+        }
+        await handle.uploadFile(params.filePath)
+        return { selector: params.selector, filePath: params.filePath }
+      }
+
+      case 'download': {
+        // Stream a remote URL to disk, reusing the active session's cookies
+        // so authenticated downloads work. Falls back to no cookies if the
+        // page isn't on the same origin.
+        const result = await this.downloadToFile(page, params.url, params.savePath, params.timeout ?? 60000)
+        return result
+      }
+
       case 'conditional': {
         // Evaluate condition: check if selector exists on page
         const exists = await page.$(params.selector).then((el: any) => !!el)
         const branch = exists ? (params.thenSteps ?? []) : (params.elseSteps ?? [])
         if (branch.length > 0) {
-          const branchStatus = await this.executeSteps(page, branch, control, allResults)
+          const branchStatus = await this.executeSteps(page, branch, control, allResults, variables)
           if (branchStatus === 'stopped') throw new Error('Workflow stopped')
           if (branchStatus === 'failed') throw new Error('Conditional branch failed')
         }
@@ -275,12 +391,133 @@ export class AutomationEngine {
         let iterations = 0
         for (let i = 0; i < times; i++) {
           if (control.abort) throw new Error('Workflow stopped')
-          const loopStatus = await this.executeSteps(page, loopSteps, control, allResults)
+          const loopStatus = await this.executeSteps(page, loopSteps, control, allResults, variables)
           if (loopStatus === 'stopped') throw new Error('Workflow stopped')
           if (loopStatus === 'failed') throw new Error(`Loop iteration ${i + 1} failed`)
           iterations++
         }
         return { iterations, totalSteps: loopSteps.length * times }
+      }
+
+      // ── Phase 12.B.1: Captcha solving ───────────────────────────────
+
+      case 'solveCaptcha': {
+        // Resolve which provider + key to use. `params.provider` overrides
+        // the global default; `params.apiKey` overrides the stored key.
+        const settings = getSettings()
+        const providerId: CaptchaProviderId =
+          (params.provider as CaptchaProviderId) || settings.captcha.defaultProvider
+        const apiKey: string = params.apiKey || settings.captcha.apiKeys[providerId] || ''
+        if (!apiKey) {
+          throw new Error(
+            `Captcha provider "${providerId}" has no API key — configure it in Settings or pass apiKey in step params`
+          )
+        }
+        const solver = getSolver(providerId)
+        const pageUrl: string = params.pageUrl || page.url()
+        const type: string = params.type || 'recaptcha-v2'
+
+        let result: SolveResult
+        switch (type) {
+          case 'recaptcha-v2':
+            result = await solver.solveRecaptchaV2(apiKey, {
+              siteKey: params.siteKey,
+              pageUrl,
+              invisible: !!params.invisible
+            })
+            break
+          case 'recaptcha-v3':
+            result = await solver.solveRecaptchaV3(apiKey, {
+              siteKey: params.siteKey,
+              pageUrl,
+              action: params.action || 'verify',
+              minScore: params.minScore
+            })
+            break
+          case 'hcaptcha':
+            result = await solver.solveHCaptcha(apiKey, {
+              siteKey: params.siteKey,
+              pageUrl
+            })
+            break
+          case 'image':
+            result = await solver.solveImage(apiKey, { imageBase64: params.imageBase64 })
+            break
+          default:
+            throw new Error(`Unknown captcha type: ${type}`)
+        }
+
+        // Persist the token into the live variables map so subsequent steps
+        // can reference it via {captchaToken} (or whatever key was requested).
+        const saveAs: string = params.saveAs || 'captchaToken'
+        variables[saveAs] = result.token
+
+        return {
+          provider: result.provider,
+          type: result.type,
+          taskId: result.taskId,
+          duration_ms: result.duration_ms,
+          tokenLength: result.token.length,
+          savedAs: saveAs
+        }
+      }
+
+      // ── Phase 12.C.3: Vault-backed credential injection ─────────────
+      case 'useCredential': {
+        const vault = getVault()
+        if (!vault.isUnlocked()) {
+          throw new Error('Vault is locked — unlock it from the Settings page first')
+        }
+        const id: string | undefined = params.id
+        const label: string | undefined = params.label
+        let cred
+        if (id) {
+          cred = vault.get(id)
+        } else if (label) {
+          const list = vault.list()
+          cred = list.find((c) => c.label === label)
+          if (!cred) throw new Error(`Vault credential "${label}" not found`)
+        } else {
+          throw new Error('useCredential requires either id or label')
+        }
+        const prefix: string = params.prefix || 'cred'
+        variables[`${prefix}.username`] = cred.username
+        variables[`${prefix}.password`] = cred.password
+        for (const [k, v] of Object.entries(cred.fields ?? {})) {
+          variables[`${prefix}.${k}`] = String(v)
+        }
+        return {
+          loaded: true,
+          label: cred.label,
+          prefix,
+          fields: Object.keys(cred.fields ?? {}).length
+        }
+      }
+
+      case 'injectCaptchaToken': {
+        // Inject a previously-solved token into the standard reCAPTCHA / hCaptcha
+        // hidden textarea so the form submit picks it up. Selector defaults to
+        // the canonical reCAPTCHA hidden field.
+        const token: string = params.token
+        if (!token) throw new Error('injectCaptchaToken requires a token (use {captchaToken})')
+        const selector: string = params.selector || '#g-recaptcha-response'
+        const injected = await page.evaluate(
+          (sel: string, value: string) => {
+            const el = document.querySelector(sel) as HTMLTextAreaElement | HTMLInputElement | null
+            if (!el) return { found: false, count: 0 }
+            // Both reCAPTCHA and hCaptcha hide their textarea with display:none — set
+            // the value directly and dispatch a synthetic event so any listeners notice.
+            ;(el as any).value = value
+            el.style.display = 'block'
+            el.dispatchEvent(new Event('input', { bubbles: true }))
+            el.dispatchEvent(new Event('change', { bubbles: true }))
+            return { found: true, count: 1 }
+          },
+          selector,
+          token
+        )
+        if (!injected.found) throw new Error(`Captcha target selector not found: ${selector}`)
+        return { selector, tokenLength: token.length }
       }
 
       default:
@@ -305,6 +542,96 @@ export class AutomationEngine {
       if (body) req.write(body)
       req.end()
     })
+  }
+
+  /**
+   * Phase 12.B.3 — Stream a remote URL to a local file path.
+   * Reuses cookies from the active page so authenticated downloads work
+   * when the URL is on (or near) the same origin as the current page.
+   */
+  private async downloadToFile(
+    page: Page,
+    url: string,
+    savePath: string,
+    timeoutMs: number
+  ): Promise<{ url: string; savePath: string; bytes: number; status: number }> {
+    // Pull cookies the browser would send for this URL.
+    let cookieHeader = ''
+    try {
+      const cookies = await page.cookies(url)
+      if (cookies.length > 0) {
+        cookieHeader = cookies.map((c: any) => `${c.name}=${c.value}`).join('; ')
+      }
+    } catch {
+      // Non-fatal — proceed without cookies.
+    }
+
+    // Ensure parent directory exists.
+    await mkdir(dirname(savePath), { recursive: true })
+
+    const followRedirect = async (
+      currentUrl: string,
+      redirectsLeft: number
+    ): Promise<{ status: number; bytes: number }> => {
+      return new Promise((resolve, reject) => {
+        let parsed: URL
+        try {
+          parsed = new URL(currentUrl)
+        } catch (err) {
+          reject(new Error(`Invalid URL: ${currentUrl}`))
+          return
+        }
+
+        const lib = parsed.protocol === 'https:' ? https : http
+        const headers: Record<string, string> = {}
+        if (cookieHeader) headers['Cookie'] = cookieHeader
+
+        const req = lib.request(
+          parsed,
+          { method: 'GET', headers, timeout: timeoutMs },
+          (res) => {
+            const status = res.statusCode ?? 0
+
+            // Handle redirects (3xx with Location header)
+            if (status >= 300 && status < 400 && res.headers.location) {
+              res.resume()
+              if (redirectsLeft <= 0) {
+                reject(new Error(`Too many redirects fetching ${url}`))
+                return
+              }
+              const next = new URL(res.headers.location, parsed).toString()
+              followRedirect(next, redirectsLeft - 1).then(resolve, reject)
+              return
+            }
+
+            if (status < 200 || status >= 300) {
+              res.resume()
+              reject(new Error(`Download failed: HTTP ${status}`))
+              return
+            }
+
+            const out = createWriteStream(savePath)
+            let bytes = 0
+            res.on('data', (chunk: Buffer) => {
+              bytes += chunk.length
+            })
+            res.pipe(out)
+            out.on('finish', () => out.close(() => resolve({ status, bytes })))
+            out.on('error', reject)
+            res.on('error', reject)
+          }
+        )
+
+        req.on('timeout', () => {
+          req.destroy(new Error(`Download timed out after ${timeoutMs}ms`))
+        })
+        req.on('error', reject)
+        req.end()
+      })
+    }
+
+    const { status, bytes } = await followRedirect(url, 5)
+    return { url, savePath, bytes, status }
   }
 
   private async getActivePage(profileId: string): Promise<Page | null> {

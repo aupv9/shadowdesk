@@ -44,7 +44,15 @@ export type {
   ChromiumPatchStatus,
   ChromiumPatchCategory,
   ChromiumPatchLevel,
-  Phase8Config
+  Phase8Config,
+  // Phase 10.2 / 10.3 / 11.2
+  WorkflowSchedule,
+  ProfileExtension,
+  WarmUpResult,
+  // Phase 12.C.4
+  CollisionGroup,
+  CollisionReport,
+  CollisionKind
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'

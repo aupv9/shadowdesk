@@ -3,10 +3,11 @@ import {
   Shield, ShieldCheck, ShieldAlert, Play,
   ChevronDown, CheckCircle, XCircle, Clock,
   BarChart3, RefreshCw, Trash2, ListChecks,
-  AlertTriangle, X, ChevronRight
+  AlertTriangle, X, ChevronRight, Download
 } from 'lucide-react'
 import { Header } from '../Layout/Header'
 import { useProfileStore } from '../../stores/profileStore'
+import { HealthTrendChart } from './HealthTrendChart'
 import type { DetectionTestResult, DetectionTestSummary, BatchTestStatus } from '../../types'
 
 // Group detection vector categories for breakdown display
@@ -108,6 +109,27 @@ export function DetectionDashboard() {
 
   const clearSelection = () => setSelectedProfiles(new Set())
 
+  const handleExportCSV = () => {
+    if (results.length === 0) return
+    const rows: string[] = ['Profile,Score,Status,TestedAt,Vector,Category,Passed,Detail']
+    for (const r of results) {
+      for (const v of r.vectors) {
+        rows.push([
+          `"${r.profileName}"`, r.overallScore, r.status, r.testedAt,
+          `"${v.name}"`, v.category, v.passed ? 'true' : 'false',
+          `"${(v.detail ?? '').replace(/"/g, "'")}"`
+        ].join(','))
+      }
+    }
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `detection-results-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const scoreColor = (score: number) => {
     if (score >= 90) return 'text-green-400'
     if (score >= 70) return 'text-yellow-400'
@@ -144,6 +166,18 @@ export function DetectionDashboard() {
       <Header
         title="Detection Testing"
         subtitle="Test profiles against bot-detection frameworks"
+        actions={
+          results.length > 0 ? (
+            <button
+              onClick={handleExportCSV}
+              className="btn-ghost flex items-center gap-2 text-sm"
+              title="Export results as CSV"
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </button>
+          ) : undefined
+        }
       />
 
       <div className="flex-1 overflow-y-auto p-6">
@@ -193,6 +227,9 @@ export function DetectionDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Phase 11.1 — Health score trending chart */}
+        <HealthTrendChart results={results} />
 
         {/* Run Test Panel */}
         <div className="card mb-4">

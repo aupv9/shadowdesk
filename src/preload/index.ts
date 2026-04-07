@@ -18,13 +18,50 @@ const api = {
     history:            (profileId: string)                   => ipcRenderer.invoke('profiles:history', profileId),
     saveVersion:        (profileId: string, label: string)    => ipcRenderer.invoke('profiles:saveVersion', profileId, label),
     restoreVersion:     (profileId: string, versionId: string)=> ipcRenderer.invoke('profiles:restoreVersion', profileId, versionId),
-    deleteVersion:      (versionId: string)                   => ipcRenderer.invoke('profiles:deleteVersion', versionId)
+    deleteVersion:      (versionId: string)                   => ipcRenderer.invoke('profiles:deleteVersion', versionId),
+    // Phase 12.C.4
+    detectCollisions:   ()                                    => ipcRenderer.invoke('profiles:detectCollisions')
   },
   cookies: {
-    import: (profileId: string, text: string, format: 'netscape' | 'json') =>
+    import:   (profileId: string, text: string, format: 'netscape' | 'json') =>
       ipcRenderer.invoke('cookies:import', profileId, text, format),
-    export: (profileId: string, format: 'netscape' | 'json') =>
-      ipcRenderer.invoke('cookies:export', profileId, format)
+    export:   (profileId: string, format: 'netscape' | 'json') =>
+      ipcRenderer.invoke('cookies:export', profileId, format),
+    capture:  (profileId: string) =>
+      ipcRenderer.invoke('cookies:capture', profileId),
+    list:     (profileId: string) =>
+      ipcRenderer.invoke('cookies:list', profileId),
+    save:     (profileId: string, cookies: any[]) =>
+      ipcRenderer.invoke('cookies:save', profileId, cookies)
+  },
+  // Phase 12.C.3 — Encrypted credential vault
+  vault: {
+    status: ()                                                                        => ipcRenderer.invoke('vault:status'),
+    unlock: (masterPassword: string)                                                  => ipcRenderer.invoke('vault:unlock', masterPassword),
+    lock:   ()                                                                        => ipcRenderer.invoke('vault:lock'),
+    list:   (profileId?: string)                                                      => ipcRenderer.invoke('vault:list', profileId),
+    get:    (id: string)                                                              => ipcRenderer.invoke('vault:get', id),
+    create: (input: { profile_id: string | null; label: string; username: string; password: string; fields?: Record<string, string> }) => ipcRenderer.invoke('vault:create', input),
+    update: (id: string, data: Partial<{ label: string; username: string; password: string; fields: Record<string, string>; profile_id: string | null }>) => ipcRenderer.invoke('vault:update', id, data),
+    delete: (id: string)                                                              => ipcRenderer.invoke('vault:delete', id)
+  },
+  // Phase 12.B.2 — Visual selector recorder
+  recorder: {
+    start:        (profileId: string) => ipcRenderer.invoke('recorder:start', profileId),
+    stop:         (profileId: string) => ipcRenderer.invoke('recorder:stop', profileId),
+    state:        (profileId: string) => ipcRenderer.invoke('recorder:state', profileId),
+    isRecording:  (profileId: string) => ipcRenderer.invoke('recorder:isRecording', profileId)
+  },
+  // Phase 12.C.2 — Per-profile storage inspector (read-only)
+  storage: {
+    listOrigins:        (profileId: string) =>
+      ipcRenderer.invoke('storage:listOrigins', profileId),
+    getDOMStorage:      (profileId: string, origin: string, isLocalStorage: boolean) =>
+      ipcRenderer.invoke('storage:getDOMStorage', profileId, origin, isLocalStorage),
+    listIndexedDb:      (profileId: string, origin: string) =>
+      ipcRenderer.invoke('storage:listIndexedDb', profileId, origin),
+    getIndexedDbEntries:(profileId: string, origin: string, dbName: string, store: string, max?: number) =>
+      ipcRenderer.invoke('storage:getIndexedDbEntries', profileId, origin, dbName, store, max)
   },
   groups: {
     list:   ()                                        => ipcRenderer.invoke('groups:list'),
@@ -32,25 +69,48 @@ const api = {
     delete: (id: string)                              => ipcRenderer.invoke('groups:delete', id)
   },
   proxies: {
-    list:   ()               => ipcRenderer.invoke('proxies:list'),
-    create: (input: unknown) => ipcRenderer.invoke('proxies:create', input),
-    delete: (id: string)     => ipcRenderer.invoke('proxies:delete', id),
-    test:   (id: string)     => ipcRenderer.invoke('proxies:test', id)
+    list:        ()                    => ipcRenderer.invoke('proxies:list'),
+    create:      (input: unknown)      => ipcRenderer.invoke('proxies:create', input),
+    delete:      (id: string)          => ipcRenderer.invoke('proxies:delete', id),
+    test:        (id: string)          => ipcRenderer.invoke('proxies:test', id),
+    importBulk:  (lines: string[])     => ipcRenderer.invoke('proxies:importBulk', lines)
   },
   fingerprint: {
     presets: () => ipcRenderer.invoke('fingerprint:presets')
+  },
+  extensions: {
+    list:       (profileId: string)                          => ipcRenderer.invoke('extensions:list', profileId),
+    add:        (profileId: string, name: string, path: string) => ipcRenderer.invoke('extensions:add', profileId, name, path),
+    setEnabled: (id: string, enabled: boolean)               => ipcRenderer.invoke('extensions:setEnabled', id, enabled),
+    remove:     (id: string)                                 => ipcRenderer.invoke('extensions:remove', id),
+    pickFolder: ()                                           => ipcRenderer.invoke('extensions:pickFolder')
+  },
+  warmup: {
+    run: (profileId: string, sites?: string[]) => ipcRenderer.invoke('profiles:warmUp', profileId, sites)
+  },
+  drift: {
+    setEnabled: (profileId: string, enabled: boolean) => ipcRenderer.invoke('profiles:setDrift', profileId, enabled),
+    apply:      (profileId: string)                   => ipcRenderer.invoke('profiles:applyDrift', profileId)
   },
   settings: {
     get:    ()                        => ipcRenderer.invoke('settings:get'),
     update: (partial: Record<string, any>) => ipcRenderer.invoke('settings:update', partial)
   },
+  system: {
+    chromiumVersion: () => ipcRenderer.invoke('system:chromiumVersion')
+  },
+  captcha: {
+    listProviders: () => ipcRenderer.invoke('captcha:listProviders'),
+    checkBalance:  (providerId: string, apiKey?: string) =>
+      ipcRenderer.invoke('captcha:checkBalance', providerId, apiKey)
+  },
   updater: {
     download: ()                             => ipcRenderer.invoke('updater:download'),
     install:  ()                             => ipcRenderer.invoke('updater:install'),
-    onStatus: (cb: (status: any) => void)    => {
+    onStatus: (cb: (status: any) => void): (() => void) => {
       const handler = (_event: any, status: any) => cb(status)
       ipcRenderer.on('updater:status', handler)
-      return () => ipcRenderer.removeListener('updater:status', handler)
+      return () => { ipcRenderer.removeListener('updater:status', handler) }
     }
   },
   auth: {
@@ -91,10 +151,10 @@ const api = {
     push:     (password: string)       => ipcRenderer.invoke('sync:push', password),
     pull:     (password: string)       => ipcRenderer.invoke('sync:pull', password),
     manifest: ()                       => ipcRenderer.invoke('sync:manifest'),
-    onStatus: (cb: (state: any) => void) => {
+    onStatus: (cb: (state: any) => void): (() => void) => {
       const handler = (_event: any, state: any) => cb(state)
       ipcRenderer.on('sync:status', handler)
-      return () => ipcRenderer.removeListener('sync:status', handler)
+      return () => { ipcRenderer.removeListener('sync:status', handler) }
     }
   },
   workflows: {
@@ -103,10 +163,20 @@ const api = {
     create:    (input: { name: string; description?: string; steps: any[] }) => ipcRenderer.invoke('workflows:create', input),
     update:    (id: string, data: { name?: string; description?: string; steps?: any[] }) => ipcRenderer.invoke('workflows:update', id, data),
     delete:    (id: string)                                           => ipcRenderer.invoke('workflows:delete', id),
-    run:       (workflowId: string, profileId: string)                => ipcRenderer.invoke('workflows:run', workflowId, profileId),
+    run:       (workflowId: string, profileId: string, variables?: Record<string, string>) => ipcRenderer.invoke('workflows:run', workflowId, profileId, variables),
+    runParallel: (workflowId: string, profileIds: string[], variables?: Record<string, string>, concurrency?: number) => ipcRenderer.invoke('workflows:runParallel', workflowId, profileIds, variables, concurrency),
     stop:      (workflowId: string, profileId: string)                => ipcRenderer.invoke('workflows:stop', workflowId, profileId),
+    stopAll:   (workflowId: string)                                   => ipcRenderer.invoke('workflows:stopAll', workflowId),
     isRunning: (workflowId: string, profileId: string)                => ipcRenderer.invoke('workflows:isRunning', workflowId, profileId),
-    runs:      (workflowId: string)                                   => ipcRenderer.invoke('workflows:runs', workflowId)
+    runs:      (workflowId: string)                                   => ipcRenderer.invoke('workflows:runs', workflowId),
+    // Phase 10.2 — Schedules
+    schedules: {
+      list:    ()                                                     => ipcRenderer.invoke('schedules:list'),
+      create:  (input: { workflow_id: string; profile_ids: string[]; cron: string; enabled?: boolean; name?: string }) => ipcRenderer.invoke('schedules:create', input),
+      update:  (id: string, data: any)                                => ipcRenderer.invoke('schedules:update', id, data),
+      delete:  (id: string)                                           => ipcRenderer.invoke('schedules:delete', id),
+      runNow:  (id: string)                                           => ipcRenderer.invoke('schedules:runNow', id)
+    }
   },
   templates: {
     list:               ()                                            => ipcRenderer.invoke('templates:list'),

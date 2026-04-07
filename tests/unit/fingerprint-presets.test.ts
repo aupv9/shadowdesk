@@ -4,8 +4,12 @@ import { FINGERPRINT_PRESETS, resolveFingerprint } from '../../src/main/fingerpr
 const PRESET_KEYS = ['win10-chrome120', 'win11-chrome121', 'mac-ventura-chrome120', 'mac-sonoma-chrome121', 'linux-ubuntu-chrome120']
 
 describe('FINGERPRINT_PRESETS', () => {
-  it('has exactly 5 presets', () => {
-    expect(Object.keys(FINGERPRINT_PRESETS)).toHaveLength(5)
+  it('contains at least the 5 baseline desktop presets', () => {
+    // Mobile presets (Android, iOS) and newer Chrome majors are added on top
+    // of the original 5 baseline desktop presets — so this assertion only
+    // pins the floor. Use the PRESET_KEYS array below to test the baseline
+    // contract directly.
+    expect(Object.keys(FINGERPRINT_PRESETS).length).toBeGreaterThanOrEqual(5)
   })
 
   it('contains all expected preset keys', () => {

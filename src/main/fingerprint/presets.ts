@@ -217,6 +217,7 @@ export const FINGERPRINT_PRESETS: Record<string, FingerprintConfig> = {
 
   'android-samsung-chrome120': {
     preset: 'android-samsung-chrome120',
+    geolocation: { latitude: 10.8231, longitude: 106.6297, accuracy: 20 },
     os: { platform: 'Linux armv8l', version: '13.0.0' },
     browser: {
       userAgent:
@@ -258,6 +259,7 @@ export const FINGERPRINT_PRESETS: Record<string, FingerprintConfig> = {
 
   'android-pixel-chrome121': {
     preset: 'android-pixel-chrome121',
+    geolocation: { latitude: 13.7563, longitude: 100.5018, accuracy: 20 },
     os: { platform: 'Linux armv8l', version: '14.0.0' },
     browser: {
       userAgent:
@@ -299,6 +301,7 @@ export const FINGERPRINT_PRESETS: Record<string, FingerprintConfig> = {
 
   'android-oppo-chrome120': {
     preset: 'android-oppo-chrome120',
+    geolocation: { latitude: -6.2088, longitude: 106.8456, accuracy: 20 },
     os: { platform: 'Linux armv8l', version: '13.0.0' },
     browser: {
       userAgent:
@@ -342,6 +345,7 @@ export const FINGERPRINT_PRESETS: Record<string, FingerprintConfig> = {
 
   'ios-iphone14-safari17': {
     preset: 'ios-iphone14-safari17',
+    geolocation: { latitude: 10.8231, longitude: 106.6297, accuracy: 20 },
     os: { platform: 'iPhone', version: '17.2.0' },
     browser: {
       userAgent:
@@ -384,6 +388,7 @@ export const FINGERPRINT_PRESETS: Record<string, FingerprintConfig> = {
 
   'ios-iphone15-safari17': {
     preset: 'ios-iphone15-safari17',
+    geolocation: { latitude: 13.7563, longitude: 100.5018, accuracy: 20 },
     os: { platform: 'iPhone', version: '17.3.0' },
     browser: {
       userAgent:
@@ -426,6 +431,7 @@ export const FINGERPRINT_PRESETS: Record<string, FingerprintConfig> = {
 
   'ios-ipad-safari17': {
     preset: 'ios-ipad-safari17',
+    geolocation: { latitude: -6.2088, longitude: 106.8456, accuracy: 20 },
     os: { platform: 'iPad', version: '17.2.0' },
     browser: {
       userAgent:
@@ -464,6 +470,135 @@ export const FINGERPRINT_PRESETS: Record<string, FingerprintConfig> = {
     plugins: { mode: 'empty' },
     speech: { mode: 'filter' },
     network: { connectionType: 'wifi' }
+  },
+
+  // ── Phase 9: Chrome 124 Presets (fresh UA versions) ──────────────────────
+
+  'win11-chrome124': {
+    preset: 'win11-chrome124',
+    os: { platform: 'Win32', version: '10.0.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      platform: 'Win32',
+      vendor: 'Google Inc.',
+      version: '124',
+      languages: ['en-US', 'en']
+    },
+    screen: {
+      width: 2560,
+      height: 1440,
+      availWidth: 2560,
+      availHeight: 1400,
+      colorDepth: 24,
+      pixelRatio: 1
+    },
+    hardware: { deviceMemory: 16, hardwareConcurrency: 12, maxTouchPoints: 0 },
+    locale: { language: 'en-US', languages: ['en-US', 'en'], timezone: 'America/New_York' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Google Inc. (NVIDIA)',
+      renderer: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 Direct3D11 vs_5_0 ps_5_0, D3D11)',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Arial', 'Arial Black', 'Calibri', 'Cambria', 'Comic Sans MS',
+        'Consolas', 'Courier New', 'Georgia', 'Impact', 'Segoe UI',
+        'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 2, videoInputs: 1 },
+    plugins: { mode: 'realistic' },
+    speech: { mode: 'filter' }
+  },
+
+  'mac-sonoma-chrome124': {
+    preset: 'mac-sonoma-chrome124',
+    os: { platform: 'MacIntel', version: '14.4.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      platform: 'MacIntel',
+      vendor: 'Google Inc.',
+      version: '124',
+      languages: ['en-US', 'en']
+    },
+    screen: {
+      width: 1512,
+      height: 982,
+      availWidth: 1512,
+      availHeight: 944,
+      colorDepth: 30,
+      pixelRatio: 2
+    },
+    hardware: { deviceMemory: 16, hardwareConcurrency: 10, maxTouchPoints: 0 },
+    locale: { language: 'en-US', languages: ['en-US', 'en'], timezone: 'America/Los_Angeles' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Google Inc. (Apple)',
+      renderer: 'ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Unspecified Version)',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Arial', 'Arial Black', 'Courier New', 'Georgia', 'Helvetica',
+        'Helvetica Neue', 'Impact', 'Monaco', 'Optima', 'San Francisco',
+        'Times New Roman', 'Trebuchet MS', 'Verdana'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 1 },
+    plugins: { mode: 'realistic' },
+    speech: { mode: 'filter' }
+  },
+
+  'android-pixel8-chrome124': {
+    preset: 'android-pixel8-chrome124',
+    geolocation: { latitude: 13.7563, longitude: 100.5018, accuracy: 20 },
+    os: { platform: 'Linux armv8l', version: '14.0.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36',
+      platform: 'Linux armv8l',
+      vendor: 'Google Inc.',
+      version: '124',
+      languages: ['th-TH', 'en-US', 'en']
+    },
+    screen: {
+      width: 412,
+      height: 915,
+      availWidth: 412,
+      availHeight: 891,
+      colorDepth: 24,
+      pixelRatio: 2.625
+    },
+    hardware: { deviceMemory: 8, hardwareConcurrency: 8, maxTouchPoints: 5 },
+    locale: { language: 'th-TH', languages: ['th-TH', 'en-US', 'en'], timezone: 'Asia/Bangkok' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Google Inc. (ARM)',
+      renderer: 'ANGLE (ARM, Mali-G715 MC7, OpenGL ES 3.2)',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Roboto', 'Noto Sans', 'Noto Sans Thai', 'Noto Color Emoji',
+        'Droid Sans', 'Droid Serif', 'Courier New'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 2 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' },
+    network: { connectionType: '4g' }
   }
 }
 
@@ -500,6 +635,41 @@ export function resolveFingerprint(
   }
 
   return clone
+}
+
+// ── Locale / Timezone Validation ─────────────────────────────────────────────
+
+/** Maps a locale language tag (prefix match) → valid timezone prefixes */
+const LOCALE_TIMEZONE_MAP: Record<string, string[]> = {
+  'en-US': ['America/'],
+  'en-GB': ['Europe/London', 'Europe/Dublin'],
+  'en':    ['America/', 'Europe/', 'Australia/', 'Asia/', 'Pacific/'],
+  'vi':    ['Asia/Ho_Chi_Minh', 'Asia/Hanoi'],
+  'th':    ['Asia/Bangkok'],
+  'id':    ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'],
+  'zh':    ['Asia/Shanghai', 'Asia/Hong_Kong', 'Asia/Taipei'],
+  'ja':    ['Asia/Tokyo'],
+  'ko':    ['Asia/Seoul'],
+  'fr':    ['Europe/Paris', 'Europe/'],
+  'de':    ['Europe/Berlin', 'Europe/'],
+  'ru':    ['Europe/Moscow', 'Asia/Yekaterinburg', 'Asia/Novosibirsk'],
+}
+
+/**
+ * Returns true if the locale+timezone pair is plausible.
+ * If locale is unknown, returns true (permissive).
+ */
+export function validateLocaleTimezone(locale: string, timezone: string): boolean {
+  // Find the most specific matching locale prefix
+  const langTag = locale.toLowerCase()
+  const keys = Object.keys(LOCALE_TIMEZONE_MAP).sort((a, b) => b.length - a.length)
+  for (const key of keys) {
+    if (langTag === key || langTag.startsWith(key.toLowerCase())) {
+      const validZones = LOCALE_TIMEZONE_MAP[key]
+      return validZones.some((z) => timezone.startsWith(z))
+    }
+  }
+  return true // unknown locale — permissive
 }
 
 function hashCode(s: string): number {

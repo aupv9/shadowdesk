@@ -19,6 +19,12 @@ import { buildTimingScript } from './scripts/timing'
 import { buildIntlScript } from './scripts/intl'
 import { buildWebGPUScript } from './scripts/webgpu'
 import { buildUserAgentDataScript } from './scripts/useragentdata'
+// Phase 9: keyboard layout spoofing
+import { buildKeyboardScript } from './scripts/keyboard'
+// Phase 9.1/9.2/9.3: hardening + propagation
+import { buildWorkerFingerprintScript } from './scripts/worker'
+import { buildNativeToStringScript } from './scripts/native-tostring'
+import { buildIframePropagationScript } from './scripts/iframe'
 import { CdpEvasion } from './cdp-evasion'
 
 export class FingerprintInjector {
@@ -26,13 +32,20 @@ export class FingerprintInjector {
 
   async injectAll(page: Page, fp: FingerprintConfig): Promise<void> {
     const scripts = [
-      buildNavigatorScript(fp.browser, fp.hardware, fp.screen, fp.media),
+      // Phase 9.2 — hardened toString MUST be installed first so subsequent
+      // patches inherit `[native code]` reporting.
+      buildNativeToStringScript(),
+      // Phase 9.1 — Worker / SharedWorker constructor wrapping
+      buildWorkerFingerprintScript(fp.browser, fp.hardware, fp.locale, fp.os),
+      // Phase 9.3 — iframe context propagation (about:blank / srcdoc)
+      buildIframePropagationScript(fp.browser, fp.hardware, fp.locale, fp.screen),
+      buildNavigatorScript(fp.browser, fp.hardware, fp.screen, fp.media, fp.canvas.noiseSeed),
       buildPluginScript(fp.plugins ?? { mode: 'realistic' }, fp.os),
       buildCanvasScript(fp.canvas),
       buildWebGlScript(fp.webgl),
       buildAudioScript(fp.audio),
       buildFontsScript(fp.fonts),
-      buildWebRtcScript(fp.webrtc),
+      buildWebRtcScript(fp.webrtc, fp.canvas.noiseSeed),
       buildClientRectsScript(fp.canvas.noiseSeed),
       buildSpeechScript(fp.speech ?? { mode: 'filter' }, fp.os),
       // Phase 5: New vectors
@@ -50,7 +63,9 @@ export class FingerprintInjector {
       // Phase 8: Layer 4 — deep fingerprint vectors
       buildIntlScript(fp.locale),
       buildWebGPUScript(fp.webgl),
-      buildUserAgentDataScript(fp.browser, fp.os)
+      buildUserAgentDataScript(fp.browser, fp.os),
+      // Phase 9: keyboard layout consistency
+      buildKeyboardScript(fp.locale.language)
     ].filter(Boolean)
 
     const combined = scripts.join('\n;\n')
@@ -81,8 +96,32 @@ export class FingerprintInjector {
         timezoneId: fp.locale.timezone
       })
 
-      // Geolocation (disabled by default — prevent sites from getting location)
-      await session.send('Emulation.setGeolocationOverride', {})
+      // Geolocation — spoof coordinates if configured, otherwise deny
+      if (fp.geolocation) {
+        await session.send('Emulation.setGeolocationOverride', {
+          latitude: fp.geolocation.latitude,
+          longitude: fp.geolocation.longitude,
+          accuracy: fp.geolocation.accuracy
+        })
+      } else {
+        await session.send('Emulation.setGeolocationOverride', {})
+      }
+
+      // Mobile CDP emulation — set viewport and touch for mobile presets
+      const isMobile = fp.hardware.maxTouchPoints > 0 && fp.os.platform !== 'Win32'
+      await session.send('Emulation.setDeviceMetricsOverride', {
+        width: fp.screen.width,
+        height: fp.screen.height,
+        deviceScaleFactor: fp.screen.pixelRatio,
+        mobile: isMobile
+      }).catch(() => {})
+      if (isMobile) {
+        await session.send('Emulation.setTouchEmulationEnabled', {
+          enabled: true,
+          maxTouchPoints: fp.hardware.maxTouchPoints
+        }).catch(() => {})
+        await session.send('Emulation.setScrollbarsHidden', { hidden: true }).catch(() => {})
+      }
 
       // Phase 8: User-Agent Client Hints (UACH) at CDP level
       // This sets the Sec-CH-UA HTTP headers to match the spoofed UA

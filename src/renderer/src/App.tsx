@@ -9,6 +9,8 @@ import { SettingsPage } from './components/Settings'
 import { AccountPage } from './components/Account'
 import { TeamManager } from './components/TeamManager'
 import { PatchManager } from './components/PatchManager'
+import { ErrorBoundary } from './components/UI/ErrorBoundary'
+import { ToastContainer } from './components/UI/Toast'
 import { useProfileStore } from './stores/profileStore'
 import { useAuthStore } from './stores/authStore'
 import { useLicenseStore } from './stores/licenseStore'
@@ -23,6 +25,16 @@ export default function App() {
   useEffect(() => {
     auth.checkAuth()
     license.fetchLicense()
+    // Apply saved theme
+    window.api.settings.get().then((s: any) => {
+      const theme = s?.theme ?? 'dark'
+      if (theme === 'system') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light')
+      } else {
+        document.documentElement.setAttribute('data-theme', theme)
+      }
+    })
   }, [])
 
   return (
@@ -36,16 +48,35 @@ export default function App() {
         plan={license.license?.plan ?? 'free'}
       />
       <main className="flex-1 overflow-hidden flex flex-col bg-slate-900/50">
-        {section === 'profiles'    && <ProfileManager />}
-        {section === 'proxies'     && <ProxyManager />}
-        {section === 'fingerprint' && <FingerprintEditor />}
-        {section === 'detection'   && <DetectionDashboard />}
-        {section === 'automation'  && <AutomationBuilder />}
-        {section === 'team'        && <TeamManager />}
-        {section === 'patches'     && <PatchManager />}
-        {section === 'account'     && <AccountPage />}
-        {section === 'settings'    && <SettingsPage />}
+        <ErrorBoundary section="Profiles">
+          {section === 'profiles'    && <ProfileManager />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Proxies">
+          {section === 'proxies'     && <ProxyManager />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Fingerprint">
+          {section === 'fingerprint' && <FingerprintEditor />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Detection">
+          {section === 'detection'   && <DetectionDashboard />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Automation">
+          {section === 'automation'  && <AutomationBuilder />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Team">
+          {section === 'team'        && <TeamManager />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Patches">
+          {section === 'patches'     && <PatchManager />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Account">
+          {section === 'account'     && <AccountPage />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Settings">
+          {section === 'settings'    && <SettingsPage />}
+        </ErrorBoundary>
       </main>
+      <ToastContainer />
     </div>
   )
 }

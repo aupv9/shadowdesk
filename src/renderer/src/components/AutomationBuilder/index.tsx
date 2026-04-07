@@ -11,27 +11,49 @@ import {
   AlertCircle,
   Bot,
   FileCode,
-  Layers
+  Layers,
+  Calendar,
+  Circle,
+  StopCircle
 } from 'lucide-react'
 import { useAutomationStore } from '../../stores/automationStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { StepEditor } from './StepEditor'
 import { WorkflowCreateModal } from './WorkflowCreateModal'
 import { TemplatePickerModal } from './TemplatePickerModal'
+import { SchedulesModal } from './SchedulesModal'
+import { VariablesEditor } from './VariablesEditor'
 import type { AutomationStep } from '../../types'
 
 export function AutomationBuilder() {
   const {
-    workflows, selectedWorkflow, runResult, runHistory,
+    workflows, selectedWorkflow, runResult, parallelResults, runHistory,
     loading, running, error,
     fetchWorkflows, selectWorkflow, createWorkflow, updateWorkflow, deleteWorkflow,
-    runWorkflow, stopWorkflow, clearError
+    runWorkflow, runWorkflowParallel, stopWorkflow, stopWorkflowAll, clearError
   } = useAutomationStore()
 
   const { profiles, activeSessions } = useProfileStore()
   const [showCreate, setShowCreate] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [showSchedules, setShowSchedules] = useState(false)
   const [selectedProfileId, setSelectedProfileId] = useState<string>('')
+  // Phase 10.1 — parallel run mode
+  const [parallelMode, setParallelMode] = useState(false)
+  const [selectedProfileIds, setSelectedProfileIds] = useState<Set<string>>(new Set())
+  const [concurrency, setConcurrency] = useState(3)
+  // Phase 12.B.4 — per-run variable overrides (key → value)
+  const [overrides, setOverrides] = useState<Record<string, string>>({})
+  // Phase 12.B.2 — visual recorder
+  const [recording, setRecording] = useState(false)
+  const [recordingProfileId, setRecordingProfileId] = useState<string | null>(null)
+  const [recordedCount, setRecordedCount] = useState(0)
+  const [recorderError, setRecorderError] = useState<string | null>(null)
+
+  // Reset overrides when switching workflows
+  useEffect(() => {
+    setOverrides({})
+  }, [selectedWorkflow?.id])
 
   useEffect(() => {
     fetchWorkflows()
@@ -94,15 +116,102 @@ export function AutomationBuilder() {
   }
 
   const handleRun = async () => {
-    if (!selectedWorkflow || !selectedProfileId) return
+    if (!selectedWorkflow) return
+    // Only send non-empty overrides — engine merges them on top of stored variables
+    const runtimeVars: Record<string, string> = {}
+    for (const [k, v] of Object.entries(overrides)) {
+      if (v !== '') runtimeVars[k] = v
+    }
+    const vars = Object.keys(runtimeVars).length > 0 ? runtimeVars : undefined
     try {
-      await runWorkflow(selectedWorkflow.id, selectedProfileId)
+      if (parallelMode) {
+        if (selectedProfileIds.size === 0) return
+        await runWorkflowParallel(
+          selectedWorkflow.id,
+          Array.from(selectedProfileIds),
+          vars,
+          concurrency
+        )
+      } else {
+        if (!selectedProfileId) return
+        await runWorkflow(selectedWorkflow.id, selectedProfileId, vars)
+      }
     } catch { /* error is set in store */ }
   }
 
   const handleStop = () => {
-    if (!selectedWorkflow || !selectedProfileId) return
-    stopWorkflow(selectedWorkflow.id, selectedProfileId)
+    if (!selectedWorkflow) return
+    if (parallelMode) {
+      stopWorkflowAll(selectedWorkflow.id)
+    } else if (selectedProfileId) {
+      stopWorkflow(selectedWorkflow.id, selectedProfileId)
+    }
+  }
+
+  // ── Visual recorder (Phase 12.B.2) ─────────────────────────────────────
+  const handleStartRecording = async () => {
+    if (!selectedProfileId) return
+    setRecorderError(null)
+    try {
+      await window.api.recorder.start(selectedProfileId)
+      setRecording(true)
+      setRecordingProfileId(selectedProfileId)
+      setRecordedCount(0)
+    } catch (e: any) {
+      setRecorderError(e?.message ?? 'Failed to start recorder')
+    }
+  }
+
+  const handleStopRecording = async () => {
+    if (!recordingProfileId || !selectedWorkflow) {
+      setRecording(false)
+      setRecordingProfileId(null)
+      return
+    }
+    try {
+      const result = await window.api.recorder.stop(recordingProfileId)
+      const newSteps = result.steps || []
+      if (newSteps.length > 0) {
+        await updateWorkflow(selectedWorkflow.id, {
+          steps: [...selectedWorkflow.steps, ...newSteps]
+        })
+      }
+    } catch (e: any) {
+      setRecorderError(e?.message ?? 'Failed to stop recorder')
+    } finally {
+      setRecording(false)
+      setRecordingProfileId(null)
+      setRecordedCount(0)
+    }
+  }
+
+  // Poll recorder state while recording for a live step counter.
+  useEffect(() => {
+    if (!recording || !recordingProfileId) return
+    const id = setInterval(async () => {
+      try {
+        const s = await window.api.recorder.state(recordingProfileId)
+        if (!s.recording) {
+          setRecording(false)
+          setRecordingProfileId(null)
+          setRecordedCount(0)
+          return
+        }
+        setRecordedCount(s.steps?.length ?? 0)
+      } catch {
+        // ignore — most likely the profile was closed
+      }
+    }, 1000)
+    return () => clearInterval(id)
+  }, [recording, recordingProfileId])
+
+  const toggleProfileSelection = (id: string) => {
+    setSelectedProfileIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   const handleTemplateCreated = async (workflow: any) => {
@@ -196,6 +305,14 @@ export function AutomationBuilder() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={() => setShowSchedules(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                    title="Manage schedules"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    Schedules
+                  </button>
+                  <button
                     onClick={() => deleteWorkflow(selectedWorkflow.id)}
                     className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors"
                     title="Delete workflow"
@@ -205,39 +322,186 @@ export function AutomationBuilder() {
                 </div>
               </div>
 
+              {/* Variables editor — Phase 12.B.4 */}
+              <VariablesEditor
+                workflow={selectedWorkflow}
+                onSave={async (variables) => {
+                  await updateWorkflow(selectedWorkflow.id, { variables })
+                }}
+              />
+
               {/* Run controls */}
-              <div className="flex items-center gap-3 mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                <select
-                  value={selectedProfileId}
-                  onChange={(e) => setSelectedProfileId(e.target.value)}
-                  className="flex-1 bg-slate-700 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ghost-500"
-                >
-                  <option value="">Select a profile...</option>
-                  {profiles.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} {activeSessions.includes(p.id) ? '(running)' : ''}
-                    </option>
-                  ))}
-                </select>
-                {running ? (
+              <div className="mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50 space-y-3">
+                <div className="flex items-center gap-2 text-xs">
                   <button
-                    onClick={handleStop}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
+                    onClick={() => setParallelMode(false)}
+                    className={`px-3 py-1.5 rounded ${!parallelMode ? 'bg-ghost-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
                   >
-                    <Square className="w-4 h-4" />
-                    Stop
+                    Single profile
                   </button>
+                  <button
+                    onClick={() => setParallelMode(true)}
+                    className={`px-3 py-1.5 rounded ${parallelMode ? 'bg-ghost-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                  >
+                    Parallel ({selectedProfileIds.size} selected)
+                  </button>
+                  {parallelMode && (
+                    <label className="ml-auto flex items-center gap-2 text-slate-400">
+                      Concurrency
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={concurrency}
+                        onChange={(e) => setConcurrency(Math.max(1, Math.min(20, parseInt(e.target.value || '1', 10))))}
+                        className="w-16 bg-slate-700 border border-slate-600 text-white rounded px-2 py-1"
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {parallelMode ? (
+                  <div className="max-h-48 overflow-y-auto space-y-1 border border-slate-700 rounded p-2 bg-slate-900/50">
+                    {profiles.length === 0 ? (
+                      <div className="text-xs text-slate-500 p-2">No profiles available.</div>
+                    ) : (
+                      profiles.map((p) => (
+                        <label key={p.id} className="flex items-center gap-2 text-sm text-slate-300 hover:bg-slate-800 rounded px-2 py-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedProfileIds.has(p.id)}
+                            onChange={() => toggleProfileSelection(p.id)}
+                            className="accent-ghost-500"
+                          />
+                          <span className="flex-1">{p.name}</span>
+                          {activeSessions.includes(p.id) && (
+                            <span className="text-[10px] uppercase text-green-400">running</span>
+                          )}
+                        </label>
+                      ))
+                    )}
+                  </div>
                 ) : (
-                  <button
-                    onClick={handleRun}
-                    disabled={!selectedProfileId || !activeSessions.includes(selectedProfileId) || selectedWorkflow.steps.length === 0}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors"
+                  <select
+                    value={selectedProfileId}
+                    onChange={(e) => setSelectedProfileId(e.target.value)}
+                    className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ghost-500"
                   >
-                    <Play className="w-4 h-4" />
-                    Run
-                  </button>
+                    <option value="">Select a profile...</option>
+                    {profiles.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} {activeSessions.includes(p.id) ? '(running)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Per-run variable overrides — Phase 12.B.4 */}
+                {Object.keys(selectedWorkflow.variables ?? {}).length > 0 && (
+                  <div className="border-t border-slate-700/50 pt-3">
+                    <div className="text-xs text-slate-400 mb-2">Run-time overrides (optional)</div>
+                    <div className="space-y-1.5">
+                      {Object.entries(selectedWorkflow.variables ?? {}).map(([key, defaultValue]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <code className="w-32 text-xs text-slate-300 font-mono truncate" title={key}>{key}</code>
+                          <input
+                            value={overrides[key] ?? ''}
+                            onChange={(e) => setOverrides((prev) => ({ ...prev, [key]: e.target.value }))}
+                            placeholder={defaultValue || '(empty)'}
+                            className="flex-1 bg-slate-900/60 border border-slate-700 text-slate-200 text-xs rounded px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-ghost-500"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2">
+                  {/* Record button (only for single-profile mode, when active session) */}
+                  {!parallelMode && (
+                    recording ? (
+                      <button
+                        onClick={handleStopRecording}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors animate-pulse"
+                        title="Stop recording and append captured steps to this workflow"
+                      >
+                        <StopCircle className="w-4 h-4" />
+                        Stop recording ({recordedCount})
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleStartRecording}
+                        disabled={!selectedProfileId || !activeSessions.includes(selectedProfileId) || running}
+                        className="flex items-center gap-2 px-4 py-2 bg-rose-600/20 hover:bg-rose-600/40 disabled:bg-slate-700 disabled:text-slate-500 text-rose-300 hover:text-white text-sm font-medium rounded-lg border border-rose-600/40 transition-colors"
+                        title="Start recording interactions on the selected running profile"
+                      >
+                        <Circle className="w-3 h-3 fill-current" />
+                        Record
+                      </button>
+                    )
+                  )}
+                  {running ? (
+                    <button
+                      onClick={handleStop}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      <Square className="w-4 h-4" />
+                      Stop {parallelMode ? 'all' : ''}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleRun}
+                      disabled={
+                        selectedWorkflow.steps.length === 0 ||
+                        (parallelMode
+                          ? selectedProfileIds.size === 0
+                          : !selectedProfileId || !activeSessions.includes(selectedProfileId))
+                      }
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      <Play className="w-4 h-4" />
+                      Run{parallelMode ? ` × ${selectedProfileIds.size}` : ''}
+                    </button>
+                  )}
+                </div>
+
+                {recorderError && (
+                  <div className="text-xs text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {recorderError}
+                  </div>
+                )}
+                {recording && (
+                  <div className="text-xs text-rose-300 flex items-center gap-2 px-3 py-2 rounded-md bg-rose-600/10 border border-rose-600/30">
+                    <Circle className="w-2.5 h-2.5 fill-current animate-pulse" />
+                    Recording — interact with the browser, then click <strong>Stop recording</strong> to append the captured steps to this workflow.
+                  </div>
                 )}
               </div>
+
+              {/* Parallel results summary */}
+              {parallelResults && parallelResults.length > 0 && (
+                <div className="mb-6 p-4 rounded-lg border border-slate-700/50 bg-slate-800/40">
+                  <div className="text-sm font-medium text-white mb-3">
+                    Parallel run — {parallelResults.filter(r => r.status === 'completed').length}/{parallelResults.length} completed
+                  </div>
+                  <div className="space-y-1 max-h-60 overflow-y-auto">
+                    {parallelResults.map((r) => {
+                      const profile = profiles.find(p => p.id === r.profileId)
+                      return (
+                        <div key={r.profileId} className="flex items-center gap-2 text-xs">
+                          {r.status === 'completed' && <CheckCircle className="w-3.5 h-3.5 text-green-400" />}
+                          {r.status === 'failed' && <XCircle className="w-3.5 h-3.5 text-red-400" />}
+                          {r.status === 'stopped' && <Square className="w-3.5 h-3.5 text-yellow-400" />}
+                          <span className="text-slate-300 flex-1 truncate">{profile?.name ?? r.profileId}</span>
+                          <span className="text-slate-500">{r.stepResults.length} steps</span>
+                          {r.error && <span className="text-red-400 truncate max-w-[200px]">{r.error}</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Run result */}
               {runResult && (
@@ -362,6 +626,15 @@ export function AutomationBuilder() {
         <TemplatePickerModal
           onClose={() => setShowTemplates(false)}
           onCreated={handleTemplateCreated}
+        />
+      )}
+
+      {/* Schedules modal — Phase 10.2 */}
+      {showSchedules && selectedWorkflow && (
+        <SchedulesModal
+          workflow={selectedWorkflow}
+          profiles={profiles}
+          onClose={() => setShowSchedules(false)}
         />
       )}
     </div>

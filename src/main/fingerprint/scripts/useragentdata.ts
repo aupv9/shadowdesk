@@ -1,4 +1,4 @@
-import type { BrowserConfig, OsConfig } from '../../../../shared/types'
+import type { BrowserConfig, OsConfig } from '../../../shared/types'
 
 /**
  * Phase 8 — navigator.userAgentData (User-Agent Client Hints) spoofing.

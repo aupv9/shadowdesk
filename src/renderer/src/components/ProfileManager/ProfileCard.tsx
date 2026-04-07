@@ -2,7 +2,8 @@ import React, { useRef, useState, useEffect } from 'react'
 import {
   Play, Square, Trash2, Monitor, Globe,
   Clock, Loader2, MoreVertical, Pencil, Copy,
-  Cookie, FolderOpen, Download, Upload, History
+  Cookie, FolderOpen, Download, Upload, History,
+  Puzzle, Sparkles, Wand2, Database
 } from 'lucide-react'
 import type { Profile } from '../../types'
 
@@ -17,9 +18,13 @@ interface Props {
   onDelete:    () => void
   onImportCookies: () => void
   onExportCookies: () => void
+  onStorage:       () => void
   onExportBundle:  () => void
   onImportBundle:  () => void
   onHistory:       () => void
+  onExtensions:    () => void
+  onWarmUp:        () => void
+  onApplyDrift:    () => void
 }
 
 const PRESET_LABELS: Record<string, string> = {
@@ -39,7 +44,8 @@ const OS_ICON: Record<string, string> = {
 export function ProfileCard({
   profile, isActive, isLaunching,
   onLaunch, onClose, onEdit, onClone, onDelete,
-  onImportCookies, onExportCookies, onExportBundle, onImportBundle, onHistory
+  onImportCookies, onExportCookies, onStorage, onExportBundle, onImportBundle, onHistory,
+  onExtensions, onWarmUp, onApplyDrift
 }: Props) {
   const fp     = profile.fingerprint
   const preset = PRESET_LABELS[fp?.preset] ?? fp?.preset ?? 'Unknown'
@@ -104,8 +110,13 @@ export function ProfileCard({
           <div className="absolute right-0 top-8 z-20 w-44 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-1">
             {menuItem(<Pencil    className="w-3.5 h-3.5" />, 'Edit',           onEdit)}
             {menuItem(<Copy      className="w-3.5 h-3.5" />, 'Clone',          onClone)}
-            {menuItem(<Cookie    className="w-3.5 h-3.5" />, 'Import Cookies', onImportCookies)}
+            {menuItem(<Cookie    className="w-3.5 h-3.5" />, 'Cookies...',     onImportCookies)}
             {menuItem(<FolderOpen className="w-3.5 h-3.5" />, 'Export Cookies', onExportCookies)}
+            {menuItem(<Database  className="w-3.5 h-3.5" />, 'Storage...',     onStorage)}
+            <div className="border-t border-slate-700 my-1" />
+            {menuItem(<Puzzle    className="w-3.5 h-3.5" />, 'Extensions...',  onExtensions)}
+            {menuItem(<Sparkles  className="w-3.5 h-3.5" />, 'Warm Up...',     onWarmUp)}
+            {menuItem(<Wand2     className="w-3.5 h-3.5" />, 'Apply Drift',    onApplyDrift)}
             <div className="border-t border-slate-700 my-1" />
             {menuItem(<Download  className="w-3.5 h-3.5" />, 'Export Bundle',  onExportBundle)}
             {menuItem(<Upload    className="w-3.5 h-3.5" />, 'Import Bundle',  onImportBundle)}
@@ -127,15 +138,23 @@ export function ProfileCard({
         </div>
       </div>
 
-      {/* Group badge */}
-      {profile.group_name && (
-        <div className="mb-2">
-          <span
-            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
-            style={{ backgroundColor: `${profile.group_color ?? '#6366f1'}25`, color: profile.group_color ?? '#818cf8' }}
-          >
-            {profile.group_name}
-          </span>
+      {/* Group badge + warm-up indicator */}
+      {(profile.group_name || profile.warmed_up) && (
+        <div className="mb-2 flex items-center gap-1.5 flex-wrap">
+          {profile.group_name && (
+            <span
+              className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
+              style={{ backgroundColor: `${profile.group_color ?? '#6366f1'}25`, color: profile.group_color ?? '#818cf8' }}
+            >
+              {profile.group_name}
+            </span>
+          )}
+          {profile.warmed_up ? (
+            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-400 font-medium">
+              <Sparkles className="w-2.5 h-2.5" />
+              Warmed up
+            </span>
+          ) : null}
         </div>
       )}
 

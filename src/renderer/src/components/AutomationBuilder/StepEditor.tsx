@@ -22,7 +22,12 @@ import {
   Hand,
   MousePointerClick,
   PenTool,
-  Send
+  Send,
+  Upload,
+  Download,
+  ShieldCheck,
+  KeyRound,
+  Lock
 } from 'lucide-react'
 import type { AutomationStep, AutomationActionType } from '../../types'
 
@@ -43,13 +48,21 @@ const ACTION_META: Record<AutomationActionType, { icon: React.ElementType; label
   hover:           { icon: Hand,               label: 'Hover',            color: 'text-sky-400' },
   rightClick:      { icon: MousePointerClick,  label: 'Right Click',      color: 'text-rose-400' },
   setAttribute:    { icon: PenTool,            label: 'Set Attribute',    color: 'text-lime-400' },
-  httpRequest:     { icon: Send,               label: 'HTTP Request',     color: 'text-fuchsia-400' }
+  httpRequest:     { icon: Send,               label: 'HTTP Request',     color: 'text-fuchsia-400' },
+  upload:          { icon: Upload,             label: 'Upload File',      color: 'text-sky-300' },
+  download:        { icon: Download,           label: 'Download File',    color: 'text-emerald-300' },
+  solveCaptcha:        { icon: ShieldCheck,    label: 'Solve Captcha',    color: 'text-yellow-300' },
+  injectCaptchaToken:  { icon: KeyRound,       label: 'Inject Captcha Token', color: 'text-amber-300' },
+  useCredential:       { icon: Lock,           label: 'Use Credential',   color: 'text-emerald-400' }
 }
 
 const ALL_ACTIONS: AutomationActionType[] = [
   'navigate', 'click', 'type', 'wait', 'waitForSelector',
   'screenshot', 'extractText', 'scroll', 'select', 'keyPress', 'evaluate',
   'hover', 'rightClick', 'setAttribute', 'httpRequest',
+  'upload', 'download',
+  'solveCaptcha', 'injectCaptchaToken',
+  'useCredential',
   'conditional', 'loop'
 ]
 
@@ -80,6 +93,11 @@ function getDefaultParams(action: AutomationActionType): Record<string, any> {
     case 'rightClick': return { selector: '' }
     case 'setAttribute': return { selector: '', attribute: '', value: '' }
     case 'httpRequest': return { url: 'https://api.example.com', method: 'GET', headers: {}, body: '' }
+    case 'upload': return { selector: 'input[type="file"]', filePath: '', timeout: 10000 }
+    case 'download': return { url: '', savePath: '', timeout: 60000 }
+    case 'solveCaptcha': return { type: 'recaptcha-v2', siteKey: '', pageUrl: '', saveAs: 'captchaToken' }
+    case 'injectCaptchaToken': return { selector: '#g-recaptcha-response', token: '{captchaToken}' }
+    case 'useCredential': return { label: '', prefix: 'cred' }
     case 'conditional': return { selector: '', thenSteps: [], elseSteps: [] }
     case 'loop': return { times: 3, steps: [] }
     default: return {}
@@ -260,6 +278,99 @@ function ParamEditor({
             </select>
           </div>
           {field('body', 'Request body (JSON)', 'textarea')}
+        </>
+      )
+    case 'upload':
+      return (
+        <>
+          {field('selector', 'File input CSS selector')}
+          {field('filePath', 'Local file path')}
+          {field('timeout', 'Timeout (ms)', 'number')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Targets an <code className="text-slate-300">&lt;input type=&quot;file&quot;&gt;</code> element and uploads
+            the local file from the host machine. Supports <code className="text-slate-300">{'{var}'}</code> placeholders
+            in the file path.
+          </div>
+        </>
+      )
+    case 'download':
+      return (
+        <>
+          {field('url', 'File URL')}
+          {field('savePath', 'Save to (local file path)')}
+          {field('timeout', 'Timeout (ms)', 'number')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Streams the URL to disk using the active page's cookies. Parent directories
+            are created automatically. Up to 5 redirects are followed.
+          </div>
+        </>
+      )
+    case 'solveCaptcha':
+      return (
+        <>
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Captcha type</label>
+            <select
+              value={params.type ?? 'recaptcha-v2'}
+              onChange={(e) => onChange('type', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500"
+            >
+              <option value="recaptcha-v2">reCAPTCHA v2</option>
+              <option value="recaptcha-v3">reCAPTCHA v3</option>
+              <option value="hcaptcha">hCaptcha</option>
+              <option value="image">Image (text-in-image)</option>
+            </select>
+          </div>
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Provider (optional)</label>
+            <select
+              value={params.provider ?? ''}
+              onChange={(e) => onChange('provider', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500"
+            >
+              <option value="">Use default from Settings</option>
+              <option value="2captcha">2Captcha</option>
+              <option value="anticaptcha">Anti-Captcha</option>
+              <option value="capmonster">CapMonster</option>
+            </select>
+          </div>
+          {params.type !== 'image' && field('siteKey', 'Site key (data-sitekey)')}
+          {params.type !== 'image' && field('pageUrl', 'Page URL (defaults to current)')}
+          {params.type === 'recaptcha-v3' && field('action', 'reCAPTCHA v3 action name')}
+          {params.type === 'recaptcha-v3' && field('minScore', 'Min score (0–1)', 'number')}
+          {params.type === 'recaptcha-v2' && field('invisible', 'Invisible reCAPTCHA', 'checkbox')}
+          {params.type === 'image' && field('imageBase64', 'Image base64 data', 'textarea')}
+          {field('saveAs', 'Save token as variable (default: captchaToken)')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Solves the captcha via the configured provider. The resulting token is
+            saved into the workflow variable named in <code className="text-slate-300">saveAs</code>,
+            so a later step can use <code className="text-slate-300">{'{captchaToken}'}</code>.
+          </div>
+        </>
+      )
+    case 'injectCaptchaToken':
+      return (
+        <>
+          {field('selector', 'Target CSS selector (default: #g-recaptcha-response)')}
+          {field('token', 'Token (use {captchaToken})')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Sets the value of a hidden reCAPTCHA / hCaptcha textarea and dispatches
+            input/change events. Pair with <code className="text-slate-300">solveCaptcha</code>.
+          </div>
+        </>
+      )
+    case 'useCredential':
+      return (
+        <>
+          {field('label', 'Credential label (lookup by name)')}
+          {field('id', 'Or credential ID (overrides label)')}
+          {field('prefix', 'Variable prefix (default: cred)')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Loads a credential from the encrypted vault into workflow variables.
+            Use <code className="text-slate-300">{'{cred.username}'}</code>, <code className="text-slate-300">{'{cred.password}'}</code>,
+            and <code className="text-slate-300">{'{cred.<field>}'}</code> in later steps.
+            The vault must be unlocked from Settings before the workflow runs.
+          </div>
         </>
       )
     case 'conditional':

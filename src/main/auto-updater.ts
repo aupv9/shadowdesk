@@ -37,10 +37,13 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     })
   })
 
-  // Check for updates after a short delay
+  // Check for updates after a short delay, then every 4 hours
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(() => {})
   }, 5000)
+  setInterval(() => {
+    autoUpdater.checkForUpdates().catch(() => {})
+  }, 4 * 60 * 60 * 1000)
 }
 
 export function downloadUpdate(): void {

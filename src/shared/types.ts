@@ -16,11 +16,18 @@ export interface FingerprintConfig {
   plugins: PluginConfig
   speech: SpeechConfig
   network?: NetworkConfig
+  geolocation?: GeolocationConfig
   // Phase 6
   behavior?: BehaviorConfig
   timing?: TimingConfig
   // Phase 8
   phase8?: Phase8Config
+}
+
+export interface GeolocationConfig {
+  latitude: number
+  longitude: number
+  accuracy: number
 }
 
 export interface OsConfig {
@@ -47,7 +54,7 @@ export interface ScreenConfig {
 
 export interface HardwareConfig {
   deviceMemory: 1 | 2 | 4 | 8 | 16 | 32
-  hardwareConcurrency: 2 | 4 | 6 | 8 | 12 | 16
+  hardwareConcurrency: 2 | 4 | 6 | 8 | 10 | 12 | 16 | 20 | 24
   maxTouchPoints: number
 }
 
@@ -154,6 +161,39 @@ export interface Profile {
   status: 'active' | 'archived'
   rotation_mode?: 'none' | 'random' | 'round-robin'
   rotation_index?: number
+  // Phase 11.2 / 11.3
+  drift_enabled?: number | boolean
+  last_drift_at?: string | null
+  warmed_up?: number | boolean
+}
+
+// Phase 10.2 — Workflow scheduling
+export interface WorkflowSchedule {
+  id: string
+  name: string
+  workflow_id: string
+  profile_ids: string[]
+  cron: string
+  enabled: boolean
+  last_run_at: string | null
+  next_run_at: string | null
+  created_at: string
+}
+
+// Phase 10.3 — Per-profile browser extensions
+export interface ProfileExtension {
+  id: string
+  profile_id: string
+  name: string
+  path: string
+  enabled: boolean
+  created_at?: string
+}
+
+// Phase 11.2 — Profile warm-up
+export interface WarmUpResult {
+  visited: { url: string; success: boolean; ms: number; error?: string }[]
+  durationMs: number
 }
 
 export interface ProfileGroup {
@@ -347,6 +387,14 @@ export type AutomationActionType =
   | 'rightClick'
   | 'setAttribute'
   | 'httpRequest'
+  // Phase 12.B.3 — File transfer
+  | 'upload'
+  | 'download'
+  // Phase 12.B.1 — Captcha solving
+  | 'solveCaptcha'
+  | 'injectCaptchaToken'
+  // Phase 12.C.3 — Encrypted credential vault
+  | 'useCredential'
 
 export interface AutomationStep {
   id: string
@@ -366,6 +414,7 @@ export interface AutomationWorkflow {
   name: string
   description?: string
   steps: AutomationStep[]
+  variables?: Record<string, string>
   created_at: string
   updated_at: string
 }
@@ -393,12 +442,14 @@ export interface CreateWorkflowInput {
   name: string
   description?: string
   steps: AutomationStep[]
+  variables?: Record<string, string>
 }
 
 export interface UpdateWorkflowInput {
   name?: string
   description?: string
   steps?: AutomationStep[]
+  variables?: Record<string, string>
 }
 
 // ─── Automation API Server Types ───────────────────────────────────────────
@@ -504,6 +555,26 @@ export interface ChromiumPatchStatus {
   cdpOverrides: number
   requiresBuild: number
   patches: ChromiumPatch[]
+}
+
+// ─── Phase 12.C.4: Fingerprint Collision Detection ──────────────────────────
+
+export type CollisionKind = 'noise-seed' | 'identity-tuple'
+
+export interface CollisionGroup {
+  /** Stable id derived from the collision signature */
+  id: string
+  kind: CollisionKind
+  /** Human-readable description of the shared signature */
+  signature: string
+  /** Profiles sharing this signature */
+  profiles: { id: string; name: string }[]
+}
+
+export interface CollisionReport {
+  scannedAt: string
+  totalProfiles: number
+  groups: CollisionGroup[]
 }
 
 // Phase 8: extended fingerprint config

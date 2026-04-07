@@ -203,6 +203,74 @@ export class ApiServer {
       return
     }
 
+    if (path === '/api/proxies' && method === 'POST') {
+      const { v4: uuidv4 } = await import('uuid')
+      const id = uuidv4()
+      db.createProxy({ id, ...body })
+      this.sendJson(res, 201, { id, ...body })
+      return
+    }
+
+    const proxyMatch = path.match(/^\/api\/proxies\/([^/]+)$/)
+    if (proxyMatch && method === 'GET') {
+      const proxies = db.getAllProxies() as any[]
+      const proxy = proxies.find((p) => p.id === proxyMatch[1])
+      if (!proxy) { this.sendJson(res, 404, { error: 'Proxy not found' }); return }
+      this.sendJson(res, 200, proxy)
+      return
+    }
+
+    if (proxyMatch && method === 'DELETE') {
+      db.deleteProxy(proxyMatch[1])
+      this.sendJson(res, 200, { deleted: true })
+      return
+    }
+
+    // ── Workflows (create + delete) ────────────────────────────────────
+    if (path === '/api/workflows' && method === 'POST') {
+      const { v4: uuidv4 } = await import('uuid')
+      const id = uuidv4()
+      db.createWorkflow({ id, name: body.name, description: body.description, steps: body.steps ?? [] })
+      this.sendJson(res, 201, { id, ...body })
+      return
+    }
+
+    if (workflowMatch && method === 'DELETE') {
+      db.deleteWorkflow(workflowMatch[1])
+      this.sendJson(res, 200, { deleted: true })
+      return
+    }
+
+    // ── Detection ──────────────────────────────────────────────────────
+    if (path === '/api/detection/summary' && method === 'GET') {
+      this.sendJson(res, 200, db.getDetectionTestSummary())
+      return
+    }
+
+    const detectionResultsMatch = path.match(/^\/api\/detection\/results\/([^/]+)$/)
+    if (detectionResultsMatch && method === 'GET') {
+      const { DetectionTestRunner } = await import('./detection-test')
+      const runner = DetectionTestRunner.getInstance()
+      this.sendJson(res, 200, runner.getResults(detectionResultsMatch[1]))
+      return
+    }
+
+    const detectionRunMatch = path.match(/^\/api\/detection\/run\/([^/]+)$/)
+    if (detectionRunMatch && method === 'POST') {
+      const { DetectionTestRunner } = await import('./detection-test')
+      const runner = DetectionTestRunner.getInstance()
+      const result = await runner.runTest(detectionRunMatch[1])
+      this.sendJson(res, 200, result)
+      return
+    }
+
+    // ── Patches ────────────────────────────────────────────────────────
+    if (path === '/api/patches/status' && method === 'GET') {
+      const { ChromiumPatchManager } = await import('./fingerprint/chromium-patches')
+      this.sendJson(res, 200, ChromiumPatchManager.getInstance().getStatus())
+      return
+    }
+
     // ── 404 ────────────────────────────────────────────────────────────
     this.sendJson(res, 404, { error: 'Not found', path, method })
   }

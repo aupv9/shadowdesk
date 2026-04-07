@@ -5,6 +5,7 @@ interface AutomationState {
   workflows: AutomationWorkflow[]
   selectedWorkflow: AutomationWorkflow | null
   runResult: AutomationRunResult | null
+  parallelResults: AutomationRunResult[] | null
   runHistory: any[]
   loading: boolean
   running: boolean
@@ -13,10 +14,12 @@ interface AutomationState {
   fetchWorkflows: () => Promise<void>
   selectWorkflow: (id: string | null) => Promise<void>
   createWorkflow: (input: CreateWorkflowInput) => Promise<AutomationWorkflow>
-  updateWorkflow: (id: string, data: { name?: string; description?: string; steps?: AutomationStep[] }) => Promise<void>
+  updateWorkflow: (id: string, data: { name?: string; description?: string; steps?: AutomationStep[]; variables?: Record<string, string> }) => Promise<void>
   deleteWorkflow: (id: string) => Promise<void>
-  runWorkflow: (workflowId: string, profileId: string) => Promise<AutomationRunResult>
+  runWorkflow: (workflowId: string, profileId: string, variables?: Record<string, string>) => Promise<AutomationRunResult>
+  runWorkflowParallel: (workflowId: string, profileIds: string[], variables?: Record<string, string>, concurrency?: number) => Promise<AutomationRunResult[]>
   stopWorkflow: (workflowId: string, profileId: string) => void
+  stopWorkflowAll: (workflowId: string) => void
   fetchRunHistory: (workflowId: string) => Promise<void>
   clearError: () => void
 }
@@ -25,6 +28,7 @@ export const useAutomationStore = create<AutomationState>((set, get) => ({
   workflows: [],
   selectedWorkflow: null,
   runResult: null,
+  parallelResults: null,
   runHistory: [],
   loading: false,
   running: false,
@@ -76,10 +80,10 @@ export const useAutomationStore = create<AutomationState>((set, get) => ({
     }))
   },
 
-  runWorkflow: async (workflowId, profileId) => {
+  runWorkflow: async (workflowId, profileId, variables) => {
     set({ running: true, runResult: null, error: null })
     try {
-      const result = await window.api.workflows.run(workflowId, profileId)
+      const result = await window.api.workflows.run(workflowId, profileId, variables)
       set({ runResult: result, running: false })
       // Refresh run history
       get().fetchRunHistory(workflowId)
@@ -90,8 +94,26 @@ export const useAutomationStore = create<AutomationState>((set, get) => ({
     }
   },
 
+  runWorkflowParallel: async (workflowId, profileIds, variables, concurrency = 5) => {
+    set({ running: true, parallelResults: null, error: null })
+    try {
+      const results = await window.api.workflows.runParallel(workflowId, profileIds, variables, concurrency)
+      set({ parallelResults: results, running: false })
+      get().fetchRunHistory(workflowId)
+      return results
+    } catch (err: any) {
+      set({ error: err.message, running: false })
+      throw err
+    }
+  },
+
   stopWorkflow: (workflowId, profileId) => {
     window.api.workflows.stop(workflowId, profileId)
+  },
+
+  stopWorkflowAll: (workflowId) => {
+    window.api.workflows.stopAll(workflowId)
+    set({ running: false })
   },
 
   fetchRunHistory: async (workflowId) => {

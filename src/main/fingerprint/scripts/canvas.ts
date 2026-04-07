@@ -12,8 +12,10 @@ export function buildCanvasScript(config: CanvasConfig): string {
     return origToDataURL.apply(this, arguments);
   };
   const origToBlob = HTMLCanvasElement.prototype.toBlob;
-  HTMLCanvasElement.prototype.toBlob = function(callback) {
-    callback(null);
+  HTMLCanvasElement.prototype.toBlob = function(callback, ...args) {
+    const empty = document.createElement('canvas');
+    empty.width = 1; empty.height = 1;
+    return origToBlob.call(empty, callback, ...args);
   };
 })();
 `
