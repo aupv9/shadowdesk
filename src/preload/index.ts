@@ -182,6 +182,30 @@ const api = {
     stopAll:   (workflowId: string)                                   => ipcRenderer.invoke('workflows:stopAll', workflowId),
     isRunning: (workflowId: string, profileId: string)                => ipcRenderer.invoke('workflows:isRunning', workflowId, profileId),
     runs:      (workflowId: string)                                   => ipcRenderer.invoke('workflows:runs', workflowId),
+    // Tier 2 — Run history dashboard, metrics, dry-run, debugger
+    recentRuns:    (limit?: number)                                    => ipcRenderer.invoke('workflows:recentRuns', limit),
+    metrics:       (workflowId?: string)                               => ipcRenderer.invoke('workflows:metrics', workflowId),
+    dryRun:        (workflowId: string, variables?: Record<string, string>) => ipcRenderer.invoke('workflows:dryRun', workflowId, variables),
+    debug: {
+      run:            (workflowId: string, profileId: string, breakpoints?: string[], variables?: Record<string, string>, pauseAtStart?: boolean) =>
+                        ipcRenderer.invoke('workflows:debug:run', workflowId, profileId, breakpoints, variables, pauseAtStart),
+      pause:          (workflowId: string, profileId: string)          => ipcRenderer.invoke('workflows:debug:pause', workflowId, profileId),
+      resume:         (workflowId: string, profileId: string)          => ipcRenderer.invoke('workflows:debug:resume', workflowId, profileId),
+      stepOver:       (workflowId: string, profileId: string)          => ipcRenderer.invoke('workflows:debug:stepOver', workflowId, profileId),
+      setBreakpoints: (workflowId: string, profileId: string, stepIds: string[]) =>
+                        ipcRenderer.invoke('workflows:debug:setBreakpoints', workflowId, profileId, stepIds),
+      state:          (workflowId: string, profileId: string)          => ipcRenderer.invoke('workflows:debug:state', workflowId, profileId),
+      onPaused: (cb: (data: { workflowId: string; profileId: string; stepId: string; action: string; variables: Record<string, string> }) => void): (() => void) => {
+        const handler = (_event: any, data: any) => cb(data)
+        ipcRenderer.on('automation:paused', handler)
+        return () => { ipcRenderer.removeListener('automation:paused', handler) }
+      },
+      onResumed: (cb: (data: { workflowId: string; profileId: string; stepId: string }) => void): (() => void) => {
+        const handler = (_event: any, data: any) => cb(data)
+        ipcRenderer.on('automation:resumed', handler)
+        return () => { ipcRenderer.removeListener('automation:resumed', handler) }
+      }
+    },
     // Phase 10.2 — Schedules
     schedules: {
       list:    ()                                                     => ipcRenderer.invoke('schedules:list'),
