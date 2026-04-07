@@ -11,6 +11,7 @@ const api = {
     close:              (id: string)                          => ipcRenderer.invoke('profiles:close', id),
     active:             ()                                    => ipcRenderer.invoke('profiles:active'),
     setGroup:           (profileId: string, groupId: string | null) => ipcRenderer.invoke('profiles:setGroup', profileId, groupId),
+    setSyncExcluded:    (profileId: string, excluded: boolean)       => ipcRenderer.invoke('profiles:setSyncExcluded', profileId, excluded),
     rerollFingerprint:  (id: string)                          => ipcRenderer.invoke('profiles:rerollFingerprint', id),
     changePreset:       (id: string, presetKey: string)       => ipcRenderer.invoke('profiles:changePreset', id, presetKey),
     export:             (id: string)                          => ipcRenderer.invoke('profiles:export', id),
@@ -115,21 +116,27 @@ const api = {
     }
   },
   auth: {
-    login:            (input: { email: string; password: string })                => ipcRenderer.invoke('auth:login', input),
-    register:         (input: { email: string; password: string; name: string })  => ipcRenderer.invoke('auth:register', input),
-    logout:           ()                                                          => ipcRenderer.invoke('auth:logout'),
-    me:               ()                                                          => ipcRenderer.invoke('auth:me'),
-    isAuthenticated:  ()                                                          => ipcRenderer.invoke('auth:isAuthenticated'),
-    updatePassword:   (current: string, newPass: string)                          => ipcRenderer.invoke('auth:updatePassword', current, newPass)
+    login:               (input: { email: string; password: string })                => ipcRenderer.invoke('auth:login', input),
+    register:            (input: { email: string; password: string; name: string })  => ipcRenderer.invoke('auth:register', input),
+    logout:              ()                                                          => ipcRenderer.invoke('auth:logout'),
+    me:                  ()                                                          => ipcRenderer.invoke('auth:me'),
+    isAuthenticated:     ()                                                          => ipcRenderer.invoke('auth:isAuthenticated'),
+    updatePassword:      (current: string, newPass: string)                          => ipcRenderer.invoke('auth:updatePassword', current, newPass),
+    resendVerification:  ()                                                          => ipcRenderer.invoke('auth:resendVerification'),
+    exportData:          ()                                                          => ipcRenderer.invoke('auth:exportData'),
+    deleteAccount:       ()                                                          => ipcRenderer.invoke('auth:deleteAccount')
   },
   license: {
     current:           ()                    => ipcRenderer.invoke('license:current'),
+    status:            ()                    => ipcRenderer.invoke('license:status'),
     fetch:             ()                    => ipcRenderer.invoke('license:fetch'),
     activate:          (key: string)         => ipcRenderer.invoke('license:activate', key),
     deactivate:        ()                    => ipcRenderer.invoke('license:deactivate'),
     checkProfileLimit: ()                    => ipcRenderer.invoke('license:checkProfileLimit'),
     usage:             ()                    => ipcRenderer.invoke('license:usage'),
-    machineId:         ()                    => ipcRenderer.invoke('license:machineId')
+    machineId:         ()                    => ipcRenderer.invoke('license:machineId'),
+    devices:           ()                    => ipcRenderer.invoke('license:devices'),
+    deactivateDevice:  (machineId: string)   => ipcRenderer.invoke('license:deactivateDevice', machineId)
   },
   team: {
     get:              ()                                                                   => ipcRenderer.invoke('team:get'),
@@ -152,6 +159,8 @@ const api = {
     push:           (password: string)       => ipcRenderer.invoke('sync:push', password),
     pull:           (password: string)       => ipcRenderer.invoke('sync:pull', password),
     manifest:       ()                       => ipcRenderer.invoke('sync:manifest'),
+    history:        (limit?: number)         => ipcRenderer.invoke('sync:history', limit),
+    diff:           ()                       => ipcRenderer.invoke('sync:diff'),
     daemonEnabled:  ()                       => ipcRenderer.invoke('sync:daemonEnabled'),
     enableDaemon:   (password: string)       => ipcRenderer.invoke('sync:enableDaemon', password),
     disableDaemon:  ()                       => ipcRenderer.invoke('sync:disableDaemon'),

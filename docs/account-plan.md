@@ -19,18 +19,132 @@ Inventory rows in §1 are updated accordingly.
 | ✅ A1 | `markPendingChange()` wired into all profile/cookie write paths | [ipc/handlers.ts](../src/main/ipc/handlers.ts) |
 | ✅ A2 | Per-user deterministic salt (sha256 of `pepper\|userId`) + legacy decrypt fallback | [sync.ts:9-31](../src/main/sync.ts#L9-L31), [sync.ts:74-84](../src/main/sync.ts#L74-L84) |
 | ✅ A3 | Sync daemon refactored to opt-in: `enableSyncDaemon(password)` / `disableSyncDaemon()`; in-memory password, never persisted | [sync.ts:43-44, 196-256](../src/main/sync.ts#L196-L256), preload `sync.daemonEnabled/enableDaemon/disableDaemon` |
+| ✅ A6 | Friendly auth-error mapper (429 → "too many", 401 → "invalid", network → "check connection") | [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) |
+| ✅ B1 | Plan comparison grid (free / starter / pro / enterprise) + Upgrade CTAs that pre-fill the email | [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) |
+| ✅ B2 | License-expiry banner with 7-day warning + 7-day grace period; `getLicenseStatus()` returns active/grace/expired/free | [license.ts](../src/main/license.ts), [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) |
 | ✅ B3 | License auto-refresh on focus + every 30 min, throttled to 1/min; manual "Refresh" button next to plan tier | [licenseStore.ts:23-58](../src/renderer/src/stores/licenseStore.ts#L23-L58), [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) |
 | ✅ C1 | Sync manifest panel (profile count, last modified, version, integrity prefix) with manual refresh; auto-refreshes after push/pull | [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) |
+| ✅ C2 | First-time sync wizard — confirm-password (typed twice + 6-level strength meter) + zero-knowledge acknowledgment | [Account/SyncSetupModal.tsx](../src/renderer/src/components/Account/SyncSetupModal.tsx) |
+| ✅ C3 | Sync history panel (last 20 push/pull entries from `sync_log`, including failures with error_message) | [sync.ts](../src/main/sync.ts), [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) |
+| ✅ C4 | Conflict drawer — `pullProfiles()` returns structured `{imported, conflicts[]}`; side-drawer surfaces skipped profiles with local/cloud timestamps | [sync.ts](../src/main/sync.ts), [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) |
+| ✅ C5 | Selective sync — `sync_excluded` column on profiles, filter on push, per-card menu toggle + "No sync" badge | [database.ts](../src/main/database.ts), [sync.ts](../src/main/sync.ts), [ProfileManager/ProfileCard.tsx](../src/renderer/src/components/ProfileManager/ProfileCard.tsx) |
+| ✅ C6 | First-run "Restore from cloud" prompt — fires when authenticated + 0 local profiles + remote manifest non-empty + not previously dismissed (per-user-id flag) | [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) |
+| ✅ A3 follow-up | Background sync daemon toggle UI (switch + descriptive blurb in Cloud Sync card) | [Account/index.tsx](../src/renderer/src/components/Account/index.tsx), [syncStore.ts](../src/renderer/src/stores/syncStore.ts) |
 | ✅ D1 | Change password subsection (current / new / confirm + length & match validation) | [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) |
 | ✅ D2 | "Forgot password?" link on Sign In tab → external reset URL | [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) |
 | ✅ D3 | Show/hide password eye icon + "Remember my email" checkbox (localStorage) | [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) |
 | ✅ F1 | Account page widened to `max-w-5xl` + responsive 2-column grid for License & Sync above 1280 px | [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) |
 | ✅ F2 | Loading skeletons for License card (initial fetch) and Sync manifest panel | [Account/index.tsx](../src/renderer/src/components/Account/index.tsx), [syncStore.ts](../src/renderer/src/stores/syncStore.ts) |
+| ✅ F3 | ARIA tablist + arrow-key navigation between Sign In / Create Account tabs | [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) |
 
-**Result**: All Phase A (critical bugs / security), Phase D auth hygiene batch, the
-sync-manifest XS win, the license-refresh dead-zone fix, and all of Phase F cosmetics
-shipped in one pass. Remaining sequence picks up at **B2** (expiry warning + grace
-period).
+**Result**: All of Phase A, B, C, D, and F have shipped — every account / license /
+cloud-sync feature in §3 is now in the tree. Remaining unchecked items are the
+backend-dependent ones (D4 email verify, E1 multi-machine seats, E2 2FA, E3
+account deletion, L8 invoices, L9 trial badge, F4 i18n).
+
+---
+
+## 0.1 Master Feature Checklist
+
+> Single-source-of-truth checklist of every feature reachable from the **Account**
+> sidebar entry. Tick a box when an item ships. Items are grouped by surface, not
+> by phase. The §3 phase plan ordering still applies for sequencing the unchecked
+> ones.
+>
+> **Counts**: 52 shipped · 0 partial · 13 planned = **65 total**
+
+### A. Authentication
+
+- [x] Email + password sign-in form ([Account/index.tsx](../src/renderer/src/components/Account/index.tsx))
+- [x] Email + password registration (name, email, password)
+- [x] Sign-out with token cleanup
+- [x] Persisted auth tokens on disk (`auth-tokens.json`)
+- [x] Auto access-token refresh on expiry + on 401
+- [x] Session restore on app start (`auth:me`)
+- [x] Authenticated user header card (avatar, name, email)
+- [x] Login error banner
+- [x] **Change password form** (current / new / confirm) — D1 ✅
+- [x] **Forgot password link** → external reset URL — D2 ✅
+- [x] **Show / hide password toggle** (eye icon) — D3 ✅
+- [x] **Remember email** checkbox (localStorage) — D3 ✅
+- [x] **Login rate-limit / lockout messaging** (429 → "try again in N seconds") — A6 ✅
+- [x] **Arrow-key navigation between Sign In / Create Account tabs** — F3 ✅
+- [ ] Email verification badge + "Verify your email" warning + Resend button — **D4**
+- [ ] Two-factor authentication (TOTP enrollment + backup codes) — **E2**
+- [ ] Account deletion (typed-confirm dialog → DELETE `/auth/me`) — **E3**
+- [ ] GDPR data export (POST `/auth/me/export` → JSON download) — **E3**
+
+### B. License & Plan
+
+- [x] Plan tier display with color (free/starter/professional/enterprise)
+- [x] Profile usage bar (used / max, % colored above 70 / 90 %)
+- [x] Plan limits constants (5 / 50 / 500 / unlimited)
+- [x] License activation by typed key + Enter shortcut
+- [x] Deactivate license from this machine
+- [x] Machine fingerprint (sorted MAC + CPU SHA-256)
+- [x] Free-plan fallback when no license is loaded
+- [x] `checkProfileLimit()` enforced at profile create + multi-import
+- [x] `checkTeamMemberLimit()` enforced at team invite
+- [x] Valid-until date display (paid plans)
+- [x] License error toast / banner
+- [x] **Manual "Refresh license" button** + auto-refresh on focus / 30 min — B3 ✅
+- [x] **Plan comparison grid** (free / starter / pro / enterprise) — B1 ✅
+- [x] **Upgrade CTA** → external pricing page with email pre-fill — B1 ✅
+- [x] **License-expiry warning banner** (within 7 days of `valid_until`) — B2 ✅
+- [x] **7-day grace period** after expiry (instead of immediate fall-back) — B2 ✅
+- [ ] Trial badge ("Trial Pro" vs "Paid Pro") — **L9**
+- [ ] Receipt / invoice download (last 12 invoices) — **L8**
+- [ ] Multi-machine seat counter ("Activated machines: 2 / 3") — **E1**
+- [ ] Manage devices modal (per-machine deactivate) — **E1**
+
+### C. Cloud Sync
+
+- [x] Encrypted push of all profiles (AES-256-GCM, scrypt-derived key)
+- [x] Encrypted pull with SHA-256 integrity check
+- [x] Conflict resolution (local-wins by `updated_at` / `last_used_at`)
+- [x] Status broadcast to renderer via `sync:status` IPC
+- [x] Sync status display (idle / syncing / error / offline / disabled)
+- [x] Last-synced timestamp
+- [x] Encryption-password input + manual Push / Pull buttons
+- [x] Plan gate (Cloud Sync card hidden behind `cloud_sync_enabled`)
+- [x] Auth gate (sync requires sign-in)
+- [x] **`markPendingChange()` wired into all write paths** — A1 ✅
+- [x] **Pending-changes badge** (now actually increments) — A1 ✅
+- [x] **Per-user deterministic salt** + legacy decrypt fallback — A2 ✅
+- [x] **Opt-in background sync daemon** (`enableSyncDaemon` / `disableSyncDaemon`) — A3 ✅
+- [x] **Sync manifest panel** (profile count, last modified, version, integrity prefix) — C1 ✅
+- [x] **First-time sync wizard** (confirm-password + zero-knowledge warning) — C2 ✅
+- [x] **Sync history panel** (last 20 push/pull entries from `sync_log`) — C3 ✅
+- [x] **Conflict drawer** ("N profiles skipped — view conflicts") — C4 ✅
+- [x] **Selective sync** (per-profile `sync_excluded` opt-out) — C5 ✅
+- [x] **First-run "Restore from cloud" prompt** on empty local DB — C6 ✅
+- [x] **"Enable background sync" UI** (calls `enableSyncDaemon` with password) — C2/A3 follow-up ✅
+- [ ] Push delta (only changed profiles since last sync) — **S6**
+- [ ] Sync extensions / vault entries / schedules / automation — **S7**
+- [ ] Local-vs-remote diff preview before commit — **S3**
+
+### D. Cross-cutting / UX
+
+- [x] **Account page widened to `max-w-5xl` + 2-column grid above 1280 px** — F1 ✅
+- [x] **Loading skeletons for License & Sync manifest** — F2 ✅
+- [ ] Vietnamese / Thai / Indonesian localization (Account as i18n pilot) — **F4**
+- [ ] Toast notifications for sync push/pull success (currently inline message) — _nice-to-have_
+
+### Quick stats by surface
+
+| Surface | Shipped | Planned |
+|---------|--------:|--------:|
+| Authentication | 14 | 4 |
+| License & Plan | 16 | 4 |
+| Cloud Sync | 20 | 3 |
+| Cross-cutting | 2 | 2 |
+| **Total** | **52** | **13** |
+
+> The table above counts shipped items including the 20 new ones from §0
+> ("Shipped In This Batch"). Remaining planned items are backend-dependent
+> (D4 email verify, E1 multi-machine seats, E2 2FA, E3 account deletion,
+> L8 invoices, L9 trial badge, F4 i18n) plus advanced sync features
+> (S3 diff preview, S6 delta push, S7 sync extensions/vault/automation).
 
 ---
 

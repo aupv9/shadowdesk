@@ -3,7 +3,7 @@ import {
   Play, Square, Trash2, Monitor, Globe,
   Clock, Loader2, MoreVertical, Pencil, Copy,
   Cookie, FolderOpen, Download, Upload, History,
-  Puzzle, Sparkles, Wand2, Database
+  Puzzle, Sparkles, Wand2, Database, CloudOff, Cloud
 } from 'lucide-react'
 import type { Profile } from '../../types'
 
@@ -25,6 +25,7 @@ interface Props {
   onExtensions:    () => void
   onWarmUp:        () => void
   onApplyDrift:    () => void
+  onToggleSyncExcluded: () => void
 }
 
 const PRESET_LABELS: Record<string, string> = {
@@ -45,8 +46,9 @@ export function ProfileCard({
   profile, isActive, isLaunching,
   onLaunch, onClose, onEdit, onClone, onDelete,
   onImportCookies, onExportCookies, onStorage, onExportBundle, onImportBundle, onHistory,
-  onExtensions, onWarmUp, onApplyDrift
+  onExtensions, onWarmUp, onApplyDrift, onToggleSyncExcluded
 }: Props) {
+  const syncExcluded = !!profile.sync_excluded
   const fp     = profile.fingerprint
   const preset = PRESET_LABELS[fp?.preset] ?? fp?.preset ?? 'Unknown'
   const osIcon = OS_ICON[fp?.os?.platform ?? ''] ?? '💻'
@@ -122,6 +124,14 @@ export function ProfileCard({
             {menuItem(<Upload    className="w-3.5 h-3.5" />, 'Import Bundle',  onImportBundle)}
             {menuItem(<History   className="w-3.5 h-3.5" />, 'Version History', onHistory)}
             <div className="border-t border-slate-700 my-1" />
+            {menuItem(
+              syncExcluded
+                ? <Cloud    className="w-3.5 h-3.5" />
+                : <CloudOff className="w-3.5 h-3.5" />,
+              syncExcluded ? 'Include in Cloud Sync' : 'Exclude from Cloud Sync',
+              onToggleSyncExcluded
+            )}
+            <div className="border-t border-slate-700 my-1" />
             {menuItem(<Trash2    className="w-3.5 h-3.5" />, 'Delete',         onDelete, true)}
           </div>
         )}
@@ -138,8 +148,8 @@ export function ProfileCard({
         </div>
       </div>
 
-      {/* Group badge + warm-up indicator */}
-      {(profile.group_name || profile.warmed_up) && (
+      {/* Group badge + warm-up indicator + sync excluded */}
+      {(profile.group_name || profile.warmed_up || syncExcluded) && (
         <div className="mb-2 flex items-center gap-1.5 flex-wrap">
           {profile.group_name && (
             <span
@@ -155,6 +165,15 @@ export function ProfileCard({
               Warmed up
             </span>
           ) : null}
+          {syncExcluded && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-slate-600/30 text-slate-400 font-medium"
+              title="Excluded from cloud sync"
+            >
+              <CloudOff className="w-2.5 h-2.5" />
+              No sync
+            </span>
+          )}
         </div>
       )}
 

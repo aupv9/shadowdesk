@@ -25,7 +25,7 @@ export function ProfileManager() {
     profiles, activeSessions, loading,
     fetchProfiles, fetchActiveSessions,
     launchProfile, closeProfile, deleteProfile, cloneProfile,
-    exportProfile, importProfile
+    exportProfile, importProfile, setSyncExcluded
   } = useProfileStore()
   const { fetchProxies } = useProxyStore()
   const { groups, fetchGroups, createGroup, deleteGroup } = useGroupStore()
@@ -185,6 +185,22 @@ export function ProfileManager() {
       await fetchProfiles()
     } catch (e: any) {
       setError(e.message ?? 'Failed to apply drift')
+    }
+  }
+
+  // Account C5 — flip selective-sync flag and toast the result.
+  const handleToggleSyncExcluded = async (profile: Profile) => {
+    const next = !profile.sync_excluded
+    try {
+      await setSyncExcluded(profile.id, next)
+      pushToast(
+        next
+          ? `"${profile.name}" excluded from cloud sync`
+          : `"${profile.name}" included in cloud sync`,
+        'success'
+      )
+    } catch (e: any) {
+      pushToast(e?.message ?? 'Failed to update sync setting', 'error')
     }
   }
 
@@ -491,6 +507,7 @@ export function ProfileManager() {
                     onExtensions={() => setExtensionsProfile(profile)}
                     onWarmUp={() => setWarmUpProfile(profile)}
                     onApplyDrift={() => handleApplyDrift(profile)}
+                    onToggleSyncExcluded={() => handleToggleSyncExcluded(profile)}
                   />
                 </div>
               ))}

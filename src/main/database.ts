@@ -249,6 +249,16 @@ export class Database {
       this.db.exec(`ALTER TABLE workflows ADD COLUMN variables TEXT`)
     } catch { /* exists */ }
 
+    // Sync history error_message column (Account C3)
+    try {
+      this.db.exec(`ALTER TABLE sync_log ADD COLUMN error_message TEXT`)
+    } catch { /* exists */ }
+
+    // Selective sync — per-profile opt-out (Account C5)
+    try {
+      this.db.exec(`ALTER TABLE profiles ADD COLUMN sync_excluded INTEGER DEFAULT 0`)
+    } catch { /* exists */ }
+
     // Phase 12.C.3 — encrypted credential vault
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS credentials (
@@ -485,7 +495,8 @@ export class Database {
 
   private static readonly PROFILE_UPDATABLE = new Set([
     'name', 'group_id', 'fingerprint', 'proxy_id', 'cookies', 'notes',
-    'last_used_at', 'user_data_path', 'status', 'rotation_mode', 'rotation_index'
+    'last_used_at', 'user_data_path', 'status', 'rotation_mode', 'rotation_index',
+    'sync_excluded'
   ])
 
   updateProfile(id: string, data: Record<string, any>): void {
@@ -502,6 +513,23 @@ export class Database {
 
   updateProfileLastUsed(id: string): void {
     this.run(`UPDATE profiles SET last_used_at = datetime('now') WHERE id = ?`, [id])
+  }
+
+  // ── Selective sync (Account C5) ─────────────────────────────────────────
+  setSyncExcluded(id: string, excluded: boolean): void {
+    this.run('UPDATE profiles SET sync_excluded = ? WHERE id = ?', [excluded ? 1 : 0, id])
+  }
+
+  getSyncableProfiles(): any[] {
+    return this.queryAll(`
+      SELECT p.*,
+             pr.host || ':' || CAST(pr.port AS TEXT) AS proxy_label,
+             pr.type AS proxy_type
+      FROM profiles p
+      LEFT JOIN proxies pr ON p.proxy_id = pr.id
+      WHERE p.status != 'archived' AND COALESCE(p.sync_excluded, 0) = 0
+      ORDER BY p.created_at DESC
+    `)
   }
 
   cloneProfile(params: {
@@ -635,10 +663,16 @@ export class Database {
 
   // ── Sync Log ───────────────────────────────────────────────────────────────
 
-  addSyncEntry(entry: { id: string; direction: string; profile_count: number; status: string }): void {
+  addSyncEntry(entry: {
+    id: string
+    direction: string
+    profile_count: number
+    status: string
+    error_message?: string | null
+  }): void {
     this.run(
-      'INSERT INTO sync_log (id, direction, profile_count, status) VALUES (?, ?, ?, ?)',
-      [entry.id, entry.direction, entry.profile_count, entry.status]
+      'INSERT INTO sync_log (id, direction, profile_count, status, error_message) VALUES (?, ?, ?, ?, ?)',
+      [entry.id, entry.direction, entry.profile_count, entry.status, entry.error_message ?? null]
     )
   }
 

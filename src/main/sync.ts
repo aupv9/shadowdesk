@@ -4,7 +4,7 @@ import { apiRequest } from './api-client'
 import { Database } from './database'
 import { isAuthenticated, getCurrentUser } from './auth'
 import { getCurrentLicense } from './license'
-import type { SyncStatus, SyncManifest } from '../shared/types'
+import type { SyncStatus, SyncManifest, SyncLogEntry, SyncPullResult, SyncConflict, SyncDiff } from '../shared/types'
 
 const ALGORITHM = 'aes-256-gcm'
 const SCRYPT_KEYLEN = 32
@@ -111,10 +111,12 @@ export async function pushProfiles(encryptionPassword: string): Promise<void> {
 
   setStatus('syncing')
 
+  const db = Database.getInstance()
+  // Selective sync: respect per-profile sync_excluded flag.
+  const profiles = db.getSyncableProfiles()
+
   try {
     const userId = await getActiveUserId()
-    const db = Database.getInstance()
-    const profiles = db.getAllProfiles()
 
     const payload = JSON.stringify({
       profiles,
@@ -137,13 +139,15 @@ export async function pushProfiles(encryptionPassword: string): Promise<void> {
     lastSyncedAt = new Date().toISOString()
     pendingChanges = 0
     setStatus('idle')
+    logSyncEntry('push', profiles.length, 'success')
   } catch (e: any) {
     setStatus('error')
+    logSyncEntry('push', profiles.length, 'error', e?.message ?? String(e))
     throw e
   }
 }
 
-export async function pullProfiles(encryptionPassword: string): Promise<number> {
+export async function pullProfiles(encryptionPassword: string): Promise<SyncPullResult> {
   if (!isAuthenticated()) throw new Error('Not authenticated')
   const license = getCurrentLicense()
   if (!license.cloud_sync_enabled) throw new Error('Cloud sync not available on free plan')
@@ -172,7 +176,7 @@ export async function pullProfiles(encryptionPassword: string): Promise<number> 
     const db = Database.getInstance()
 
     let imported = 0
-    let conflicts = 0
+    const conflicts: SyncConflict[] = []
     for (const profile of payload.profiles) {
       const existing = db.getProfile(profile.id) as any
       if (existing) {
@@ -180,7 +184,12 @@ export async function pullProfiles(encryptionPassword: string): Promise<number> 
         const localUpdated = existing.updated_at ?? existing.last_used_at ?? ''
         const remoteUpdated = profile.updated_at ?? ''
         if (localUpdated && remoteUpdated && localUpdated > remoteUpdated) {
-          conflicts++
+          conflicts.push({
+            profile_id: profile.id,
+            profile_name: existing.name ?? profile.name ?? '(unnamed)',
+            local_updated_at: localUpdated || null,
+            remote_updated_at: remoteUpdated || null
+          })
           continue // local wins — skip this profile
         }
         db.updateProfile(profile.id, {
@@ -208,17 +217,56 @@ export async function pullProfiles(encryptionPassword: string): Promise<number> 
       }
       imported++
     }
-    if (conflicts > 0) {
-      console.info(`[Sync] ${conflicts} profile(s) skipped (local version is newer)`)
+    if (conflicts.length > 0) {
+      console.info(`[Sync] ${conflicts.length} profile(s) skipped (local version is newer)`)
     }
 
     lastSyncedAt = new Date().toISOString()
     pendingChanges = 0
     setStatus('idle')
-    return imported
+    logSyncEntry('pull', imported, 'success')
+    return { imported, conflicts }
   } catch (e: any) {
     setStatus('error')
+    logSyncEntry('pull', 0, 'error', e?.message ?? String(e))
     throw e
+  }
+}
+
+// ── Sync history ─────────────────────────────────────────────────────────────
+
+function logSyncEntry(
+  direction: 'push' | 'pull',
+  profileCount: number,
+  status: 'success' | 'error',
+  errorMessage?: string
+): void {
+  try {
+    Database.getInstance().addSyncEntry({
+      id: randomBytes(8).toString('hex'),
+      direction,
+      profile_count: profileCount,
+      status,
+      error_message: errorMessage ?? null
+    })
+  } catch {
+    // Logging failure should never break the sync flow.
+  }
+}
+
+export function getSyncHistory(limit = 20): SyncLogEntry[] {
+  try {
+    const rows = Database.getInstance().getSyncLog(limit) as any[]
+    return rows.map((r) => ({
+      id: r.id,
+      direction: r.direction,
+      profile_count: r.profile_count,
+      status: r.status,
+      synced_at: r.synced_at,
+      error_message: r.error_message ?? null
+    }))
+  } catch {
+    return []
   }
 }
 
@@ -227,6 +275,37 @@ export async function getSyncManifest(): Promise<SyncManifest | null> {
     return await apiRequest<SyncManifest>('/profiles/sync/manifest')
   } catch {
     return null
+  }
+}
+
+// S3: Compute a local-vs-remote diff so the renderer can show "what
+// will change" before the user commits to a push or pull. The diff is
+// based on profile ids only — content-level diffs would require
+// decrypting the remote bundle, which we deliberately avoid here so the
+// preview is cheap and works without re-typing the encryption password.
+export async function getSyncDiff(): Promise<SyncDiff> {
+  const manifest = await getSyncManifest()
+  const localProfiles = Database.getInstance().getSyncableProfiles() as Array<{ id: string; name: string }>
+  const remoteIds = new Set(manifest?.profile_ids ?? [])
+  const localIdSet = new Set(localProfiles.map((p) => p.id))
+
+  const local_only = localProfiles
+    .filter((p) => !remoteIds.has(p.id))
+    .map((p) => ({ id: p.id, name: p.name }))
+
+  const remote_only: string[] = []
+  let shared = 0
+  for (const id of remoteIds) {
+    if (localIdSet.has(id)) shared++
+    else                    remote_only.push(id)
+  }
+
+  return {
+    local_only,
+    remote_only,
+    shared,
+    local_count: localProfiles.length,
+    remote_count: remoteIds.size
   }
 }
 
