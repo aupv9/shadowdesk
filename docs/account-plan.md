@@ -82,7 +82,7 @@ period).
 | 10 | **Encryption-password input** + manual Push / Pull buttons | [Account/index.tsx:372-403](../src/renderer/src/components/Account/index.tsx#L372-L403) | ✅ |
 | 11 | **Plan gate** — Cloud Sync card hidden behind `cloud_sync_enabled` flag | [Account/index.tsx:332-341](../src/renderer/src/components/Account/index.tsx#L332-L341) | ✅ |
 | 12 | **Auth gate** — sync requires sign-in | [Account/index.tsx:342-346](../src/renderer/src/components/Account/index.tsx#L342-L346) | ✅ |
-| 13 | **Sync manifest** fetch (`syncStore.fetchManifest()`) | [syncStore.ts:55-60](../src/renderer/src/stores/syncStore.ts#L55-L60) | 🟡 — fetched but **never displayed** |
+| 13 | **Sync manifest** fetch + display panel (C1) | [syncStore.ts](../src/renderer/src/stores/syncStore.ts), [Account/index.tsx](../src/renderer/src/components/Account/index.tsx) | ✅ |
 
 ---
 
