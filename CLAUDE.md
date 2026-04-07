@@ -98,7 +98,8 @@ Adding a new IPC channel requires updating all three files.
 - **Consistency rule**: all scripts use the same seed so same profile = same fingerprint across sessions
 - Layer 1 (CDP + JS): core fingerprint spoofing
 - Layer 2 (Advanced CDP Evasion): automation hiding, stack sanitization, chrome.runtime stubs
-- Layer 3 (Chromium C++ patches): planned Phase 6
+- Layer 3 (Behavior + Timing): mouse jitter, typing cadence, scroll inertia, timing quantisation ✅ Phase 6
+- Layer 4 (Chromium C++ patches): planned Phase 8
 
 ### React / State
 - State lives in **Zustand stores** — no prop drilling, no Context
@@ -112,6 +113,10 @@ Adding a new IPC channel requires updating all three files.
 **proxies**: `id, name, type, host, port, username, password, country, latency_ms, is_healthy, last_checked_at, created_at`
 
 **audit_log**: `id, user_id, user_name, action, target_id, target_name, timestamp, ip_address`
+
+**profile_versions**: `id, profile_id, fingerprint (JSON), label, saved_at` (Phase 6 — max 20 per profile)
+
+**detection_tests**: `id, profile_id, profile_name, tested_at, overall_score, vectors (JSON), status`
 
 **sync_log**: `id, direction, profile_count, status, synced_at`
 
@@ -146,8 +151,10 @@ Adding a new IPC channel requires updating all three files.
 - **Phase 2** (Weeks 9–14): Advanced vectors, proxy rotation, UX polish ✅
 - **Phase 3** (Weeks 15–22): API client, licensing, team features, cloud sync ✅
 - **Phase 4** (Weeks 23–28): Automation API, RPA builder, mobile presets, workflow templates ✅
-- **Phase 5** (Weeks 29–34): Advanced CDP evasion, detection testing, iOS presets, new vectors ✅ **current**
-- **Phase 6** (Future): Custom Chromium build (C++ patches), advanced detection framework integration
+- **Phase 5** (Weeks 29–34): Advanced CDP evasion, detection testing, iOS presets, new vectors ✅
+- **Phase 6** (Weeks 35–40): Behavior simulation, timing defenses, profile versioning, 10 new detection vectors ✅
+- **Phase 7** (Weeks 41–46): Batch detection testing, result management, behavior/timing config UI ✅ **current**
+- **Phase 8** (Future): Custom Chromium build (C++ patches), advanced detection framework integration
 
 ## Common Gotchas
 

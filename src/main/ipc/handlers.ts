@@ -532,6 +532,33 @@ export function registerIpcHandlers(): void {
     return db.getDetectionTestSummary()
   })
 
+  // Phase 7: detection result management + batch testing
+  ipcMain.handle('detection:deleteResult', (_event, resultId: string) => {
+    db.deleteDetectionTestResult(resultId)
+  })
+
+  ipcMain.handle('detection:clearHistory', (_event, profileId?: string) => {
+    db.deleteAllDetectionTestResults(profileId)
+  })
+
+  ipcMain.handle('detection:batchTest', async (_event, profileIds: string[]) => {
+    const results: any[] = []
+    let completed = 0
+    let failed = 0
+
+    for (const profileId of profileIds) {
+      try {
+        const result = await detectionRunner.runTest(profileId)
+        results.push(result)
+        completed++
+      } catch {
+        failed++
+      }
+    }
+
+    return { total: profileIds.length, completed, failed, results }
+  })
+
   // ── Profile Version History (Phase 6) ─────────────────────────────────────
 
   ipcMain.handle('profiles:history', (_event, profileId: string) => {

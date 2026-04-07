@@ -516,6 +516,18 @@ export class Database {
     }
   }
 
+  deleteDetectionTestResult(id: string): void {
+    this.run('DELETE FROM detection_tests WHERE id = ?', [id])
+  }
+
+  deleteAllDetectionTestResults(profileId?: string): void {
+    if (profileId) {
+      this.run('DELETE FROM detection_tests WHERE profile_id = ?', [profileId])
+    } else {
+      this.run('DELETE FROM detection_tests', [])
+    }
+  }
+
   // ── Profile Versions (Phase 6) ─────────────────────────────────────────────
 
   saveProfileVersion(version: {

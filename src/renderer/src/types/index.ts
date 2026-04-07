@@ -35,6 +35,7 @@ export type {
   DetectionTestResult,
   DetectionVectorResult,
   DetectionTestSummary,
+  BatchTestStatus,
   ProfileVersion,
   BehaviorConfig,
   TimingConfig
