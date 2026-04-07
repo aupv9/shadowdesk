@@ -458,6 +458,8 @@ export type AutomationActionType =
   | 'injectCaptchaToken'
   // Phase 12.C.3 — Encrypted credential vault
   | 'useCredential'
+  // Tier 3 RPA — Assertion framework
+  | 'assert'
   // Tier 1 RPA — Workflow chaining, parallel steps, control flow
   | 'callWorkflow'
   | 'parallelSteps'
@@ -559,6 +561,54 @@ export interface ProfileVersion {
   fingerprint: FingerprintConfig
   savedAt: string
   label: string
+}
+
+// ─── Workflow Version Types (Tier 3) ─────────────────────────────────────────
+
+export interface WorkflowVersion {
+  id: string
+  workflowId: string
+  name: string
+  description: string
+  steps: AutomationStep[]
+  variables: Record<string, string>
+  savedAt: string
+  label: string
+}
+
+// ─── Assert Action Result (Tier 3) ──────────────────────────────────────────
+
+export type AssertType =
+  | 'element-exists'
+  | 'element-not-exists'
+  | 'text-equals'
+  | 'text-contains'
+  | 'text-not-contains'
+  | 'url-matches'
+  | 'url-contains'
+  | 'variable-equals'
+  | 'variable-contains'
+  | 'variable-truthy'
+  | 'element-count'
+  | 'page-title-contains'
+  | 'js-truthy'
+
+export interface AssertResult {
+  assertType: AssertType
+  passed: boolean
+  /** Human-readable failure description (empty when passed) */
+  failureMessage: string
+  actual?: string
+  expected?: string
+}
+
+// ─── Recorder Screenshot Trail (Tier 3) ──────────────────────────────────────
+
+export interface RecordedScreenshot {
+  /** Corresponds to RecordedEvent.timestamp */
+  eventTimestamp: number
+  /** base64-encoded PNG */
+  dataUrl: string
 }
 
 // ─── Detection Test Types ──────────────────────────────────────────────────

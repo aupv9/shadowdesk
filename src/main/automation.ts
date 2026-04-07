@@ -8,7 +8,9 @@ import type {
   AutomationStep,
   AutomationStepResult,
   AutomationRunResult,
-  AutomationWorkflow
+  AutomationWorkflow,
+  AssertResult,
+  AssertType
 } from '../shared/types'
 import type { Page, ElementHandle } from 'puppeteer-core'
 import type { WebContents } from 'electron'
@@ -1262,6 +1264,134 @@ export class AutomationEngine {
         }))
         await page.deleteCookie(...(targets as any[]))
         return { deleted: targets.length, names }
+      }
+
+      // ── Tier 3: Assertion framework ─────────────────────────────────
+      case 'assert': {
+        const assertType: AssertType = params.assertType ?? 'element-exists'
+        const onFail: 'stop' | 'warn' | 'continue' = params.onFail ?? 'stop'
+        let passed = false
+        let actual: string | undefined
+        let failureMessage = ''
+        const expected: string = String(params.expected ?? '')
+
+        switch (assertType) {
+          case 'element-exists': {
+            const el = await page.$(params.selector ?? '').catch(() => null)
+            passed = el !== null
+            actual = passed ? 'found' : 'not found'
+            if (!passed) failureMessage = `Expected "${params.selector}" to exist`
+            break
+          }
+          case 'element-not-exists': {
+            const el = await page.$(params.selector ?? '').catch(() => null)
+            passed = el === null
+            actual = passed ? 'not found' : 'found'
+            if (!passed) failureMessage = `Expected "${params.selector}" to NOT exist`
+            break
+          }
+          case 'text-equals':
+          case 'text-contains':
+          case 'text-not-contains': {
+            actual = await page
+              .$eval(params.selector ?? 'body', (el: Element) => el.textContent ?? '')
+              .catch(() => '')
+            actual = actual.trim()
+            if (assertType === 'text-equals') {
+              passed = actual === expected
+              if (!passed) failureMessage = `Expected text "${expected}", got "${actual}"`
+            } else if (assertType === 'text-contains') {
+              passed = actual.includes(expected)
+              if (!passed) failureMessage = `Expected text to contain "${expected}", got "${actual}"`
+            } else {
+              passed = !actual.includes(expected)
+              if (!passed) failureMessage = `Expected text NOT to contain "${expected}"`
+            }
+            break
+          }
+          case 'url-matches': {
+            actual = page.url()
+            const regex = new RegExp(expected)
+            passed = regex.test(actual)
+            if (!passed) failureMessage = `URL "${actual}" does not match /${expected}/`
+            break
+          }
+          case 'url-contains': {
+            actual = page.url()
+            passed = actual.includes(expected)
+            if (!passed) failureMessage = `URL "${actual}" does not contain "${expected}"`
+            break
+          }
+          case 'variable-equals': {
+            const varName: string = params.variable ?? ''
+            actual = variables[varName] ?? ''
+            passed = actual === expected
+            if (!passed) failureMessage = `Variable "${varName}" is "${actual}", expected "${expected}"`
+            break
+          }
+          case 'variable-contains': {
+            const varName: string = params.variable ?? ''
+            actual = variables[varName] ?? ''
+            passed = actual.includes(expected)
+            if (!passed) failureMessage = `Variable "${varName}" ("${actual}") does not contain "${expected}"`
+            break
+          }
+          case 'variable-truthy': {
+            const varName: string = params.variable ?? ''
+            actual = variables[varName] ?? ''
+            passed = actual !== '' && actual !== '0' && actual !== 'false' && actual !== 'null' && actual !== 'undefined'
+            if (!passed) failureMessage = `Variable "${varName}" is falsy: "${actual}"`
+            break
+          }
+          case 'element-count': {
+            const els = await page.$$(params.selector ?? '')
+            actual = String(els.length)
+            const op: string = params.operator ?? 'eq'
+            const count = Number(expected)
+            if (op === 'eq') passed = els.length === count
+            else if (op === 'gt') passed = els.length > count
+            else if (op === 'gte') passed = els.length >= count
+            else if (op === 'lt') passed = els.length < count
+            else if (op === 'lte') passed = els.length <= count
+            else passed = els.length === count
+            if (!passed) failureMessage = `Expected ${params.selector} count ${op} ${count}, got ${els.length}`
+            break
+          }
+          case 'page-title-contains': {
+            actual = await page.title()
+            passed = actual.includes(expected)
+            if (!passed) failureMessage = `Page title "${actual}" does not contain "${expected}"`
+            break
+          }
+          case 'js-truthy': {
+            const result = await page.evaluate(params.script ?? 'false')
+            actual = String(result)
+            passed = !!result
+            if (!passed) failureMessage = `Script returned falsy: ${actual}`
+            break
+          }
+          default:
+            throw new Error(`Unknown assertType: ${assertType}`)
+        }
+
+        const assertResult: AssertResult = {
+          assertType,
+          passed,
+          failureMessage,
+          actual,
+          expected: expected || undefined
+        }
+
+        if (!passed) {
+          if (onFail === 'stop') throw new Error(failureMessage || `Assertion failed: ${assertType}`)
+          if (onFail === 'warn') {
+            // Mark as succeeded but include failure info so the UI shows a warning badge
+            return { ...assertResult, warning: true }
+          }
+          // onFail === 'continue': swallow, return failed result without throwing
+          return { ...assertResult, continued: true }
+        }
+        return assertResult
       }
 
       default:

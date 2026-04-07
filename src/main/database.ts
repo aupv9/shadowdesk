@@ -267,6 +267,22 @@ export class Database {
       this.db.exec(`ALTER TABLE workflow_runs ADD COLUMN variables TEXT`)
     } catch { /* exists */ }
 
+    // Tier 3 RPA — workflow versioning (mirrors profile_versions pattern)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS workflow_versions (
+        id          TEXT PRIMARY KEY,
+        workflow_id TEXT NOT NULL,
+        name        TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        steps       TEXT NOT NULL DEFAULT '[]',
+        variables   TEXT,
+        label       TEXT NOT NULL DEFAULT '',
+        saved_at    TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY(workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_wf_versions_workflow ON workflow_versions(workflow_id);
+    `)
+
     // Phase 12.C.3 — encrypted credential vault
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS credentials (
@@ -976,5 +992,64 @@ export class Database {
 
   deleteProfileVersion(versionId: string): void {
     this.run(`DELETE FROM profile_versions WHERE id = ?`, [versionId])
+  }
+
+  // ── Workflow Versions (Tier 3) ────────────────────────────────────────────
+
+  saveWorkflowVersion(version: {
+    id: string
+    workflowId: string
+    name: string
+    description: string
+    steps: any[]
+    variables?: Record<string, string>
+    label: string
+  }): void {
+    this.run(
+      `INSERT INTO workflow_versions (id, workflow_id, name, description, steps, variables, label)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        version.id,
+        version.workflowId,
+        version.name,
+        version.description,
+        JSON.stringify(version.steps),
+        version.variables ? JSON.stringify(version.variables) : null,
+        version.label
+      ]
+    )
+    // Keep only last 20 versions per workflow (same policy as profile_versions)
+    this.run(
+      `DELETE FROM workflow_versions
+       WHERE workflow_id = ?
+         AND id NOT IN (
+           SELECT id FROM workflow_versions
+           WHERE workflow_id = ?
+           ORDER BY saved_at DESC
+           LIMIT 20
+         )`,
+      [version.workflowId, version.workflowId]
+    )
+  }
+
+  getWorkflowVersions(workflowId: string): any[] {
+    return this.queryAll(
+      `SELECT * FROM workflow_versions WHERE workflow_id = ? ORDER BY saved_at DESC LIMIT 20`,
+      [workflowId]
+    ).map((r) => ({
+      ...r,
+      steps: JSON.parse(r.steps),
+      variables: r.variables ? JSON.parse(r.variables) : {}
+    }))
+  }
+
+  getWorkflowVersion(versionId: string): any {
+    const row = this.queryOne(`SELECT * FROM workflow_versions WHERE id = ?`, [versionId])
+    if (!row) return null
+    return { ...row, steps: JSON.parse(row.steps), variables: row.variables ? JSON.parse(row.variables) : {} }
+  }
+
+  deleteWorkflowVersion(versionId: string): void {
+    this.run(`DELETE FROM workflow_versions WHERE id = ?`, [versionId])
   }
 }
