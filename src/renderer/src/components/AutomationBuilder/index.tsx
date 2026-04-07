@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   Play,
   Plus,
@@ -14,7 +14,10 @@ import {
   Layers,
   Calendar,
   Circle,
-  StopCircle
+  StopCircle,
+  Download,
+  Upload,
+  Loader2
 } from 'lucide-react'
 import { useAutomationStore } from '../../stores/automationStore'
 import { useProfileStore } from '../../stores/profileStore'
@@ -23,7 +26,7 @@ import { WorkflowCreateModal } from './WorkflowCreateModal'
 import { TemplatePickerModal } from './TemplatePickerModal'
 import { SchedulesModal } from './SchedulesModal'
 import { VariablesEditor } from './VariablesEditor'
-import type { AutomationStep } from '../../types'
+import type { AutomationStep, AutomationStepResult } from '../../types'
 
 export function AutomationBuilder() {
   const {
@@ -49,10 +52,15 @@ export function AutomationBuilder() {
   const [recordingProfileId, setRecordingProfileId] = useState<string | null>(null)
   const [recordedCount, setRecordedCount] = useState(0)
   const [recorderError, setRecorderError] = useState<string | null>(null)
+  // Live step progress stream
+  const [liveSteps, setLiveSteps] = useState<AutomationStepResult[]>([])
+  // Import file ref
+  const importInputRef = useRef<HTMLInputElement>(null)
 
-  // Reset overrides when switching workflows
+  // Reset overrides and live steps when switching workflows
   useEffect(() => {
     setOverrides({})
+    setLiveSteps([])
   }, [selectedWorkflow?.id])
 
   useEffect(() => {
@@ -64,6 +72,25 @@ export function AutomationBuilder() {
       setSelectedProfileId(activeSessions[0])
     }
   }, [activeSessions])
+
+  // Subscribe to live step progress events from main process
+  useEffect(() => {
+    const unsubscribe = window.api.automation.onStepProgress(({ workflowId, step }) => {
+      if (selectedWorkflow && workflowId === selectedWorkflow.id) {
+        setLiveSteps((prev) => {
+          // Replace existing entry for this stepId (retry), otherwise append
+          const idx = prev.findIndex((s) => s.stepId === step.stepId)
+          if (idx >= 0) {
+            const next = [...prev]
+            next[idx] = step
+            return next
+          }
+          return [...prev, step]
+        })
+      }
+    })
+    return unsubscribe
+  }, [selectedWorkflow?.id])
 
   const handleAddStep = () => {
     if (!selectedWorkflow) return
@@ -117,6 +144,7 @@ export function AutomationBuilder() {
 
   const handleRun = async () => {
     if (!selectedWorkflow) return
+    setLiveSteps([])
     // Only send non-empty overrides — engine merges them on top of stored variables
     const runtimeVars: Record<string, string> = {}
     for (const [k, v] of Object.entries(overrides)) {
@@ -148,7 +176,7 @@ export function AutomationBuilder() {
     }
   }
 
-  // ── Visual recorder (Phase 12.B.2) ─────────────────────────────────────
+  // ── Visual recorder (Phase 12.B.2) ─────────────────────────────────────────
   const handleStartRecording = async () => {
     if (!selectedProfileId) return
     setRecorderError(null)
@@ -220,6 +248,51 @@ export function AutomationBuilder() {
     setShowTemplates(false)
   }
 
+  // ── Export workflow as JSON ──────────────────────────────────────────────────
+  const handleExport = () => {
+    if (!selectedWorkflow) return
+    const exportData = {
+      name: selectedWorkflow.name,
+      description: selectedWorkflow.description,
+      steps: selectedWorkflow.steps,
+      variables: selectedWorkflow.variables ?? {}
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${selectedWorkflow.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // ── Import workflow from JSON file ──────────────────────────────────────────
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      if (!data.name || !Array.isArray(data.steps)) {
+        throw new Error('Invalid workflow JSON: must have name and steps array')
+      }
+      // Reassign all step IDs to avoid conflicts
+      const steps = data.steps.map((s: any) => ({ ...s, id: crypto.randomUUID() }))
+      const w = await createWorkflow({
+        name: data.name,
+        description: data.description,
+        steps,
+        variables: data.variables
+      })
+      selectWorkflow(w.id)
+    } catch (err: any) {
+      alert(`Import failed: ${err.message}`)
+    } finally {
+      // Reset file input so the same file can be re-imported
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -232,6 +305,22 @@ export function AutomationBuilder() {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Hidden import file input */}
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <button
+            onClick={() => importInputRef.current?.click()}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors"
+            title="Import workflow from JSON file"
+          >
+            <Upload className="w-4 h-4" />
+            Import
+          </button>
           <button
             onClick={() => setShowTemplates(true)}
             className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors"
@@ -305,6 +394,14 @@ export function AutomationBuilder() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={handleExport}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                    title="Export workflow as JSON"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Export
+                  </button>
+                  <button
                     onClick={() => setShowSchedules(true)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
                     title="Manage schedules"
@@ -329,6 +426,15 @@ export function AutomationBuilder() {
                   await updateWorkflow(selectedWorkflow.id, { variables })
                 }}
               />
+
+              {/* Built-in variable hint */}
+              <div className="mb-4 p-2.5 bg-slate-800/40 rounded-lg border border-slate-700/40 text-xs text-slate-500">
+                Built-in variables available in every run:
+                {' '}<code className="text-ghost-400 font-mono">{'{timestamp}'}</code>
+                {' '}<code className="text-ghost-400 font-mono">{'{runId}'}</code>
+                {' '}<code className="text-ghost-400 font-mono">{'{random}'}</code>
+                {' '}<code className="text-ghost-400 font-mono">{'{profileName}'}</code>
+              </div>
 
               {/* Run controls */}
               <div className="mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50 space-y-3">
@@ -479,6 +585,31 @@ export function AutomationBuilder() {
                 )}
               </div>
 
+              {/* Live step progress — shown while running */}
+              {running && liveSteps.length > 0 && (
+                <div className="mb-6 p-4 rounded-lg border border-ghost-500/20 bg-ghost-600/5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Loader2 className="w-4 h-4 text-ghost-400 animate-spin" />
+                    <span className="text-sm font-medium text-white">Running — live progress</span>
+                    <span className="text-xs text-slate-500">{liveSteps.length} step{liveSteps.length !== 1 ? 's' : ''} executed</span>
+                  </div>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {liveSteps.map((sr, i) => (
+                      <div key={`${sr.stepId}-${i}`} className="flex items-center gap-2 text-xs">
+                        {sr.success
+                          ? <CheckCircle className="w-3 h-3 text-green-400 shrink-0" />
+                          : <XCircle className="w-3 h-3 text-red-400 shrink-0" />
+                        }
+                        <span className="text-slate-400 w-28 truncate">{sr.action}</span>
+                        <span className="text-slate-600">{sr.duration_ms}ms</span>
+                        {sr.error && <span className="text-red-400 truncate flex-1">{sr.error}</span>}
+                        {sr.output?.text && <span className="text-slate-500 truncate flex-1 font-mono">{sr.output.text}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Parallel results summary */}
               {parallelResults && parallelResults.length > 0 && (
                 <div className="mb-6 p-4 rounded-lg border border-slate-700/50 bg-slate-800/40">
@@ -504,7 +635,7 @@ export function AutomationBuilder() {
               )}
 
               {/* Run result */}
-              {runResult && (
+              {runResult && !running && (
                 <div className={`mb-6 p-4 rounded-lg border ${
                   runResult.status === 'completed'
                     ? 'bg-green-500/5 border-green-500/20'
@@ -531,9 +662,10 @@ export function AutomationBuilder() {
                           ? <CheckCircle className="w-3 h-3 text-green-400" />
                           : <XCircle className="w-3 h-3 text-red-400" />
                         }
-                        <span className="text-slate-400">{sr.action}</span>
+                        <span className="text-slate-400 w-28 truncate">{sr.action}</span>
                         <span className="text-slate-600">{sr.duration_ms}ms</span>
-                        {sr.error && <span className="text-red-400 truncate">{sr.error}</span>}
+                        {sr.error && <span className="text-red-400 truncate flex-1">{sr.error}</span>}
+                        {sr.output?.text && <span className="text-slate-500 truncate flex-1 font-mono">{String(sr.output.text).slice(0, 60)}</span>}
                       </div>
                     ))}
                   </div>
@@ -597,13 +729,22 @@ export function AutomationBuilder() {
                 Build automation workflows to control browser profiles. Add steps like navigate, click,
                 type, screenshot, and more — then run them on any active profile.
               </p>
-              <button
-                onClick={() => setShowTemplates(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors"
-              >
-                <Layers className="w-4 h-4" />
-                Browse Templates
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowTemplates(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors"
+                >
+                  <Layers className="w-4 h-4" />
+                  Browse Templates
+                </button>
+                <button
+                  onClick={() => importInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors"
+                >
+                  <Upload className="w-4 h-4" />
+                  Import JSON
+                </button>
+              </div>
             </div>
           )}
         </div>

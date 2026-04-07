@@ -3,17 +3,23 @@ import {
   Shield, ShieldCheck, ShieldAlert, Play,
   ChevronDown, CheckCircle, XCircle, Clock,
   BarChart3, RefreshCw, Trash2, ListChecks,
-  AlertTriangle, X, ChevronRight, Download
+  AlertTriangle, X, ChevronRight, Download, ExternalLink
 } from 'lucide-react'
 import { Header } from '../Layout/Header'
 import { useProfileStore } from '../../stores/profileStore'
 import { HealthTrendChart } from './HealthTrendChart'
+import { CategoryScoreChart } from './CategoryScoreChart'
 import type { DetectionTestResult, DetectionTestSummary, BatchTestStatus } from '../../types'
+import type { NavSection } from '../../types'
 
 // Group detection vector categories for breakdown display
 const CATEGORY_ORDER = ['Automation', 'Browser', 'Graphics', 'Audio', 'Hardware', 'Locale', 'Timing', 'API']
 
-export function DetectionDashboard() {
+interface Props {
+  onNavigate?: (section: NavSection) => void
+}
+
+export function DetectionDashboard({ onNavigate }: Props) {
   const { profiles, fetchProfiles } = useProfileStore()
   const [selectedId,       setSelectedId]       = useState<string>('')
   const [running,          setRunning]          = useState(false)
@@ -388,6 +394,9 @@ export function DetectionDashboard() {
               />
             </div>
 
+            {/* Per-category score breakdown chart */}
+            <CategoryScoreChart result={activeResult} />
+
             {/* Category breakdown */}
             <div className="space-y-1">
               {Array.from(vectorsByCategory(activeResult.vectors).entries())
@@ -435,9 +444,21 @@ export function DetectionDashboard() {
                                 {v.name}
                               </span>
                               {v.detail && (
-                                <span className="text-xs text-slate-600 max-w-[180px] truncate" title={v.detail}>
+                                <span className="text-xs text-slate-600 max-w-[140px] truncate" title={v.detail}>
                                   {v.detail}
                                 </span>
+                              )}
+                              {!v.passed && onNavigate && (
+                                <button
+                                  onClick={() => onNavigate('fingerprint')}
+                                  className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded
+                                             text-ghost-400 hover:text-ghost-200 hover:bg-ghost-600/20
+                                             transition-colors shrink-0"
+                                  title="Open Fingerprint Editor to review this vector"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  Fix
+                                </button>
                               )}
                             </div>
                           ))}

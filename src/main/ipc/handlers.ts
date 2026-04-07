@@ -111,6 +111,29 @@ export function registerIpcHandlers(): void {
     return db.getProfile(id)
   })
 
+  // Phase 10: switch preset on an existing profile while preserving behavior/timing
+  ipcMain.handle('profiles:changePreset', async (_event, id: string, presetKey: string) => {
+    const profile = db.getProfile(id) as any
+    if (!profile) throw new Error(`Profile ${id} not found`)
+    if (!FINGERPRINT_PRESETS[presetKey]) throw new Error(`Unknown preset: ${presetKey}`)
+
+    const fp = typeof profile.fingerprint === 'string'
+      ? JSON.parse(profile.fingerprint)
+      : profile.fingerprint
+
+    // Snapshot before changing
+    db.saveProfileVersion({ id: uuidv4(), profileId: id, fingerprint: fp, label: `Before preset change to ${presetKey}` })
+
+    // Resolve new fingerprint, then carry over behavior + timing from old one
+    const newFp = resolveFingerprint(presetKey, id)
+    if (fp.behavior) newFp.behavior = fp.behavior
+    if (fp.timing)   newFp.timing   = fp.timing
+
+    db.updateProfile(id, { fingerprint: newFp })
+    markPendingChange()
+    return db.getProfile(id)
+  })
+
   ipcMain.handle('profiles:delete', async (_event, id: string) => {
     await bm.closeProfile(id).catch(() => {})
     db.deleteProfile(id)
