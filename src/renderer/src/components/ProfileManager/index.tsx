@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { Plus, RefreshCw, X, FolderPlus, CheckSquare, Trash2, ShieldAlert, Upload } from 'lucide-react'
+import { Plus, RefreshCw, X, FolderPlus, CheckSquare, Trash2, ShieldAlert, Upload, MonitorX } from 'lucide-react'
 import { useProfileStore } from '../../stores/profileStore'
 import { useProxyStore } from '../../stores/proxyStore'
 import { useGroupStore } from '../../stores/groupStore'
 import { useLicenseStore } from '../../stores/licenseStore'
 import { useToastStore } from '../../stores/toastStore'
+import { useConfirm } from '../UI/ConfirmDialog'
+import { EmptyState } from '../UI/EmptyState'
 import { ProfileCard } from './ProfileCard'
 import { CreateProfileModal } from './CreateProfileModal'
 import { EditProfileModal } from './EditProfileModal'
@@ -31,6 +33,7 @@ export function ProfileManager() {
   const { groups, fetchGroups, createGroup, deleteGroup } = useGroupStore()
   const { checkProfileLimit, fetchUsage } = useLicenseStore()
   const pushToast = useToastStore((s) => s.push)
+  const confirm = useConfirm()
 
   const [importing, setImporting] = useState(false)
 
@@ -116,7 +119,14 @@ export function ProfileManager() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this profile? This cannot be undone.')) return
+    const profile = profiles.find((p) => p.id === id)
+    const ok = await confirm({
+      title: 'Delete Profile',
+      message: `Delete "${profile?.name ?? 'this profile'}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     await deleteProfile(id)
   }
 
@@ -128,7 +138,13 @@ export function ProfileManager() {
   }
 
   const handleDeleteGroup = async (id: string, name: string) => {
-    if (!confirm(`Delete group "${name}"? Profiles in this group will become ungrouped.`)) return
+    const ok = await confirm({
+      title: 'Delete Group',
+      message: `Delete group "${name}"? Profiles in this group will become ungrouped.`,
+      confirmLabel: 'Delete Group',
+      destructive: true,
+    })
+    if (!ok) return
     if (activeGroup === id) setActiveGroup(null)
     await deleteGroup(id)
   }
@@ -143,7 +159,13 @@ export function ProfileManager() {
   }
 
   const handleBulkDelete = async () => {
-    if (!confirm(`Delete ${selected.size} profile(s)? This cannot be undone.`)) return
+    const ok = await confirm({
+      title: `Delete ${selected.size} Profile${selected.size !== 1 ? 's' : ''}`,
+      message: `This will permanently delete ${selected.size} profile${selected.size !== 1 ? 's' : ''}. This cannot be undone.`,
+      confirmLabel: `Delete ${selected.size}`,
+      destructive: true,
+    })
+    if (!ok) return
     for (const id of selected) {
       await deleteProfile(id)
     }
@@ -179,7 +201,12 @@ export function ProfileManager() {
   }
 
   const handleApplyDrift = async (profile: Profile) => {
-    if (!confirm(`Apply fingerprint drift to "${profile.name}"? This bumps the Chrome version and rotates noise seeds.`)) return
+    const ok = await confirm({
+      title: 'Apply Fingerprint Drift',
+      message: `Apply drift to "${profile.name}"? This bumps the Chrome version and rotates noise seeds.`,
+      confirmLabel: 'Apply Drift',
+    })
+    if (!ok) return
     try {
       await window.api.drift.apply(profile.id)
       await fetchProfiles()
@@ -278,7 +305,7 @@ export function ProfileManager() {
           const msg = remaining === 0
             ? `Profile limit reached (${limit.current}/${limit.max}). Upgrade your plan to import more.`
             : `Importing ${files.length} would exceed your plan limit (${limit.current}/${limit.max}). Only the first ${remaining} will be imported.`
-          if (!confirm(msg + '\n\nContinue?')) return
+          if (!window.confirm(msg + '\n\nContinue?')) return
           // Truncate to whatever the plan allows
           files.length = remaining
         }
@@ -449,20 +476,21 @@ export function ProfileManager() {
             Loading profiles...
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-60 text-center">
-            <div className="text-4xl mb-3">👻</div>
-            <p className="text-slate-400 font-medium">
-              {profiles.length === 0 ? 'No profiles yet' : 'No profiles match'}
-            </p>
-            <p className="text-slate-500 text-sm mt-1 mb-4">
-              {profiles.length === 0 ? 'Create your first browser profile to get started' : 'Try a different search or group'}
-            </p>
-            {profiles.length === 0 && (
-              <button onClick={() => setShowCreate(true)} className="btn-primary text-sm flex items-center gap-2">
-                <Plus className="w-4 h-4" /> Create Profile
-              </button>
-            )}
-          </div>
+          profiles.length === 0 ? (
+            <EmptyState
+              icon={MonitorX}
+              title="No profiles yet"
+              description="Create your first browser profile with a unique fingerprint to get started."
+              actionLabel="Create Profile"
+              onAction={() => setShowCreate(true)}
+            />
+          ) : (
+            <EmptyState
+              icon={MonitorX}
+              title="No profiles match"
+              description="Try a different search term or group filter."
+            />
+          )
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

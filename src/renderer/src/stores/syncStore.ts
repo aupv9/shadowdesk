@@ -102,6 +102,10 @@ export const useSyncStore = create<SyncStore>((set) => ({
     }
   },
 
+  fetchDiff: async () => {
+    return window.api.sync.diff()
+  },
+
   fetchDaemonEnabled: async () => {
     try {
       const daemonEnabled = await window.api.sync.daemonEnabled()
