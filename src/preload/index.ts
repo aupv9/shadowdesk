@@ -226,6 +226,14 @@ const api = {
     list:          ()                  => ipcRenderer.invoke('patches:list'),
     getByCategory: (category: string)  => ipcRenderer.invoke('patches:getByCategory', category)
   },
+  // Phase 14.A — Remote Browser Nodes
+  nodes: {
+    list:     ()                       => ipcRenderer.invoke('nodes:list'),
+    add:      (input: { name: string; url: string; authToken?: string; region?: string; capacity?: number }) => ipcRenderer.invoke('nodes:add', input),
+    remove:   (id: string)             => ipcRenderer.invoke('nodes:remove', id),
+    test:     (id: string)             => ipcRenderer.invoke('nodes:test', id),
+    pickBest: ()                       => ipcRenderer.invoke('nodes:pickBest')
+  },
   // Phase 13.E — Structured error events from main process
   onError: (cb: (event: { category: string; message: string; timestamp: string }) => void): (() => void) => {
     const handler = (_ipcEvent: any, appEvent: any) => cb(appEvent)

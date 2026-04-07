@@ -35,6 +35,8 @@ import { detectCollisions } from '../fingerprint/collision-detector'
 import { getSolver, listSolvers, type CaptchaProviderId } from '../captcha'
 import { Recorder } from '../recorder'
 import { getVault } from '../vault'
+import { getNodeManager } from '../remote-nodes'
+import type { CreateNodeInput } from '../../shared/types'
 
 // ── Handler registration ───────────────────────────────────────────────────
 
@@ -1191,4 +1193,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('profiles:deleteVersion', (_event, versionId: string) => {
     db.deleteProfileVersion(versionId)
   })
+
+  // ── Remote Browser Nodes (Phase 14.A) ─────────────────────────────────────
+  const nodes = getNodeManager()
+
+  ipcMain.handle('nodes:list', () => nodes.list())
+  ipcMain.handle('nodes:add', (_e, input: CreateNodeInput) => nodes.add(input))
+  ipcMain.handle('nodes:remove', (_e, id: string) => nodes.remove(id))
+  ipcMain.handle('nodes:test', (_e, id: string) => nodes.ping(id))
+  ipcMain.handle('nodes:pickBest', () => nodes.pickBestNode())
 }

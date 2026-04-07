@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Save, RefreshCw, Info, Keyboard, Server, Play, Square, Copy, CheckCircle, Cpu, AlertTriangle, ShieldCheck, Lock, Unlock, Plus, Trash2, KeyRound } from 'lucide-react'
 import type { ApiServerStatus, ApiServerConfig } from '../../types'
+import { RemoteNodesPanel } from './RemoteNodesPanel'
 
 type CaptchaProviderId = '2captcha' | 'anticaptcha' | 'capmonster'
 
@@ -742,6 +743,9 @@ export function SettingsPage() {
             </div>
           )}
         </div>
+
+        {/* Phase 14.A — Remote Browser Nodes */}
+        <RemoteNodesPanel />
 
         {/* Keyboard Shortcuts */}
         <div className="card">
