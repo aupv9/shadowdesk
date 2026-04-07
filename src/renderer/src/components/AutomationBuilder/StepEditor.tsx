@@ -95,7 +95,12 @@ const ACTION_META: Record<AutomationActionType, { icon: React.ElementType; label
   getStorage:         { icon: Database,           label: 'Get Storage',          color: 'text-cyan-400' },
   setStorage:         { icon: Database,           label: 'Set Storage',          color: 'text-cyan-500' },
   clearStorage:       { icon: Trash2,             label: 'Clear Storage',        color: 'text-red-400' },
-  queryIndexedDB:     { icon: Database,           label: 'Query IndexedDB',      color: 'text-indigo-400' }
+  queryIndexedDB:     { icon: Database,           label: 'Query IndexedDB',      color: 'text-indigo-400' },
+  // Tier 6 RPA — data-driven automation & file handling
+  forEachRow:         { icon: Repeat,             label: 'For Each Row',         color: 'text-emerald-400' },
+  readFile:           { icon: FileText,           label: 'Read File',            color: 'text-sky-400' },
+  writeFile:          { icon: FileText,           label: 'Write File',           color: 'text-sky-500' },
+  waitForDownload:    { icon: Download,           label: 'Wait For Download',    color: 'text-amber-300' }
 }
 
 const ALL_ACTIONS: AutomationActionType[] = [
@@ -116,7 +121,9 @@ const ALL_ACTIONS: AutomationActionType[] = [
   'switchProxy',
   'clickByText',
   // Tier 5 RPA
-  'getStorage', 'setStorage', 'clearStorage', 'queryIndexedDB'
+  'getStorage', 'setStorage', 'clearStorage', 'queryIndexedDB',
+  // Tier 6 RPA
+  'forEachRow', 'readFile', 'writeFile', 'waitForDownload'
 ]
 
 interface StepEditorProps {
@@ -174,6 +181,10 @@ function getDefaultParams(action: AutomationActionType): Record<string, any> {
     case 'setStorage':         return { type: 'localStorage', key: '', value: '' }
     case 'clearStorage':       return { type: 'all' }
     case 'queryIndexedDB':     return { saveAs: 'idb' }
+    case 'forEachRow':         return { filePath: 'data.csv', prefix: 'row', steps: [], failFast: true, limit: 0 }
+    case 'readFile':           return { filePath: '', encoding: 'utf-8', saveAs: 'fileContent' }
+    case 'writeFile':          return { filePath: '', content: '', append: false, encoding: 'utf-8' }
+    case 'waitForDownload':    return { directory: '', pattern: '', filePath: '', timeout: 60000, pollInterval: 500, saveAs: 'downloadedFile' }
     default:                   return {}
   }
 }
