@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { CheckCircle, AlertCircle, Info, RefreshCw, ChevronDown } from 'lucide-react'
+import { CheckCircle, AlertCircle, Info, RefreshCw, ChevronDown, Sliders } from 'lucide-react'
 import { Header } from '../Layout/Header'
 import { useProfileStore } from '../../stores/profileStore'
+import type { BehaviorConfig, TimingConfig } from '../../types'
 
 const VECTORS = [
   { category: 'Browser',    name: 'User-Agent / UA-CH',        risk: 'critical', status: 'spoofed' },
@@ -68,6 +69,11 @@ export function FingerprintEditor() {
   const [selectedId,  setSelectedId]  = useState<string>('')
   const [rolling,     setRolling]     = useState(false)
   const [rolledMsg,   setRolledMsg]   = useState(false)
+  const [savingBehavior, setSavingBehavior] = useState(false)
+  const [behaviorMsg,    setBehaviorMsg]    = useState(false)
+  // Local editable copies of behavior/timing
+  const [behavior, setBehavior] = useState<BehaviorConfig | null>(null)
+  const [timing,   setTiming]   = useState<TimingConfig | null>(null)
 
   useEffect(() => {
     if (profiles.length === 0) fetchProfiles()
@@ -75,6 +81,17 @@ export function FingerprintEditor() {
 
   const selectedProfile = profiles.find((p) => p.id === selectedId) ?? null
   const fp = selectedProfile?.fingerprint
+
+  // Sync local state when profile selection changes
+  useEffect(() => {
+    if (fp) {
+      setBehavior(fp.behavior ?? { mouseJitter: true, typingNoise: true, scrollInertia: true })
+      setTiming(fp.timing ?? { dateNoisePrecision: 100, rafJitter: true, performanceClamp: true })
+    } else {
+      setBehavior(null)
+      setTiming(null)
+    }
+  }, [selectedId, fp?.behavior, fp?.timing])
 
   const handleReroll = async () => {
     if (!selectedId) return
@@ -85,6 +102,21 @@ export function FingerprintEditor() {
       setTimeout(() => setRolledMsg(false), 2500)
     } finally {
       setRolling(false)
+    }
+  }
+
+  const handleSaveBehavior = async () => {
+    if (!selectedId || !fp || !behavior || !timing) return
+    setSavingBehavior(true)
+    try {
+      await window.api.profiles.update(selectedId, {
+        fingerprint: { ...fp, behavior, timing }
+      })
+      await fetchProfiles()
+      setBehaviorMsg(true)
+      setTimeout(() => setBehaviorMsg(false), 2000)
+    } finally {
+      setSavingBehavior(false)
     }
   }
 
@@ -183,6 +215,93 @@ export function FingerprintEditor() {
           )}
         </div>
 
+        {/* Behavior & Timing Configuration (Phase 6) */}
+        {fp && behavior && timing && (
+          <div className="card mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-ghost-400" />
+                <h3 className="text-sm font-semibold text-white">Behavior & Timing</h3>
+              </div>
+              <button
+                onClick={handleSaveBehavior}
+                disabled={savingBehavior}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ghost-600/20 hover:bg-ghost-600/30
+                           text-ghost-400 text-xs font-medium transition-colors disabled:opacity-50"
+              >
+                {savingBehavior ? <RefreshCw className="w-3 h-3 animate-spin" /> : null}
+                {savingBehavior ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+
+            {behaviorMsg && (
+              <p className="text-xs text-green-400 mb-3">✓ Behavior settings saved</p>
+            )}
+
+            <div className="space-y-4">
+              {/* Behavior section */}
+              <div>
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Behavior Simulation</p>
+                <div className="space-y-2">
+                  <BehaviorToggle
+                    label="Mouse Jitter"
+                    description="Adds sub-pixel Gaussian noise to pointer events"
+                    checked={behavior.mouseJitter}
+                    onChange={(v) => setBehavior({ ...behavior, mouseJitter: v })}
+                  />
+                  <BehaviorToggle
+                    label="Typing Cadence Noise"
+                    description="Randomises keydown/keyup event timing (±25 ms variance)"
+                    checked={behavior.typingNoise}
+                    onChange={(v) => setBehavior({ ...behavior, typingNoise: v })}
+                  />
+                  <BehaviorToggle
+                    label="Scroll Inertia"
+                    description="Simulates natural momentum decay on wheel events"
+                    checked={behavior.scrollInertia}
+                    onChange={(v) => setBehavior({ ...behavior, scrollInertia: v })}
+                  />
+                </div>
+              </div>
+
+              {/* Timing section */}
+              <div>
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Timing Defenses</p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between bg-slate-800/60 rounded-lg px-3 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-slate-200">Date.now() Precision</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Quantise to nearest block (ms)</p>
+                    </div>
+                    <select
+                      className="bg-slate-700 border border-slate-600 text-slate-200 text-xs rounded-lg px-2 py-1.5
+                                 focus:outline-none focus:border-ghost-500 ml-3"
+                      value={timing.dateNoisePrecision}
+                      onChange={(e) => setTiming({ ...timing, dateNoisePrecision: Number(e.target.value) as 50 | 100 | 250 })}
+                    >
+                      <option value={50}>50 ms (high noise)</option>
+                      <option value={100}>100 ms (balanced)</option>
+                      <option value={250}>250 ms (max noise)</option>
+                    </select>
+                  </div>
+                  <BehaviorToggle
+                    label="rAF Timestamp Jitter"
+                    description="Adds ±1.2 ms Gaussian noise to requestAnimationFrame timestamps"
+                    checked={timing.rafJitter}
+                    onChange={(v) => setTiming({ ...timing, rafJitter: v })}
+                  />
+                  <BehaviorToggle
+                    label="performance.now() Clamping"
+                    description="Reduces performance.now() precision to match Date.now()"
+                    checked={timing.performanceClamp}
+                    onChange={(v) => setTiming({ ...timing, performanceClamp: v })}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Vector Table by Category */}
         {categories.map((cat) => (
           <div key={cat} className="mb-5">
@@ -229,5 +348,36 @@ function InfoRow({ label, value, mono, truncate }: {
         {value}
       </span>
     </>
+  )
+}
+
+function BehaviorToggle({
+  label, description, checked, onChange
+}: {
+  label: string
+  description: string
+  checked: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <div className="flex items-center justify-between bg-slate-800/60 rounded-lg px-3 py-2.5">
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-slate-200">{label}</p>
+        <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-5 w-9 shrink-0 ml-3 rounded-full border-2 border-transparent
+                    transition-colors focus:outline-none
+                    ${checked ? 'bg-ghost-600' : 'bg-slate-700'}`}
+        role="switch"
+        aria-checked={checked}
+      >
+        <span
+          className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow
+                      transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'}`}
+        />
+      </button>
+    </div>
   )
 }

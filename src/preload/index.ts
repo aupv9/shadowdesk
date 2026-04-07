@@ -120,9 +120,13 @@ const api = {
     stop:   ()                                                         => ipcRenderer.invoke('apiServer:stop')
   },
   detection: {
-    runTest: (profileId: string)        => ipcRenderer.invoke('detection:runTest', profileId),
-    results: (profileId?: string)       => ipcRenderer.invoke('detection:results', profileId),
-    summary: ()                         => ipcRenderer.invoke('detection:summary')
+    runTest:      (profileId: string)          => ipcRenderer.invoke('detection:runTest', profileId),
+    results:      (profileId?: string)         => ipcRenderer.invoke('detection:results', profileId),
+    summary:      ()                           => ipcRenderer.invoke('detection:summary'),
+    // Phase 7: result management + batch testing
+    deleteResult: (resultId: string)           => ipcRenderer.invoke('detection:deleteResult', resultId),
+    clearHistory: (profileId?: string)         => ipcRenderer.invoke('detection:clearHistory', profileId),
+    batchTest:    (profileIds: string[])       => ipcRenderer.invoke('detection:batchTest', profileIds)
   }
 }
 
