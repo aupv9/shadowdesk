@@ -5,6 +5,7 @@ import { ProxyManager } from './components/ProxyManager'
 import { FingerprintEditor } from './components/FingerprintEditor'
 import { DetectionDashboard } from './components/DetectionDashboard'
 import { AutomationBuilder } from './components/AutomationBuilder'
+import { RunDashboard } from './components/RunDashboard'
 import { SettingsPage } from './components/Settings'
 import { AccountPage } from './components/Account'
 import { TeamManager } from './components/TeamManager'
@@ -80,6 +81,9 @@ export default function App() {
         </ErrorBoundary>
         <ErrorBoundary section="Automation">
           {section === 'automation'  && <AutomationBuilder />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Run Dashboard">
+          {section === 'runs'        && <RunDashboard />}
         </ErrorBoundary>
         <ErrorBoundary section="Marketplace">
           {section === 'marketplace' && <Marketplace />}
