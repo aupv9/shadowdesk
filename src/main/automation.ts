@@ -55,9 +55,23 @@ function globToRegex(glob: string): RegExp {
   return new RegExp('^' + escaped + '$')
 }
 
+/** Tier 2: Debugger control surface attached to each running workflow.
+ *  The renderer interacts with these via IPC (`workflows:debug:*`). */
+interface DebugControl {
+  abort: boolean
+  /** Currently paused (manually or by breakpoint) */
+  paused: boolean
+  /** "Step over" requested — runner advances one step then re-pauses */
+  stepOver: boolean
+  /** Set of step ids that should pause execution before running */
+  breakpoints: Set<string>
+  /** Resolver to wait on while paused */
+  resumeWaiter: (() => void) | null
+}
+
 export class AutomationEngine {
   private static instance: AutomationEngine
-  private running = new Map<string, { abort: boolean }>()
+  private running = new Map<string, DebugControl>()
   /** Active network intercept state per profileId */
   private intercepts = new Map<string, InterceptState>()
 
@@ -72,7 +86,8 @@ export class AutomationEngine {
     workflowId: string,
     profileId: string,
     runtimeVars?: Record<string, string>,
-    webContents?: WebContents
+    webContents?: WebContents,
+    debugOpts?: { breakpoints?: string[]; pauseAtStart?: boolean }
   ): Promise<AutomationRunResult> {
     const db = Database.getInstance()
     const bm = BrowserManager.getInstance()
@@ -112,10 +127,17 @@ export class AutomationEngine {
     if (!page) throw new Error('No active page found for profile')
 
     const runKey = `${workflowId}:${profileId}`
-    const control = { abort: false }
+    const control: DebugControl = {
+      abort: false,
+      paused: !!debugOpts?.pauseAtStart,
+      stepOver: false,
+      breakpoints: new Set(debugOpts?.breakpoints ?? []),
+      resumeWaiter: null
+    }
     this.running.set(runKey, control)
 
     const startedAt = new Date().toISOString()
+    const startedAtMs = Date.now()
     const stepResults: AutomationStepResult[] = []
     let status: 'completed' | 'failed' | 'stopped' = 'completed'
     let runError: string | undefined
@@ -152,7 +174,7 @@ export class AutomationEngine {
       error: runError
     }
 
-    // Persist run to DB
+    // Persist run to DB (Tier 2: includes started_at, duration, variables snapshot)
     db.addWorkflowRun({
       id: uuidv4(),
       workflow_id: workflowId,
@@ -160,17 +182,260 @@ export class AutomationEngine {
       status,
       step_results: stepResults,
       error: runError,
-      completed_at: completedAt
+      started_at: startedAt,
+      completed_at: completedAt,
+      duration_ms: Date.now() - startedAtMs,
+      variables
     })
 
     return runResult
+  }
+
+  // ── Tier 2: Debugger control surface ───────────────────────────────────
+
+  /** Pause a running workflow at the next step boundary. */
+  pauseWorkflow(workflowId: string, profileId: string): boolean {
+    const ctrl = this.running.get(`${workflowId}:${profileId}`)
+    if (!ctrl) return false
+    ctrl.paused = true
+    return true
+  }
+
+  /** Resume a paused workflow. */
+  resumeWorkflow(workflowId: string, profileId: string): boolean {
+    const ctrl = this.running.get(`${workflowId}:${profileId}`)
+    if (!ctrl) return false
+    ctrl.paused = false
+    ctrl.stepOver = false
+    if (ctrl.resumeWaiter) {
+      const w = ctrl.resumeWaiter
+      ctrl.resumeWaiter = null
+      w()
+    }
+    return true
+  }
+
+  /** Run exactly one step then re-pause. */
+  stepOverWorkflow(workflowId: string, profileId: string): boolean {
+    const ctrl = this.running.get(`${workflowId}:${profileId}`)
+    if (!ctrl) return false
+    ctrl.stepOver = true
+    ctrl.paused = false
+    if (ctrl.resumeWaiter) {
+      const w = ctrl.resumeWaiter
+      ctrl.resumeWaiter = null
+      w()
+    }
+    return true
+  }
+
+  /** Replace the breakpoint set for a running workflow. */
+  setBreakpoints(workflowId: string, profileId: string, stepIds: string[]): boolean {
+    const ctrl = this.running.get(`${workflowId}:${profileId}`)
+    if (!ctrl) return false
+    ctrl.breakpoints = new Set(stepIds)
+    return true
+  }
+
+  /** Inspect a paused (or running) workflow's current state. */
+  getDebugState(workflowId: string, profileId: string): {
+    running: boolean
+    paused: boolean
+    breakpoints: string[]
+  } | null {
+    const ctrl = this.running.get(`${workflowId}:${profileId}`)
+    if (!ctrl) return null
+    return {
+      running: true,
+      paused: ctrl.paused,
+      breakpoints: Array.from(ctrl.breakpoints)
+    }
+  }
+
+  /** Wait while paused. Resolves when caller resumes / steps / aborts. */
+  private async waitWhilePaused(control: DebugControl): Promise<void> {
+    while (control.paused && !control.abort) {
+      await new Promise<void>((resolve) => {
+        control.resumeWaiter = resolve
+      })
+    }
+  }
+
+  // ── Tier 2: Dry-run validation ─────────────────────────────────────────
+
+  /**
+   * Validate a workflow without executing it. Checks for:
+   * - unknown action types
+   * - missing required params
+   * - jumpToStep targets that don't exist in the same step list
+   * - callWorkflow targets that don't exist in the database
+   * - unresolved {variable} placeholders
+   */
+  dryRunWorkflow(workflowId: string, runtimeVars?: Record<string, string>): {
+    valid: boolean
+    issues: { stepId?: string; severity: 'error' | 'warning'; message: string }[]
+    stepCount: number
+  } {
+    const db = Database.getInstance()
+    const row = db.getWorkflow(workflowId)
+    if (!row) throw new Error(`Workflow ${workflowId} not found`)
+
+    const steps: AutomationStep[] = JSON.parse(row.steps)
+    const storedVars: Record<string, string> = row.variables ? JSON.parse(row.variables) : {}
+    const knownVars = new Set([
+      ...Object.keys(storedVars),
+      ...Object.keys(runtimeVars ?? {}),
+      'timestamp', 'runId', 'random', 'profileName'
+    ])
+
+    const issues: { stepId?: string; severity: 'error' | 'warning'; message: string }[] = []
+
+    // Required params per action type — keep tight: only the must-haves.
+    const REQUIRED: Record<string, string[]> = {
+      navigate: ['url'],
+      click: ['selector'],
+      doubleClick: ['selector'],
+      rightClick: ['selector'],
+      hover: ['selector'],
+      type: ['selector', 'text'],
+      waitForSelector: ['selector'],
+      extractText: ['selector'],
+      select: ['selector', 'value'],
+      keyPress: ['key'],
+      evaluate: ['script'],
+      setAttribute: ['selector', 'attribute'],
+      httpRequest: ['url'],
+      upload: ['selector', 'filePath'],
+      download: ['url', 'savePath'],
+      solveCaptcha: ['siteKey'],
+      injectCaptchaToken: ['token'],
+      callWorkflow: ['workflowId'],
+      jumpToStep: ['targetStepId'],
+      interceptRequest: ['urlPattern'],
+      setCookies: [],
+      deleteCookies: [],
+      getCookies: []
+    }
+
+    const KNOWN_ACTIONS = new Set([
+      'navigate', 'click', 'doubleClick', 'rightClick', 'type', 'wait',
+      'waitForSelector', 'waitForNavigation', 'screenshot', 'extractText',
+      'scroll', 'select', 'keyPress', 'evaluate', 'hover', 'setAttribute',
+      'httpRequest', 'upload', 'download', 'solveCaptcha', 'injectCaptchaToken',
+      'useCredential', 'conditional', 'loop',
+      'callWorkflow', 'parallelSteps', 'jumpToStep',
+      'interceptRequest', 'clearIntercepts',
+      'getCookies', 'setCookies', 'deleteCookies'
+    ])
+
+    // Pre-collect ids that produce variables so {var} references resolve.
+    const producedVars = new Set<string>(knownVars)
+    const collectProduced = (list: AutomationStep[]) => {
+      for (const s of list) {
+        if (s.params?.saveAs) producedVars.add(String(s.params.saveAs))
+        if (s.action === 'useCredential') {
+          const prefix = s.params?.prefix || 'cred'
+          producedVars.add(`${prefix}.username`)
+          producedVars.add(`${prefix}.password`)
+        }
+        // Recurse into nested step containers
+        if (Array.isArray(s.params?.thenSteps)) collectProduced(s.params.thenSteps)
+        if (Array.isArray(s.params?.elseSteps)) collectProduced(s.params.elseSteps)
+        if (Array.isArray(s.params?.steps)) collectProduced(s.params.steps)
+      }
+    }
+    collectProduced(steps)
+
+    const validateStepList = (list: AutomationStep[], parentIds: Set<string>) => {
+      const localIds = new Set(list.map((s) => s.id))
+      for (const step of list) {
+        // Unknown action
+        if (!KNOWN_ACTIONS.has(step.action)) {
+          issues.push({ stepId: step.id, severity: 'error', message: `Unknown action: ${step.action}` })
+          continue
+        }
+
+        // Required params
+        const reqs = REQUIRED[step.action] ?? []
+        for (const r of reqs) {
+          if (step.params == null || step.params[r] === undefined || step.params[r] === '') {
+            issues.push({
+              stepId: step.id,
+              severity: 'error',
+              message: `${step.action}: missing required param "${r}"`
+            })
+          }
+        }
+
+        // jumpToStep target must exist somewhere in the workflow tree.
+        if (step.action === 'jumpToStep' && step.params?.targetStepId) {
+          const target = String(step.params.targetStepId)
+          if (!localIds.has(target) && !parentIds.has(target)) {
+            issues.push({
+              stepId: step.id,
+              severity: 'error',
+              message: `jumpToStep target "${target}" not found in workflow`
+            })
+          }
+        }
+
+        // callWorkflow target must exist in DB.
+        if (step.action === 'callWorkflow' && step.params?.workflowId) {
+          const targetId = String(step.params.workflowId)
+          const target = db.getWorkflow(targetId)
+          if (!target) {
+            issues.push({
+              stepId: step.id,
+              severity: 'error',
+              message: `callWorkflow: workflow "${targetId}" does not exist`
+            })
+          } else if (targetId === workflowId) {
+            issues.push({
+              stepId: step.id,
+              severity: 'warning',
+              message: 'callWorkflow targets itself — possible infinite recursion'
+            })
+          }
+        }
+
+        // Unresolved {variable} placeholders in any string param.
+        try {
+          const json = JSON.stringify(step.params ?? {})
+          const refs = json.match(/\{([\w.]+)\}/g) ?? []
+          for (const raw of refs) {
+            const key = raw.slice(1, -1)
+            if (!producedVars.has(key)) {
+              issues.push({
+                stepId: step.id,
+                severity: 'warning',
+                message: `${step.action}: references unknown variable "${key}"`
+              })
+            }
+          }
+        } catch { /* unstringifiable params, ignore */ }
+
+        // Recurse
+        const nextParents = new Set([...parentIds, ...localIds])
+        if (Array.isArray(step.params?.thenSteps)) validateStepList(step.params.thenSteps, nextParents)
+        if (Array.isArray(step.params?.elseSteps)) validateStepList(step.params.elseSteps, nextParents)
+        if (Array.isArray(step.params?.steps)) validateStepList(step.params.steps, nextParents)
+      }
+    }
+
+    validateStepList(steps, new Set())
+
+    return {
+      valid: issues.filter((i) => i.severity === 'error').length === 0,
+      issues,
+      stepCount: steps.length
+    }
   }
 
   /** Execute a list of steps, collecting results. Returns overall status. */
   private async executeSteps(
     page: Page,
     steps: AutomationStep[],
-    control: { abort: boolean },
+    control: DebugControl | { abort: boolean },
     stepResults: AutomationStepResult[],
     variables: Record<string, string>,
     webContents?: WebContents,
@@ -181,9 +446,42 @@ export class AutomationEngine {
     let i = 0
     let jumpsUsed = 0
     const MAX_JUMPS = 1000 // safety: prevent infinite jump loops
+
+    // Tier 2: Detect debugger-aware control. Sub-step lists (loop bodies,
+    // conditional branches, parallelSteps) reuse the parent control so
+    // breakpoints work uniformly.
+    const isDebug = (c: any): c is DebugControl => c && typeof c.paused === 'boolean'
+
     while (i < steps.length) {
       if (control.abort) return 'stopped'
       const step = steps[i]
+
+      // Tier 2: pause if a breakpoint is set on this step (or paused manually)
+      if (isDebug(control)) {
+        if (control.breakpoints.has(step.id)) {
+          control.paused = true
+        }
+        if (control.paused) {
+          if (webContents && !webContents.isDestroyed()) {
+            try {
+              webContents.send('automation:paused', {
+                workflowId,
+                profileId,
+                stepId: step.id,
+                action: step.action,
+                variables: { ...variables }
+              })
+            } catch { /* non-fatal */ }
+          }
+          await this.waitWhilePaused(control)
+          if (control.abort) return 'stopped'
+          if (webContents && !webContents.isDestroyed()) {
+            try {
+              webContents.send('automation:resumed', { workflowId, profileId, stepId: step.id })
+            } catch { /* non-fatal */ }
+          }
+        }
+      }
 
       // Interpolate this step's params lazily — variables may have been
       // mutated by an earlier step (e.g. solveCaptcha → {captchaToken}).
@@ -194,6 +492,12 @@ export class AutomationEngine {
 
       const result = await this.executeStep(page, liveStep, control, stepResults, variables, profileId)
       stepResults.push(result)
+
+      // Tier 2: re-pause after stepOver
+      if (isDebug(control) && control.stepOver) {
+        control.stepOver = false
+        control.paused = true
+      }
 
       // Stream live progress to renderer
       if (webContents && !webContents.isDestroyed()) {
@@ -304,7 +608,7 @@ export class AutomationEngine {
   private async executeStep(
     page: Page,
     step: AutomationStep,
-    control: { abort: boolean },
+    control: DebugControl | { abort: boolean },
     allResults: AutomationStepResult[],
     variables: Record<string, string>,
     profileId?: string
@@ -347,7 +651,7 @@ export class AutomationEngine {
   private async runAction(
     page: Page,
     step: AutomationStep,
-    control: { abort: boolean },
+    control: DebugControl | { abort: boolean },
     allResults: AutomationStepResult[],
     variables: Record<string, string>,
     profileId?: string

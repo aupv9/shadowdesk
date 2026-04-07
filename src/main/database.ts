@@ -259,6 +259,14 @@ export class Database {
       this.db.exec(`ALTER TABLE profiles ADD COLUMN sync_excluded INTEGER DEFAULT 0`)
     } catch { /* exists */ }
 
+    // Tier 2 RPA — extended workflow run logging
+    try {
+      this.db.exec(`ALTER TABLE workflow_runs ADD COLUMN duration_ms INTEGER`)
+    } catch { /* exists */ }
+    try {
+      this.db.exec(`ALTER TABLE workflow_runs ADD COLUMN variables TEXT`)
+    } catch { /* exists */ }
+
     // Phase 12.C.3 — encrypted credential vault
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS credentials (
@@ -731,11 +739,27 @@ export class Database {
     status: string
     step_results: any[]
     error?: string
+    started_at?: string
     completed_at: string
+    duration_ms?: number
+    variables?: Record<string, string>
   }): void {
     this.run(
-      'INSERT INTO workflow_runs (id, workflow_id, profile_id, status, step_results, error, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [run.id, run.workflow_id, run.profile_id, run.status, JSON.stringify(run.step_results), run.error ?? null, run.completed_at]
+      `INSERT INTO workflow_runs
+        (id, workflow_id, profile_id, status, step_results, error, started_at, completed_at, duration_ms, variables)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        run.id,
+        run.workflow_id,
+        run.profile_id,
+        run.status,
+        JSON.stringify(run.step_results),
+        run.error ?? null,
+        run.started_at ?? new Date().toISOString(),
+        run.completed_at,
+        run.duration_ms ?? null,
+        run.variables ? JSON.stringify(run.variables) : null
+      ]
     )
   }
 
@@ -744,6 +768,103 @@ export class Database {
       'SELECT * FROM workflow_runs WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?',
       [workflowId, limit]
     )
+  }
+
+  /** Tier 2: Recent runs across ALL workflows for the metrics dashboard. */
+  getRecentWorkflowRuns(limit = 100): any[] {
+    return this.queryAll(
+      `SELECT r.*, w.name AS workflow_name, p.name AS profile_name
+       FROM workflow_runs r
+       LEFT JOIN workflows w ON w.id = r.workflow_id
+       LEFT JOIN profiles  p ON p.id = r.profile_id
+       ORDER BY r.started_at DESC
+       LIMIT ?`,
+      [limit]
+    )
+  }
+
+  /** Tier 2: Aggregated stats for the metrics dashboard. Optionally scoped
+   *  to a single workflow id. */
+  getWorkflowRunMetrics(workflowId?: string): {
+    total: number
+    completed: number
+    failed: number
+    stopped: number
+    avgDurationMs: number
+    successRate: number
+    last7Days: { date: string; total: number; failed: number }[]
+    actionErrors: { action: string; count: number }[]
+  } {
+    const where = workflowId ? 'WHERE workflow_id = ?' : ''
+    const wfParams = workflowId ? [workflowId] : []
+
+    const totals = this.queryOne(
+      `SELECT
+         COUNT(*)                                              AS total,
+         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+         SUM(CASE WHEN status = 'failed'    THEN 1 ELSE 0 END) AS failed,
+         SUM(CASE WHEN status = 'stopped'   THEN 1 ELSE 0 END) AS stopped,
+         AVG(duration_ms)                                      AS avg_duration
+       FROM workflow_runs ${where}`,
+      wfParams
+    ) ?? { total: 0, completed: 0, failed: 0, stopped: 0, avg_duration: 0 }
+
+    const total = Number(totals.total ?? 0)
+    const completed = Number(totals.completed ?? 0)
+    const failed = Number(totals.failed ?? 0)
+    const stopped = Number(totals.stopped ?? 0)
+    const avgDurationMs = Math.round(Number(totals.avg_duration ?? 0))
+    const successRate = total > 0 ? Math.round((completed / total) * 100) : 0
+
+    // 7-day time series (UTC dates)
+    const series = this.queryAll(
+      `SELECT
+         substr(started_at, 1, 10) AS day,
+         COUNT(*)                  AS total,
+         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
+       FROM workflow_runs
+       ${where ? where + ' AND ' : 'WHERE '} started_at >= datetime('now', '-7 days')
+       GROUP BY day
+       ORDER BY day ASC`,
+      wfParams
+    )
+
+    // Action-level error breakdown — extract from JSON step_results.
+    // sql.js has no JSON1 functions guaranteed, so do this in JS.
+    const last200 = this.queryAll(
+      `SELECT step_results FROM workflow_runs ${where} ORDER BY started_at DESC LIMIT 200`,
+      wfParams
+    )
+    const actionErrorMap = new Map<string, number>()
+    for (const row of last200) {
+      try {
+        const steps = JSON.parse(row.step_results || '[]')
+        for (const s of steps) {
+          if (s && s.success === false && s.action) {
+            actionErrorMap.set(s.action, (actionErrorMap.get(s.action) ?? 0) + 1)
+          }
+        }
+      } catch { /* malformed row, skip */ }
+    }
+    const actionErrors = Array.from(actionErrorMap.entries())
+      .map(([action, count]) => ({ action, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+
+    return {
+      total,
+      completed,
+      failed,
+      stopped,
+      avgDurationMs,
+      successRate,
+      last7Days: series.map((r: any) => ({
+        date: r.day,
+        total: Number(r.total),
+        failed: Number(r.failed)
+      })),
+      actionErrors
+    }
   }
 
   // ── Detection Tests ───────────────────────────────────────────────────────
