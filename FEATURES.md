@@ -6,397 +6,397 @@
 ---
 
 ## 1. Profile Management
-- [ ] List all profiles
-- [ ] Create profile with fingerprint preset selection
-- [ ] Edit profile details (name, group, notes)
-- [ ] Delete profile
-- [ ] Clone profile (with new fingerprint)
-- [ ] Launch profile in isolated Chromium session
-- [ ] Close profile session
-- [ ] View active sessions
-- [ ] Assign profile to group
-- [ ] Track last-used timestamp
-- [ ] Selective cloud sync opt-out per profile
+- [x] List all profiles
+- [x] Create profile with fingerprint preset selection
+- [x] Edit profile details (name, group, notes)
+- [x] Delete profile
+- [x] Clone profile (with new fingerprint)
+- [x] Launch profile in isolated Chromium session
+- [x] Close profile session
+- [x] View active sessions
+- [x] Assign profile to group
+- [x] Track last-used timestamp
+- [x] Selective cloud sync opt-out per profile
 
 ---
 
 ## 2. Fingerprint Spoofing Engine
 
 ### Core Vectors
-- [ ] User Agent (browser, OS, version)
-- [ ] Platform / OS string
-- [ ] Screen resolution & color depth
-- [ ] Device memory & CPU concurrency
-- [ ] Hardware concurrency
-- [ ] Touch points
-- [ ] Locale / language / timezone
-- [ ] WebRTC (disable / fake / real)
-- [ ] Canvas (noise / block)
-- [ ] WebGL vendor & renderer (+ noise)
-- [ ] Audio context (noise / block)
-- [ ] Font enumeration whitelist
-- [ ] Media device counts
-- [ ] Browser plugins list
-- [ ] Speech recognition API
-- [ ] Network Information API (connection type)
-- [ ] Geolocation (lat/lon/accuracy)
-- [ ] Behavior simulation (mouse jitter, typing noise, scroll inertia)
-- [ ] Timing defenses (Date.now precision, RAF jitter, performance.now clamping)
-- [ ] Intl API locale normalization
-- [ ] User Agent Client Hints (UACH) high-entropy spoofing
-- [ ] WebGPU API stub
-- [ ] Math FPU normalization
+- [x] User Agent (browser, OS, version)
+- [x] Platform / OS string
+- [x] Screen resolution & color depth
+- [x] Device memory & CPU concurrency
+- [x] Hardware concurrency
+- [x] Touch points
+- [x] Locale / language / timezone
+- [x] WebRTC (disable / fake / real)
+- [x] Canvas (noise / block)
+- [x] WebGL vendor & renderer (+ noise)
+- [x] Audio context (noise / block)
+- [x] Font enumeration whitelist
+- [x] Media device counts
+- [x] Browser plugins list
+- [x] Speech recognition API
+- [x] Network Information API (connection type)
+- [x] Geolocation (lat/lon/accuracy)
+- [x] Behavior simulation (mouse jitter, typing noise, scroll inertia)
+- [x] Timing defenses (Date.now precision, RAF jitter, performance.now clamping)
+- [x] Intl API locale normalization
+- [x] User Agent Client Hints (UACH) high-entropy spoofing
+- [x] WebGPU API stub
+- [x] Math FPU normalization
 
 ### Injection Script Modules (22)
-- [ ] audio.ts — AudioContext spoofing
-- [ ] behavior.ts — Pointer/keyboard/scroll simulation
-- [ ] canvas.ts — Canvas noise injection
-- [ ] clientrects.ts — DOM rect noise
-- [ ] fonts.ts — Font enumeration control
-- [ ] iframe.ts — Cross-iframe fingerprint propagation
-- [ ] intl.ts — Intl API normalization
-- [ ] keyboard.ts — Keyboard layout spoofing
-- [ ] native-tostring.ts — Function.toString override
-- [ ] navigator.ts — Navigator property spoofing
-- [ ] network.ts — Network API spoofing
-- [ ] performance.ts — Performance timing sanitization
-- [ ] permissions.ts — Permissions API spoofing
-- [ ] plugins.ts — Plugin enumeration control
-- [ ] speech.ts — Speech recognition API
-- [ ] storage.ts — Storage quota fingerprint defense
-- [ ] timing.ts — Timing attack defenses
-- [ ] useragentdata.ts — UACH spoofing
-- [ ] webgl.ts — WebGL vendor/renderer spoofing
-- [ ] webgpu.ts — WebGPU stub
-- [ ] webrtc.ts — WebRTC IP leak prevention
-- [ ] worker.ts — Web Worker fingerprint propagation
+- [x] audio.ts — AudioContext spoofing
+- [x] behavior.ts — Pointer/keyboard/scroll simulation
+- [x] canvas.ts — Canvas noise injection
+- [x] clientrects.ts — DOM rect noise
+- [x] fonts.ts — Font enumeration control
+- [x] iframe.ts — Cross-iframe fingerprint propagation
+- [x] intl.ts — Intl API normalization
+- [x] keyboard.ts — Keyboard layout spoofing
+- [x] native-tostring.ts — Function.toString override
+- [x] navigator.ts — Navigator property spoofing
+- [x] network.ts — Network API spoofing
+- [x] performance.ts — Performance timing sanitization
+- [x] permissions.ts — Permissions API spoofing
+- [x] plugins.ts — Plugin enumeration control
+- [x] speech.ts — Speech recognition API
+- [x] storage.ts — Storage quota fingerprint defense
+- [x] timing.ts — Timing attack defenses
+- [x] useragentdata.ts — UACH spoofing
+- [x] webgl.ts — WebGL vendor/renderer spoofing
+- [x] webgpu.ts — WebGPU stub
+- [x] webrtc.ts — WebRTC IP leak prevention
+- [x] worker.ts — Web Worker fingerprint propagation
 
 ### Fingerprint Management
-- [ ] 11 built-in presets (5 desktop, 3 Android, 3 iOS)
-- [ ] Switch presets while preserving behavior/timing config
-- [ ] Reroll fingerprint (new random seed)
-- [ ] Profile version history (max 20 snapshots)
-- [ ] Restore to a previous fingerprint version
-- [ ] Save manual fingerprint snapshot with label
-- [ ] Deterministic noise seeds (same profile = same fingerprint)
-- [ ] Auto-sync binary UA to match real Chromium binary version
+- [x] 11 built-in presets (5 desktop, 3 Android, 3 iOS)
+- [x] Switch presets while preserving behavior/timing config
+- [x] Reroll fingerprint (new random seed)
+- [x] Profile version history (max 20 snapshots)
+- [x] Restore to a previous fingerprint version
+- [x] Save manual fingerprint snapshot with label
+- [x] Deterministic noise seeds (same profile = same fingerprint)
+- [x] Auto-sync binary UA to match real Chromium binary version
 
 ---
 
 ## 3. Proxy Management
-- [ ] List all proxies
-- [ ] Add proxy (HTTP, HTTPS, SOCKS5)
-- [ ] Delete proxy
-- [ ] Test proxy connectivity (latency + health)
-- [ ] Bulk import proxies (multiple formats)
-- [ ] Proxy rotation: none / random / round-robin
-- [ ] Per-proxy country label
-- [ ] Health status tracking
+- [x] List all proxies
+- [x] Add proxy (HTTP, HTTPS, SOCKS5)
+- [x] Delete proxy
+- [x] Test proxy connectivity (latency + health)
+- [x] Bulk import proxies (multiple formats)
+- [x] Proxy rotation: none / random / round-robin
+- [x] Per-proxy country label
+- [x] Health status tracking
 
 ---
 
 ## 4. Profile Groups
-- [ ] Create group with custom color
-- [ ] List all groups
-- [ ] Delete group
-- [ ] Assign profiles to groups
+- [x] Create group with custom color
+- [x] List all groups
+- [x] Delete group
+- [x] Assign profiles to groups
 
 ---
 
 ## 5. Cookies & Storage Management
 
 ### Cookie Operations
-- [ ] Import cookies (Netscape or JSON format)
-- [ ] Export cookies (Netscape or JSON format)
-- [ ] Capture live cookies from running browser
-- [ ] List cookies for profile
-- [ ] Save / replace entire cookie set
-- [ ] Push live cookie updates to running session
+- [x] Import cookies (Netscape or JSON format)
+- [x] Export cookies (Netscape or JSON format)
+- [x] Capture live cookies from running browser
+- [x] List cookies for profile
+- [x] Save / replace entire cookie set
+- [x] Push live cookie updates to running session
 
 ### Storage Inspector (read-only)
-- [ ] List security origins
-- [ ] Inspect localStorage per origin
-- [ ] Inspect sessionStorage per origin
-- [ ] List IndexedDB databases per origin
-- [ ] Browse IndexedDB entries with pagination
+- [x] List security origins
+- [x] Inspect localStorage per origin
+- [x] Inspect sessionStorage per origin
+- [x] List IndexedDB databases per origin
+- [x] Browse IndexedDB entries with pagination
 
 ---
 
 ## 6. Automation / RPA Engine
 
 ### Action Types (22)
-- [ ] navigate
-- [ ] click / rightClick / doubleClick
-- [ ] type (with variable interpolation)
-- [ ] wait (fixed delay)
-- [ ] waitForSelector
-- [ ] waitForNavigation
-- [ ] scroll
-- [ ] hover
-- [ ] select
-- [ ] keyPress
-- [ ] setAttribute
-- [ ] screenshot
-- [ ] extractText
-- [ ] evaluate (JS execution)
-- [ ] httpRequest
-- [ ] conditional (if/else)
-- [ ] loop (repeat N times)
-- [ ] solveCaptcha
-- [ ] injectCaptchaToken
-- [ ] upload
-- [ ] download
-- [ ] useCredential (vault injection)
+- [x] navigate
+- [x] click / rightClick / doubleClick
+- [x] type (with variable interpolation)
+- [x] wait (fixed delay)
+- [x] waitForSelector
+- [x] waitForNavigation
+- [x] scroll
+- [x] hover
+- [x] select
+- [x] keyPress
+- [x] setAttribute
+- [x] screenshot
+- [x] extractText
+- [x] evaluate (JS execution)
+- [x] httpRequest
+- [x] conditional (if/else)
+- [x] loop (repeat N times)
+- [x] solveCaptcha
+- [x] injectCaptchaToken
+- [x] upload
+- [x] download
+- [x] useCredential (vault injection)
 
 ### Workflow Management
-- [ ] Create / update / delete workflows
-- [ ] List and browse workflows
-- [ ] Add / reorder / delete steps
-- [ ] Define workflow variables
-- [ ] Use built-in variables: `{timestamp}`, `{random}`, `{profileName}`, `{runId}`
+- [x] Create / update / delete workflows
+- [x] List and browse workflows
+- [x] Add / reorder / delete steps
+- [x] Define workflow variables
+- [x] Use built-in variables: `{timestamp}`, `{random}`, `{profileName}`, `{runId}`
 
 ### Execution
-- [ ] Single-profile execution
-- [ ] Parallel multi-profile execution with concurrency limit
-- [ ] Step retry (configurable retries + delay)
-- [ ] Live progress streaming to UI
-- [ ] Stop / abort running execution
-- [ ] Execution history
+- [x] Single-profile execution
+- [x] Parallel multi-profile execution with concurrency limit
+- [x] Step retry (configurable retries + delay)
+- [x] Live progress streaming to UI
+- [x] Stop / abort running execution
+- [x] Execution history
 
 ### Workflow Templates (6 built-in)
-- [ ] Web Page Scraper
-- [ ] Login Flow
-- [ ] Social Media Feed Scroll
-- [ ] E-Commerce Price Checker
-- [ ] Form Auto-Fill
-- [ ] Generic template
+- [x] Web Page Scraper
+- [x] Login Flow
+- [x] Social Media Feed Scroll
+- [x] E-Commerce Price Checker
+- [x] Form Auto-Fill
+- [x] Generic template
 
 ---
 
 ## 7. Workflow Scheduling
-- [ ] Create schedules with cron expressions (5-field)
-- [ ] Assign multiple profiles to a schedule
-- [ ] Enable / disable schedule
-- [ ] Manual trigger (run now)
-- [ ] Last / next run timestamps
-- [ ] Delete schedule
-- [ ] Background 30-second polling tick
+- [x] Create schedules with cron expressions (5-field)
+- [x] Assign multiple profiles to a schedule
+- [x] Enable / disable schedule
+- [x] Manual trigger (run now)
+- [x] Last / next run timestamps
+- [x] Delete schedule
+- [x] Background 30-second polling tick
 
 ---
 
 ## 8. Profile Extensions
-- [ ] Add unpacked Chrome extensions per profile
-- [ ] List extensions for profile
-- [ ] Enable / disable extension
-- [ ] Remove extension
-- [ ] Extension folder picker
+- [x] Add unpacked Chrome extensions per profile
+- [x] List extensions for profile
+- [x] Enable / disable extension
+- [x] Remove extension
+- [x] Extension folder picker
 
 ---
 
 ## 9. Detection Testing
-- [ ] Run detection test against profile
-- [ ] 45+ test vectors (webdriver, chrome.runtime, plugins, canvas, WebGL, audio, etc.)
-- [ ] Overall detection score (0–100)
-- [ ] Per-vector pass / warning / fail status
-- [ ] Test result history
-- [ ] Delete individual test result
-- [ ] Clear all history for profile
-- [ ] Batch detection testing (multiple profiles)
-- [ ] Summary statistics
+- [x] Run detection test against profile
+- [x] 45+ test vectors (webdriver, chrome.runtime, plugins, canvas, WebGL, audio, etc.)
+- [x] Overall detection score (0–100)
+- [x] Per-vector pass / warning / fail status
+- [x] Test result history
+- [x] Delete individual test result
+- [x] Clear all history for profile
+- [x] Batch detection testing (multiple profiles)
+- [x] Summary statistics
 
 ---
 
 ## 10. Profile Warm-Up
-- [ ] Pre-configured warm-up site list (Google, YouTube, Wikipedia, etc.)
-- [ ] Custom warm-up site lists
-- [ ] Simulated dwell time per site (2–5 s)
-- [ ] Warm-up completion flag per profile
-- [ ] Duration metrics
+- [x] Pre-configured warm-up site list (Google, YouTube, Wikipedia, etc.)
+- [x] Custom warm-up site lists
+- [x] Simulated dwell time per site (2–5 s)
+- [x] Warm-up completion flag per profile
+- [x] Duration metrics
 
 ---
 
 ## 11. Fingerprint Drift
-- [ ] Automatic drift detection flag per profile
-- [ ] Chrome major version bump (conservative, capped at 140)
-- [ ] User Agent update on drift
-- [ ] Noise seed rotation (canvas / WebGL / audio)
-- [ ] Last drift timestamp tracking
+- [x] Automatic drift detection flag per profile
+- [x] Chrome major version bump (conservative, capped at 140)
+- [x] User Agent update on drift
+- [x] Noise seed rotation (canvas / WebGL / audio)
+- [x] Last drift timestamp tracking
 
 ---
 
 ## 12. Chromium Patch Manager
-- [ ] 60+ evasion patches (fingerprint, automation, timing, network, GPU, locale)
-- [ ] Patch implementation levels: JS shim / CDP override / custom build
-- [ ] Per-patch impact rating (low / medium / high)
-- [ ] Per-patch activation toggle
-- [ ] Category-based filtering
-- [ ] Patch status dashboard
+- [x] 60+ evasion patches (fingerprint, automation, timing, network, GPU, locale)
+- [x] Patch implementation levels: JS shim / CDP override / custom build
+- [x] Per-patch impact rating (low / medium / high)
+- [x] Per-patch activation toggle
+- [x] Category-based filtering
+- [x] Patch status dashboard
 
 ---
 
 ## 13. Fingerprint Collision Detection
-- [ ] Scan all profiles for duplicate fingerprints
-- [ ] Detect collision types: noise-seed, identity-tuple
-- [ ] Group colliding profiles by signature
-- [ ] Generate collision report
+- [x] Scan all profiles for duplicate fingerprints
+- [x] Detect collision types: noise-seed, identity-tuple
+- [x] Group colliding profiles by signature
+- [x] Generate collision report
 
 ---
 
 ## 14. Authentication
-- [ ] User registration (email / password / name)
-- [ ] Login
-- [ ] Logout
-- [ ] Session token management (access + refresh)
-- [ ] Password update
-- [ ] Email verification resend
-- [ ] Get current user
-- [ ] GDPR data export
-- [ ] Account deletion
+- [x] User registration (email / password / name)
+- [x] Login
+- [x] Logout
+- [x] Session token management (access + refresh)
+- [x] Password update
+- [x] Email verification resend
+- [x] Get current user
+- [x] GDPR data export
+- [x] Account deletion
 
 ---
 
 ## 15. Licensing
-- [ ] License activation (key-based)
-- [ ] License deactivation
-- [ ] View current license & plan
-- [ ] Machine fingerprint (MAC + CPU hash)
-- [ ] Plan limits: Free (5), Starter (50), Professional (500), Enterprise (∞)
-- [ ] Grace period handling (7 days post-expiry)
-- [ ] Trial badge detection
-- [ ] Multi-machine seat management
-- [ ] List licensed devices
-- [ ] Deactivate remote device
+- [x] License activation (key-based)
+- [x] License deactivation
+- [x] View current license & plan
+- [x] Machine fingerprint (MAC + CPU hash)
+- [x] Plan limits: Free (5), Starter (50), Professional (500), Enterprise (∞)
+- [x] Grace period handling (7 days post-expiry)
+- [x] Trial badge detection
+- [x] Multi-machine seat management
+- [x] List licensed devices
+- [x] Deactivate remote device
 
 ---
 
 ## 16. Team Collaboration
-- [ ] Create team
-- [ ] Update team name
-- [ ] Delete team
-- [ ] List team members
-- [ ] Invite member by email with role (admin / editor / viewer)
-- [ ] Update member role
-- [ ] Remove member
-- [ ] Cancel pending invitation
-- [ ] List pending invites
-- [ ] Accept invitation
-- [ ] Share profile with read / write permission
-- [ ] Unshare profile
-- [ ] List shared profiles
-- [ ] Audit log (paginated): profile launch/create/delete/export, team invite/remove, settings update
+- [x] Create team
+- [x] Update team name
+- [x] Delete team
+- [x] List team members
+- [x] Invite member by email with role (admin / editor / viewer)
+- [x] Update member role
+- [x] Remove member
+- [x] Cancel pending invitation
+- [x] List pending invites
+- [x] Accept invitation
+- [x] Share profile with read / write permission
+- [x] Unshare profile
+- [x] List shared profiles
+- [x] Audit log (paginated): profile launch/create/delete/export, team invite/remove, settings update
 
 ---
 
 ## 17. Cloud Sync
-- [ ] Push profiles to cloud (AES-256-GCM encrypted)
-- [ ] Pull profiles from cloud
-- [ ] Scrypt key derivation with per-user salt
-- [ ] Sync manifest with checksum
-- [ ] Sync status tracking (idle / syncing / error / offline / disabled)
-- [ ] Sync history log
-- [ ] Pending changes counter
-- [ ] Sync diff preview (local-only / remote-only / shared counts)
-- [ ] Background sync daemon
-- [ ] Selective sync opt-out per profile
-- [ ] Conflict detection
+- [x] Push profiles to cloud (AES-256-GCM encrypted)
+- [x] Pull profiles from cloud
+- [x] Scrypt key derivation with per-user salt
+- [x] Sync manifest with checksum
+- [x] Sync status tracking (idle / syncing / error / offline / disabled)
+- [x] Sync history log
+- [x] Pending changes counter
+- [x] Sync diff preview (local-only / remote-only / shared counts)
+- [x] Background sync daemon
+- [x] Selective sync opt-out per profile
+- [x] Conflict detection
 
 ---
 
 ## 18. Encrypted Credential Vault
-- [ ] Master password unlock (scrypt)
-- [ ] Per-vault random salt + sentinel verification
-- [ ] AES-256-GCM encryption per credential
-- [ ] Idle timeout auto-lock (configurable)
-- [ ] Create credential (username, password, custom fields)
-- [ ] Update / delete credential
-- [ ] List credentials (all or filtered by profile)
-- [ ] Inject credential into automation step
-- [ ] Lock / unlock vault
+- [x] Master password unlock (scrypt)
+- [x] Per-vault random salt + sentinel verification
+- [x] AES-256-GCM encryption per credential
+- [x] Idle timeout auto-lock (configurable)
+- [x] Create credential (username, password, custom fields)
+- [x] Update / delete credential
+- [x] List credentials (all or filtered by profile)
+- [x] Inject credential into automation step
+- [x] Lock / unlock vault
 
 ---
 
 ## 19. Visual Recorder
-- [ ] Record user interactions on a running profile
-- [ ] Capture: click, input, change, submit, navigate events
-- [ ] Smart selector generation (ID → data-testid → name → nth-child)
-- [ ] Event coalescing (collapse adjacent events)
-- [ ] Human-friendly step labels
-- [ ] Stop recording
-- [ ] Convert recording to automation workflow steps
+- [x] Record user interactions on a running profile
+- [x] Capture: click, input, change, submit, navigate events
+- [x] Smart selector generation (ID → data-testid → name → nth-child)
+- [x] Event coalescing (collapse adjacent events)
+- [x] Human-friendly step labels
+- [x] Stop recording
+- [x] Convert recording to automation workflow steps
 
 ---
 
 ## 20. Captcha Solving
-- [ ] Provider support: 2captcha, Anticaptcha, CapMonster
-- [ ] Captcha types: reCAPTCHA v2/v3, hCaptcha, image-based
-- [ ] Account balance check per provider
-- [ ] Result caching with provider task ID
-- [ ] Duration tracking (end-to-end)
-- [ ] Default provider configuration
-- [ ] Per-provider API key management
+- [x] Provider support: 2captcha, Anticaptcha, CapMonster
+- [x] Captcha types: reCAPTCHA v2/v3, hCaptcha, image-based
+- [x] Account balance check per provider
+- [x] Result caching with provider task ID
+- [x] Duration tracking (end-to-end)
+- [x] Default provider configuration
+- [x] Per-provider API key management
 
 ---
 
 ## 21. Local Automation API Server
-- [ ] HTTP server on configurable port (default 9222)
-- [ ] Profile CRUD endpoints
-- [ ] Profile launch / close endpoints
-- [ ] Workflow execution endpoint
-- [ ] Browser control endpoints
-- [ ] Screenshot endpoint
-- [ ] Optional bearer token auth
-- [ ] CORS headers for local tools
+- [x] HTTP server on configurable port (default 9222)
+- [x] Profile CRUD endpoints
+- [x] Profile launch / close endpoints
+- [x] Workflow execution endpoint
+- [x] Browser control endpoints
+- [x] Screenshot endpoint
+- [x] Optional bearer token auth
+- [x] CORS headers for local tools
 
 ---
 
 ## 22. Settings & Configuration
-- [ ] Default fingerprint preset
-- [ ] UI language (English, Vietnamese, Thai, Indonesian)
-- [ ] Theme (dark / light)
-- [ ] Auto-launch last session
-- [ ] Auto-sync binary UA
-- [ ] Captcha provider defaults & API keys
-- [ ] Vault idle timeout
+- [x] Default fingerprint preset
+- [x] UI language (English, Vietnamese, Thai, Indonesian)
+- [x] Theme (dark / light)
+- [x] Auto-launch last session
+- [x] Auto-sync binary UA
+- [x] Captcha provider defaults & API keys
+- [x] Vault idle timeout
 
 ---
 
 ## 23. Profile Import / Export
-- [ ] Export profile bundle (profile.json + fingerprint.json + cookies.json in ZIP)
-- [ ] Import profile bundle
-- [ ] Proxy bulk import with format auto-detection
+- [x] Export profile bundle (profile.json + fingerprint.json + cookies.json in ZIP)
+- [x] Import profile bundle
+- [x] Proxy bulk import with format auto-detection
 
 ---
 
 ## 24. Auto-Updater
-- [ ] Check for updates
-- [ ] Download update
-- [ ] Install update
-- [ ] Restart on update
+- [x] Check for updates
+- [x] Download update
+- [x] Install update
+- [x] Restart on update
 
 ---
 
 ## 25. UI / UX
-- [ ] Sidebar navigation
-- [ ] Header with global actions
-- [ ] Profile list / grid view with status cards
-- [ ] Create / edit profile modal
-- [ ] Cookie editor modal
-- [ ] Extension manager modal
-- [ ] Storage inspector modal
-- [ ] Warm-up modal
-- [ ] Profile fingerprint history viewer
-- [ ] Collision report drawer
-- [ ] Proxy list with test results
-- [ ] Fingerprint editor (all vectors)
-- [ ] Detection dashboard (category charts, trend graphs)
-- [ ] Automation builder (step editor with drag-and-drop)
-- [ ] Variables editor
-- [ ] Schedule creator modal
-- [ ] Workflow template picker
-- [ ] Team workspace (members, invites, audit log, shared profiles)
-- [ ] Account page (sync setup, license, settings)
-- [ ] Toast notifications (success / warning / error)
-- [ ] Global error boundary
+- [x] Sidebar navigation
+- [x] Header with global actions
+- [x] Profile list / grid view with status cards
+- [x] Create / edit profile modal
+- [x] Cookie editor modal
+- [x] Extension manager modal
+- [x] Storage inspector modal
+- [x] Warm-up modal
+- [x] Profile fingerprint history viewer
+- [x] Collision report drawer
+- [x] Proxy list with test results
+- [x] Fingerprint editor (all vectors)
+- [x] Detection dashboard (category charts, trend graphs)
+- [x] Automation builder (step editor with drag-and-drop)
+- [x] Variables editor
+- [x] Schedule creator modal
+- [x] Workflow template picker
+- [x] Team workspace (members, invites, audit log, shared profiles)
+- [x] Account page (sync setup, license, settings)
+- [x] Toast notifications (success / warning / error)
+- [x] Global error boundary
 
 ---
 
