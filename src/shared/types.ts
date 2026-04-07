@@ -165,6 +165,8 @@ export interface Profile {
   drift_enabled?: number | boolean
   last_drift_at?: string | null
   warmed_up?: number | boolean
+  // Account C5: per-profile selective sync opt-out
+  sync_excluded?: number | boolean
 }
 
 // Phase 10.2 — Workflow scheduling
@@ -245,6 +247,9 @@ export interface User {
   team_id?: string
   role?: TeamRole
   created_at: string
+  // D4: email verification (backend may or may not populate — UI degrades gracefully)
+  email_verified?: boolean
+  email_verified_at?: string | null
 }
 
 export interface AuthTokens {
@@ -283,6 +288,25 @@ export interface License {
   valid_until: string
   machine_id: string
   activated_at: string
+  // L9: trial badge — populated by backend when the current paid plan
+  // is part of a trial period rather than a paid subscription.
+  is_trial?: boolean
+  trial_ends_at?: string | null
+  // E1: multi-machine seat counters. Both fields are optional so older
+  // backends keep working — the renderer only shows the seat row when
+  // both numbers are present.
+  seats_used?: number
+  seats_max?: number
+}
+
+// E1: Per-machine activation record returned by /licenses/devices.
+export interface LicenseDevice {
+  machine_id: string
+  label?: string | null
+  os?: string | null
+  last_seen_at: string | null
+  activated_at: string
+  is_current: boolean
 }
 
 export const PLAN_LIMITS: Record<LicensePlan, { profiles: number; members: number; sync: boolean }> = {
@@ -365,6 +389,43 @@ export interface SyncManifest {
   profile_ids: string[]
   last_modified: string
   checksum: string
+}
+
+export interface SyncLogEntry {
+  id: string
+  direction: 'push' | 'pull'
+  profile_count: number
+  status: 'success' | 'error'
+  synced_at: string
+  error_message?: string | null
+}
+
+export interface SyncConflict {
+  profile_id: string
+  profile_name: string
+  local_updated_at: string | null
+  remote_updated_at: string | null
+}
+
+export interface SyncPullResult {
+  imported: number
+  conflicts: SyncConflict[]
+}
+
+// S3: Local-vs-remote diff summary computed before push/pull so the user
+// can preview what's about to change. Counts profiles only — extensions
+// and other artifacts are tracked separately.
+export interface SyncDiff {
+  // Local profile ids that are not in the cloud manifest yet (would be uploaded)
+  local_only: { id: string; name: string }[]
+  // Remote profile ids that are missing locally (would be downloaded)
+  remote_only: string[]
+  // Profile ids present in both — could be modified on either side
+  shared: number
+  // Sum totals so the renderer can show "5 → cloud · 2 ← local · 12 in sync"
+  // without re-computing.
+  local_count: number
+  remote_count: number
 }
 
 // ─── Automation / RPA Types ─────────────────────────────────────────────────

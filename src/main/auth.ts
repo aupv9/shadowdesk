@@ -57,6 +57,30 @@ export async function updatePassword(currentPassword: string, newPassword: strin
   })
 }
 
+// D4: Re-send verification email. Backend should rate-limit; the renderer
+// also enforces a 60-second cooldown so users don't spam.
+export async function resendVerificationEmail(): Promise<void> {
+  await apiRequest('/auth/verify-email/resend', { method: 'POST' })
+}
+
+// E3: GDPR data export. Returns a JSON blob containing the user's
+// personal data so the renderer can let them download it.
+export async function exportUserData(): Promise<unknown> {
+  return apiRequest<unknown>('/auth/me/export', { method: 'POST' })
+}
+
+// E3: Permanent account deletion. The backend signs the user out by
+// invalidating the refresh token; we still call clearTokens() locally
+// in case the request succeeded but the response was lost.
+export async function deleteAccount(): Promise<void> {
+  try {
+    await apiRequest('/auth/me', { method: 'DELETE' })
+  } finally {
+    currentUser = null
+    clearTokens()
+  }
+}
+
 export function isAuthenticated(): boolean {
   const tokens = loadTokens()
   return tokens !== null && tokens.access_token.length > 0

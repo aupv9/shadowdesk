@@ -17,6 +17,7 @@ interface ProfileState {
   closeProfile:       (id: string)                    => Promise<void>
   rerollFingerprint:  (id: string)                    => Promise<void>
   setGroup:           (profileId: string, groupId: string | null) => Promise<void>
+  setSyncExcluded:    (profileId: string, excluded: boolean)       => Promise<void>
   exportProfile:      (id: string)                    => Promise<Buffer>
   importProfile:      (buffer: Buffer)                => Promise<void>
 }
@@ -94,6 +95,26 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   setGroup: async (profileId: string, groupId: string | null) => {
     await window.api.profiles.setGroup(profileId, groupId)
     await get().fetchProfiles()
+  },
+
+  // C5 — selective sync. Optimistically updates local state then commits.
+  setSyncExcluded: async (profileId: string, excluded: boolean) => {
+    set((s) => ({
+      profiles: s.profiles.map((p) =>
+        p.id === profileId ? { ...p, sync_excluded: excluded ? 1 : 0 } : p
+      )
+    }))
+    try {
+      await window.api.profiles.setSyncExcluded(profileId, excluded)
+    } catch (e) {
+      // Revert on failure
+      set((s) => ({
+        profiles: s.profiles.map((p) =>
+          p.id === profileId ? { ...p, sync_excluded: excluded ? 0 : 1 } : p
+        )
+      }))
+      throw e
+    }
   },
 
   exportProfile: async (id: string) => {

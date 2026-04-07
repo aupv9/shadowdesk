@@ -11,11 +11,17 @@ import { resolveFingerprint, FINGERPRINT_PRESETS } from '../fingerprint/presets'
 import { getTemplates, getTemplate } from '../workflow-templates'
 import { getSettings, updateSettings } from '../settings'
 import { downloadUpdate, installUpdate } from '../auto-updater'
-import { login, register, logout, getCurrentUser, updatePassword, isAuthenticated } from '../auth'
-import { fetchLicense, activateLicense, deactivateLicense, getCurrentLicense, checkProfileLimit, getUsage, getMachineId } from '../license'
+import {
+  login, register, logout, getCurrentUser, updatePassword, isAuthenticated,
+  resendVerificationEmail, exportUserData, deleteAccount
+} from '../auth'
+import {
+  fetchLicense, activateLicense, deactivateLicense, getCurrentLicense, checkProfileLimit,
+  getUsage, getMachineId, getLicenseStatus, listLicenseDevices, deactivateDevice
+} from '../license'
 import * as team from '../team'
 import {
-  pushProfiles, pullProfiles, getSyncState, getSyncManifest,
+  pushProfiles, pullProfiles, getSyncState, getSyncManifest, getSyncHistory, getSyncDiff,
   markPendingChange, enableSyncDaemon, disableSyncDaemon, isDaemonEnabled
 } from '../sync'
 import type { CreateProfileInput, CreateProxyInput, TeamRole, CreateWorkflowInput, UpdateWorkflowInput, ApiServerConfig } from '../../shared/types'
@@ -178,6 +184,12 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('profiles:setGroup', (_event, profileId: string, groupId: string | null) => {
     db.updateProfileGroup(profileId, groupId)
+    markPendingChange()
+  })
+
+  // Selective sync (Account C5) — flip the sync_excluded flag
+  ipcMain.handle('profiles:setSyncExcluded', (_event, profileId: string, excluded: boolean) => {
+    db.setSyncExcluded(profileId, excluded)
     markPendingChange()
   })
 
@@ -700,10 +712,31 @@ export function registerIpcHandlers(): void {
     return updatePassword(currentPassword, newPassword)
   })
 
+  // D4: resend the verification email. Backend rate-limits server-side.
+  ipcMain.handle('auth:resendVerification', async () => {
+    return resendVerificationEmail()
+  })
+
+  // E3: GDPR data export — main returns the JSON payload for the
+  // renderer to convert into a download.
+  ipcMain.handle('auth:exportData', async () => {
+    return exportUserData()
+  })
+
+  // E3: account deletion. Always clears local tokens, even on a partial
+  // failure, so the user can't get stuck in a half-deleted state.
+  ipcMain.handle('auth:deleteAccount', async () => {
+    return deleteAccount()
+  })
+
   // ── License ──────────────────────────────────────────────────────────────
 
   ipcMain.handle('license:current', async () => {
     return getCurrentLicense()
+  })
+
+  ipcMain.handle('license:status', () => {
+    return getLicenseStatus()
   })
 
   ipcMain.handle('license:fetch', async () => {
@@ -728,6 +761,19 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('license:machineId', () => {
     return getMachineId()
+  })
+
+  // E1: list machines this license is activated on. Returns an empty
+  // array if the backend doesn't yet implement /licenses/devices, so the
+  // renderer can hide the section gracefully.
+  ipcMain.handle('license:devices', async () => {
+    return listLicenseDevices()
+  })
+
+  // E1: revoke a remote machine's seat. Refuses to deactivate the
+  // current machine — that path goes through license:deactivate.
+  ipcMain.handle('license:deactivateDevice', async (_event, machineId: string) => {
+    return deactivateDevice(machineId)
   })
 
   // ── Team ─────────────────────────────────────────────────────────────────
@@ -804,6 +850,16 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('sync:manifest', async () => {
     return getSyncManifest()
+  })
+
+  ipcMain.handle('sync:history', (_event, limit?: number) => {
+    return getSyncHistory(limit)
+  })
+
+  // S3: local-vs-remote diff preview. Computed without decrypting the
+  // remote bundle so the user can preview before re-typing the password.
+  ipcMain.handle('sync:diff', async () => {
+    return getSyncDiff()
   })
 
   ipcMain.handle('sync:daemonEnabled', () => {

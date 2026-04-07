@@ -7,11 +7,14 @@ interface AuthStore {
   loading: boolean
   error: string | null
 
-  checkAuth:      () => Promise<void>
-  login:          (email: string, password: string) => Promise<void>
-  register:       (email: string, password: string, name: string) => Promise<void>
-  logout:         () => Promise<void>
-  updatePassword: (current: string, newPass: string) => Promise<void>
+  checkAuth:           () => Promise<void>
+  login:               (email: string, password: string) => Promise<void>
+  register:            (email: string, password: string, name: string) => Promise<void>
+  logout:              () => Promise<void>
+  updatePassword:      (current: string, newPass: string) => Promise<void>
+  resendVerification:  () => Promise<void>
+  exportData:          () => Promise<unknown>
+  deleteAccount:       () => Promise<void>
 }
 
 export const useAuthStore = create<AuthStore>((set) => ({
@@ -59,5 +62,18 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   updatePassword: async (current, newPass) => {
     await window.api.auth.updatePassword(current, newPass)
+  },
+
+  resendVerification: async () => {
+    await window.api.auth.resendVerification()
+  },
+
+  exportData: async () => {
+    return window.api.auth.exportData()
+  },
+
+  deleteAccount: async () => {
+    await window.api.auth.deleteAccount()
+    set({ user: null, authenticated: false })
   }
 }))
