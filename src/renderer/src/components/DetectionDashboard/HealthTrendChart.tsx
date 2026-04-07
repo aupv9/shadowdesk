@@ -31,6 +31,9 @@ export function HealthTrendChart({ results }: Props) {
 
     const byDay = new Map<string, { total: number; count: number }>()
     for (const r of filtered) {
+      // Defensive: skip rows missing testedAt (e.g. legacy/snake_case rows
+      // before the database mapper was added).
+      if (!r.testedAt || typeof r.testedAt !== 'string') continue
       const day = r.testedAt.slice(0, 10) // YYYY-MM-DD
       const existing = byDay.get(day) ?? { total: 0, count: 0 }
       existing.total += r.overallScore

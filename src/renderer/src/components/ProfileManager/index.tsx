@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { Plus, RefreshCw, X, FolderPlus, CheckSquare, Trash2, ShieldAlert } from 'lucide-react'
+import { Plus, RefreshCw, X, FolderPlus, CheckSquare, Trash2, ShieldAlert, Upload } from 'lucide-react'
 import { useProfileStore } from '../../stores/profileStore'
 import { useProxyStore } from '../../stores/proxyStore'
 import { useGroupStore } from '../../stores/groupStore'
+import { useLicenseStore } from '../../stores/licenseStore'
+import { useToastStore } from '../../stores/toastStore'
 import { ProfileCard } from './ProfileCard'
 import { CreateProfileModal } from './CreateProfileModal'
 import { EditProfileModal } from './EditProfileModal'
@@ -12,6 +14,7 @@ import { ProfileHistory } from './ProfileHistory'
 import { ExtensionsModal } from './ExtensionsModal'
 import { WarmUpModal } from './WarmUpModal'
 import { CollisionsDrawer } from './CollisionsDrawer'
+import { ImportGuideModal } from './ImportGuideModal'
 import { Header } from '../Layout/Header'
 import type { Profile } from '../../types'
 
@@ -26,6 +29,10 @@ export function ProfileManager() {
   } = useProfileStore()
   const { fetchProxies } = useProxyStore()
   const { groups, fetchGroups, createGroup, deleteGroup } = useGroupStore()
+  const { checkProfileLimit, fetchUsage } = useLicenseStore()
+  const pushToast = useToastStore((s) => s.push)
+
+  const [importing, setImporting] = useState(false)
 
   const [showCreate,     setShowCreate]     = useState(false)
   const [editProfile,    setEditProfile]    = useState<Profile | null>(null)
@@ -41,6 +48,7 @@ export function ProfileManager() {
   const [selected,       setSelected]       = useState<Set<string>>(new Set())
   const [selectionMode,  setSelectionMode]  = useState(false)
   const [showCollisions, setShowCollisions] = useState(false)
+  const [showImportGuide, setShowImportGuide] = useState(false)
   const [highlightId,    setHighlightId]    = useState<string | null>(null)
 
   // Group creation inline state
@@ -209,6 +217,92 @@ export function ProfileManager() {
     input.click()
   }
 
+  /**
+   * Entry-point for the top-level Import button. Shows the format guide
+   * modal first (with what's-included / what's-not / multi-select tip), or
+   * skips straight to the file picker if the user previously dismissed it.
+   */
+  const handleImportClick = () => {
+    if (importing) return
+    let dismissed = false
+    try {
+      dismissed = localStorage.getItem('ghostbrowser.importGuideDismissed') === '1'
+    } catch {
+      // localStorage may be disabled — fall back to always showing the guide
+    }
+    if (dismissed) {
+      pickAndImport()
+    } else {
+      setShowImportGuide(true)
+    }
+  }
+
+  /**
+   * Multi-profile import. Pops a file picker that accepts N `.zip` bundles,
+   * runs a license-limit pre-check, then imports them sequentially. Each
+   * bundle reuses the audited single-profile import path so we don't open
+   * up a new format surface. Per-file failures don't abort the batch — the
+   * summary toast tells the user how many succeeded/failed.
+   */
+  const pickAndImport = async () => {
+    if (importing) return
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.zip'
+    input.multiple = true
+    input.onchange = async () => {
+      const files = Array.from(input.files ?? [])
+      if (files.length === 0) return
+
+      // Pre-flight license-limit check. -1 = unlimited.
+      try {
+        const limit = await checkProfileLimit()
+        if (limit.max !== -1 && limit.current + files.length > limit.max) {
+          const remaining = Math.max(0, limit.max - limit.current)
+          const msg = remaining === 0
+            ? `Profile limit reached (${limit.current}/${limit.max}). Upgrade your plan to import more.`
+            : `Importing ${files.length} would exceed your plan limit (${limit.current}/${limit.max}). Only the first ${remaining} will be imported.`
+          if (!confirm(msg + '\n\nContinue?')) return
+          // Truncate to whatever the plan allows
+          files.length = remaining
+        }
+      } catch {
+        // If the limit check itself fails, fall through and let the per-file
+        // import surface the real error rather than blocking the whole flow.
+      }
+
+      setImporting(true)
+      setError(null)
+      let succeeded = 0
+      const failures: string[] = []
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        try {
+          const arrayBuffer = await file.arrayBuffer()
+          await importProfile(Buffer.from(arrayBuffer))
+          succeeded += 1
+          pushToast(`Imported ${i + 1}/${files.length}: ${file.name}`, 'info', 1500)
+        } catch (e: any) {
+          failures.push(`${file.name}: ${e.message ?? 'unknown error'}`)
+        }
+      }
+
+      setImporting(false)
+      await fetchUsage()
+
+      if (failures.length === 0) {
+        pushToast(`Imported ${succeeded} profile${succeeded !== 1 ? 's' : ''}`, 'success')
+      } else if (succeeded === 0) {
+        setError(`All ${failures.length} import${failures.length !== 1 ? 's' : ''} failed:\n` + failures.join('\n'))
+      } else {
+        pushToast(`Imported ${succeeded} of ${succeeded + failures.length} (${failures.length} failed)`, 'info')
+        setError('Some imports failed:\n' + failures.join('\n'))
+      }
+    }
+    input.click()
+  }
+
   return (
     <div className="flex flex-col h-full">
       <Header
@@ -236,6 +330,15 @@ export function ProfileManager() {
             >
               <ShieldAlert className="w-4 h-4" />
               Check collisions
+            </button>
+            <button
+              onClick={handleImportClick}
+              disabled={importing}
+              className="btn-ghost flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Import one or more profile bundles (.ghost.zip)"
+            >
+              <Upload className={`w-4 h-4 ${importing ? 'animate-pulse' : ''}`} />
+              {importing ? 'Importing…' : 'Import'}
             </button>
             <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2 text-sm">
               <Plus className="w-4 h-4" />
@@ -459,6 +562,15 @@ export function ProfileManager() {
         <CollisionsDrawer
           onPickProfile={handlePickCollisionProfile}
           onClose={() => setShowCollisions(false)}
+        />
+      )}
+      {showImportGuide && (
+        <ImportGuideModal
+          onClose={() => setShowImportGuide(false)}
+          onConfirm={() => {
+            setShowImportGuide(false)
+            pickAndImport()
+          }}
         />
       )}
     </div>

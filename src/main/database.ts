@@ -731,15 +731,28 @@ export class Database {
   }
 
   getDetectionTestResults(profileId?: string): any[] {
+    // Map snake_case DB columns → camelCase to match the renderer's
+    // DetectionTestResult shape. Without this, fields like `testedAt`,
+    // `profileId`, `profileName`, `overallScore` are undefined and crash
+    // anything that touches them (e.g. HealthTrendChart's `r.testedAt.slice(...)`).
+    const mapRow = (r: any) => ({
+      id: r.id,
+      profileId: r.profile_id,
+      profileName: r.profile_name,
+      testedAt: r.tested_at,
+      overallScore: r.overall_score,
+      status: r.status,
+      vectors: JSON.parse(r.vectors)
+    })
     if (profileId) {
       return this.queryAll(
         'SELECT * FROM detection_tests WHERE profile_id = ? ORDER BY tested_at DESC LIMIT 50',
         [profileId]
-      ).map(r => ({ ...r, vectors: JSON.parse(r.vectors) }))
+      ).map(mapRow)
     }
     return this.queryAll(
       'SELECT * FROM detection_tests ORDER BY tested_at DESC LIMIT 100'
-    ).map(r => ({ ...r, vectors: JSON.parse(r.vectors) }))
+    ).map(mapRow)
   }
 
   getDetectionTestSummary(): { totalTests: number; averageScore: number; lastTestedAt: string | null } {
