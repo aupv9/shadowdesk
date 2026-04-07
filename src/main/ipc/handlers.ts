@@ -40,7 +40,7 @@ import { getMarketplace } from '../marketplace'
 import { getWebhookManager } from '../webhooks'
 import {
   getAiStatus, setAiApiKey, setAiEnabled,
-  generateWorkflow, explainStep, fixStep,
+  generateWorkflow, generateWorkflowFromCapture, explainStep, fixStep,
   analyzeDetection, healSelector,
   getBehaviorArchetypes, getBehaviorArchetype
 } from '../ai-assistant'
@@ -456,6 +456,15 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('recorder:isRecording', async (_event, profileId: string) => {
     return Recorder.getInstance().isRecording(profileId)
+  })
+
+  ipcMain.handle('recorder:generateWorkflow', async (_event, profileId: string) => {
+    const recorder = Recorder.getInstance()
+    const state = recorder.state(profileId)
+    if (!state.recording && state.steps.length === 0) {
+      throw new Error('No recorded actions to generate workflow from')
+    }
+    return generateWorkflowFromCapture(state.steps)
   })
 
   // ── Encrypted credential vault (Phase 12.C.3) ─────────────────────────────

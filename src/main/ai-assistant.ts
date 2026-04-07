@@ -259,6 +259,77 @@ export async function generateWorkflow(
   }
 }
 
+// ── 16.A.2: Generate workflow from captured user actions ─────────────────────
+
+const CAPTURE_ENHANCEMENT_PROMPT = `You are an expert automation workflow optimizer.
+Given a list of captured automation steps (user actions), enhance them to create a polished, reusable workflow.
+
+For each step:
+- Improve the label to be more descriptive and action-oriented
+- Verify the action type is correct (click, type, navigate, wait, etc.)
+- Suggest any missing steps (e.g., add waits after navigation, add validation checks)
+- Keep selectors exactly as captured
+- Add helpful params like timeout, delay, or waitUntil if appropriate
+
+Respond with valid JSON only:
+{
+  "summary": "1-2 sentence description of what the entire workflow does",
+  "enhancedSteps": [
+    {
+      "id": "step-id",
+      "action": "action-type",
+      "label": "improved description",
+      "params": { ... }
+    }
+  ],
+  "suggestions": "Optional tips for making the workflow more reliable"
+}`
+
+export async function generateWorkflowFromCapture(
+  capturedSteps: AutomationStep[]
+): Promise<AiWorkflowResult> {
+  if (capturedSteps.length === 0) {
+    return {
+      summary: 'No actions captured',
+      steps: [],
+      notes: 'Start recording and perform some actions to generate a workflow.'
+    }
+  }
+
+  checkRateLimit()
+  const client = getClient()
+
+  const userContent = `Captured steps to enhance:\n${JSON.stringify(capturedSteps, null, 2)}`
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 2048,
+    system: CAPTURE_ENHANCEMENT_PROMPT,
+    messages: [{ role: 'user', content: userContent }]
+  })
+  incrementCall()
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const jsonMatch = text.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) throw new Error('Model did not return valid JSON for workflow enhancement')
+
+  const parsed = JSON.parse(jsonMatch[0])
+
+  // Preserve original IDs but use enhanced labels and params
+  const steps: AutomationStep[] = (parsed.enhancedSteps ?? []).map((s: any, i: number) => ({
+    id: s.id ?? capturedSteps[i]?.id ?? `step-${i + 1}-${uuidv4().slice(0, 8)}`,
+    action: s.action,
+    label: s.label,
+    params: s.params ?? {}
+  }))
+
+  return {
+    summary: parsed.summary ?? 'Enhanced workflow from captured actions',
+    steps,
+    notes: parsed.suggestions
+  }
+}
+
 export async function explainStep(step: AutomationStep): Promise<string> {
   checkRateLimit()
   const client = getClient()

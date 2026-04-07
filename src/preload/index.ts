@@ -53,7 +53,9 @@ const api = {
     stop:              (profileId: string) => ipcRenderer.invoke('recorder:stop', profileId),
     state:             (profileId: string) => ipcRenderer.invoke('recorder:state', profileId),
     isRecording:       (profileId: string) => ipcRenderer.invoke('recorder:isRecording', profileId),
-    validateSelectors: (profileId: string) => ipcRenderer.invoke('recorder:validateSelectors', profileId)
+    validateSelectors: (profileId: string) => ipcRenderer.invoke('recorder:validateSelectors', profileId),
+    // Phase 16.A.2 — Generate workflow from captured actions
+    generateWorkflow:  (profileId: string) => ipcRenderer.invoke('recorder:generateWorkflow', profileId)
   },
   // Phase 12.C.2 — Per-profile storage inspector (read-only)
   storage: {
