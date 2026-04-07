@@ -13,8 +13,13 @@ interface Window {
       active:            ()                                        => Promise<string[]>
       setGroup:          (profileId: string, groupId: string | null) => Promise<void>
       rerollFingerprint: (id: string)                              => Promise<any>
-      export: (id: string)                                         => Promise<Buffer>
-      import: (buffer: Buffer)                                     => Promise<import('./types').Profile>
+      export:            (id: string)                              => Promise<Buffer>
+      import:            (buffer: Buffer)                          => Promise<import('./types').Profile>
+      // Phase 6: version history
+      history:           (profileId: string)                       => Promise<import('./types').ProfileVersion[]>
+      saveVersion:       (profileId: string, label: string)        => Promise<{ id: string }>
+      restoreVersion:    (profileId: string, versionId: string)    => Promise<import('./types').Profile>
+      deleteVersion:     (versionId: string)                       => Promise<void>
     }
     cookies: {
       import: (profileId: string, text: string, format: 'netscape' | 'json') => Promise<number>
@@ -106,9 +111,13 @@ interface Window {
       stop:   () => Promise<import('./types').ApiServerStatus>
     }
     detection: {
-      runTest: (profileId: string) => Promise<import('./types').DetectionTestResult>
-      results: (profileId?: string) => Promise<import('./types').DetectionTestResult[]>
-      summary: () => Promise<import('./types').DetectionTestSummary>
+      runTest:      (profileId: string)          => Promise<import('./types').DetectionTestResult>
+      results:      (profileId?: string)         => Promise<import('./types').DetectionTestResult[]>
+      summary:      ()                           => Promise<import('./types').DetectionTestSummary>
+      // Phase 7: result management + batch testing
+      deleteResult: (resultId: string)           => Promise<void>
+      clearHistory: (profileId?: string)         => Promise<void>
+      batchTest:    (profileIds: string[])       => Promise<import('./types').BatchTestStatus>
     }
   }
 }

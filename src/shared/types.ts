@@ -458,3 +458,11 @@ export interface DetectionTestSummary {
   lastTestedAt: string | null
   results: DetectionTestResult[]
 }
+
+// Phase 7: batch detection test result
+export interface BatchTestStatus {
+  total: number
+  completed: number
+  failed: number
+  results: DetectionTestResult[]
+}
