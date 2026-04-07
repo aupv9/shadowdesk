@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { Save, RefreshCw, Info, Keyboard, Server, Play, Square, Copy, CheckCircle, Cpu, AlertTriangle, ShieldCheck, Lock, Unlock, Plus, Trash2, KeyRound } from 'lucide-react'
 import type { ApiServerStatus, ApiServerConfig } from '../../types'
 import { RemoteNodesPanel } from './RemoteNodesPanel'
+import { CommunityPresetsPanel } from './CommunityPresetsPanel'
+import { WebhooksPanel } from './WebhooksPanel'
 
 type CaptchaProviderId = '2captcha' | 'anticaptcha' | 'capmonster'
 
@@ -746,6 +748,12 @@ export function SettingsPage() {
 
         {/* Phase 14.A — Remote Browser Nodes */}
         <RemoteNodesPanel />
+
+        {/* Phase 15.B — Community Fingerprint Presets */}
+        <CommunityPresetsPanel />
+
+        {/* Phase 15.C — Outbound Webhooks */}
+        <WebhooksPanel />
 
         {/* Keyboard Shortcuts */}
         <div className="card">

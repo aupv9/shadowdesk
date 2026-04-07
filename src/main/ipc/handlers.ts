@@ -36,7 +36,9 @@ import { getSolver, listSolvers, type CaptchaProviderId } from '../captcha'
 import { Recorder } from '../recorder'
 import { getVault } from '../vault'
 import { getNodeManager } from '../remote-nodes'
-import type { CreateNodeInput } from '../../shared/types'
+import { getMarketplace } from '../marketplace'
+import { getWebhookManager } from '../webhooks'
+import type { CreateNodeInput, CreateWebhookInput, TelegramConfig, MarketplaceCategory, WebhookConfig } from '../../shared/types'
 
 // ── Handler registration ───────────────────────────────────────────────────
 
@@ -1202,4 +1204,28 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('nodes:remove', (_e, id: string) => nodes.remove(id))
   ipcMain.handle('nodes:test', (_e, id: string) => nodes.ping(id))
   ipcMain.handle('nodes:pickBest', () => nodes.pickBestNode())
+
+  // ── Marketplace (Phase 15.A) ──────────────────────────────────────────────
+  const mkt = getMarketplace()
+
+  ipcMain.handle('marketplace:list', (_e, opts?: { category?: MarketplaceCategory; q?: string }) =>
+    mkt.list(opts ?? {})
+  )
+  ipcMain.handle('marketplace:get', (_e, id: string) => mkt.get(id))
+  ipcMain.handle('marketplace:install', (_e, id: string, customName?: string) =>
+    mkt.install(id, customName)
+  )
+
+  // ── Webhooks (Phase 15.C) ─────────────────────────────────────────────────
+  const wh = getWebhookManager()
+
+  ipcMain.handle('webhooks:list',   () => wh.listWebhooks())
+  ipcMain.handle('webhooks:add',    (_e, input: CreateWebhookInput) => wh.addWebhook(input))
+  ipcMain.handle('webhooks:update', (_e, id: string, patch: Partial<WebhookConfig>) => wh.updateWebhook(id, patch))
+  ipcMain.handle('webhooks:remove', (_e, id: string) => wh.removeWebhook(id))
+  ipcMain.handle('webhooks:telegram:get',  () => wh.getTelegramConfig())
+  ipcMain.handle('webhooks:telegram:save', (_e, cfg: TelegramConfig) => wh.saveTelegramConfig(cfg))
+  ipcMain.handle('webhooks:dispatch', (_e, event: string, payload: Record<string, any>) =>
+    wh.dispatch(event as any, payload)
+  )
 }
