@@ -485,6 +485,11 @@ export type AutomationActionType =
   | 'getCookies'
   | 'setCookies'
   | 'deleteCookies'
+  // Tier 6 RPA — Data-driven automation & file handling
+  | 'forEachRow'
+  | 'readFile'
+  | 'writeFile'
+  | 'waitForDownload'
 
 export interface AutomationStep {
   id: string
