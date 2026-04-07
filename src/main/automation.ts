@@ -17,9 +17,70 @@ import type { WebContents } from 'electron'
 import http from 'http'
 import https from 'https'
 import { createWriteStream } from 'fs'
-import { mkdir, stat } from 'fs/promises'
-import { dirname } from 'path'
+import { mkdir, stat, readFile as fsReadFile, writeFile as fsWriteFile, appendFile as fsAppendFile } from 'fs/promises'
+import { dirname, extname, isAbsolute, resolve as pathResolve } from 'path'
 import { URL } from 'url'
+
+/**
+ * Tier 6: Minimal RFC-4180-style CSV parser. Handles quoted fields, embedded
+ * commas/newlines, and double-quote escaping. The first row is treated as the
+ * header — every subsequent row becomes an object keyed by header column.
+ *
+ * Keeping this in-tree avoids pulling a new dependency for the common case of
+ * config-style spreadsheets used in farming/scraping workflows.
+ */
+function parseCsv(text: string, delimiter = ','): Record<string, string>[] {
+  const rows: string[][] = []
+  let current: string[] = []
+  let field = ''
+  let inQuotes = false
+  let i = 0
+  // Strip BOM if present
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1)
+
+  while (i < text.length) {
+    const ch = text[i]
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 2; continue }
+        inQuotes = false
+        i++
+        continue
+      }
+      field += ch
+      i++
+      continue
+    }
+    if (ch === '"') { inQuotes = true; i++; continue }
+    if (ch === delimiter) { current.push(field); field = ''; i++; continue }
+    if (ch === '\r') { i++; continue }
+    if (ch === '\n') {
+      current.push(field)
+      rows.push(current)
+      current = []
+      field = ''
+      i++
+      continue
+    }
+    field += ch
+    i++
+  }
+  // Flush trailing field/row
+  if (field.length > 0 || current.length > 0) {
+    current.push(field)
+    rows.push(current)
+  }
+
+  if (rows.length === 0) return []
+  const header = rows[0].map((h) => h.trim())
+  return rows.slice(1)
+    .filter((r) => r.length > 0 && !(r.length === 1 && r[0] === ''))
+    .map((r) => {
+      const obj: Record<string, string> = {}
+      header.forEach((h, idx) => { obj[h] = r[idx] ?? '' })
+      return obj
+    })
+}
 
 /** Replace {key} placeholders in step params with variable values.
  *  Keys may include dots for namespaced lookups (e.g. `{cred.username}`). */
@@ -919,6 +980,206 @@ export class AutomationEngine {
           iterations++
         }
         return { iterations, totalSteps: loopSteps.length * times }
+      }
+
+      // ── Tier 6 RPA: Data-driven automation & file handling ──────────
+
+      case 'forEachRow': {
+        // Load a CSV or JSON file (or inline JSON via params.rows) and run
+        // `params.steps` once per row. Each row's columns are exposed as
+        // `{row.column}` placeholders for the duration of that iteration.
+        // Optional `prefix` overrides the `row.` namespace (e.g. `item.`).
+        // `failFast: true` (default) aborts on first iteration error;
+        // `false` collects errors and continues.
+        const innerSteps: AutomationStep[] = params.steps ?? []
+        const prefix: string = (params.prefix ?? 'row').replace(/\.$/, '')
+        const failFast: boolean = params.failFast !== false
+        const limit: number = Number(params.limit ?? 0)
+
+        let rows: Record<string, any>[] = []
+        if (Array.isArray(params.rows)) {
+          rows = params.rows
+        } else if (params.filePath) {
+          const filePath: string = params.filePath
+          let raw: string
+          try {
+            raw = await fsReadFile(filePath, 'utf-8')
+          } catch (e: any) {
+            throw new Error(`forEachRow: cannot read ${filePath}: ${e.message}`)
+          }
+          const ext = (extname(filePath) || '').toLowerCase()
+          if (ext === '.json') {
+            const parsed = JSON.parse(raw)
+            if (!Array.isArray(parsed)) {
+              throw new Error('forEachRow: JSON file must contain an array of row objects')
+            }
+            rows = parsed
+          } else {
+            // CSV — minimal RFC 4180 parser supporting quoted fields, CRLF,
+            // and embedded commas/newlines/quotes (escaped by doubling).
+            rows = parseCsv(raw, params.delimiter ?? ',')
+          }
+        } else {
+          throw new Error('forEachRow: requires `filePath` or inline `rows` array')
+        }
+
+        if (limit > 0 && rows.length > limit) {
+          rows = rows.slice(0, limit)
+        }
+
+        const errors: { index: number; error: string }[] = []
+        let completed = 0
+        for (let idx = 0; idx < rows.length; idx++) {
+          if (control.abort) throw new Error('Workflow stopped')
+          const row = rows[idx] ?? {}
+          // Snapshot the prior values so we can restore them on the next
+          // iteration (avoid leaking row.X variables out of the loop).
+          const injected: string[] = []
+          for (const [k, v] of Object.entries(row)) {
+            const key = `${prefix}.${k}`
+            variables[key] = v == null ? '' : String(v)
+            injected.push(key)
+          }
+          variables[`${prefix}._index`] = String(idx)
+          variables[`${prefix}._total`] = String(rows.length)
+          injected.push(`${prefix}._index`, `${prefix}._total`)
+
+          try {
+            const status = await this.executeSteps(page, innerSteps, control, allResults, variables)
+            if (status === 'stopped') throw new Error('Workflow stopped')
+            if (status === 'failed') throw new Error(`Iteration ${idx + 1} failed`)
+            completed++
+          } catch (err: any) {
+            errors.push({ index: idx, error: err.message ?? String(err) })
+            if (failFast) {
+              // Cleanup injected vars before bailing out
+              for (const k of injected) delete variables[k]
+              throw err
+            }
+          } finally {
+            // Remove this iteration's row.* variables to prevent leakage
+            // into subsequent iterations / outer scope.
+            for (const k of injected) delete variables[k]
+          }
+        }
+
+        return {
+          rowCount: rows.length,
+          completed,
+          failed: errors.length,
+          errors: errors.slice(0, 20) // cap reported errors
+        }
+      }
+
+      case 'readFile': {
+        // Read a text file into a workflow variable. Defaults to UTF-8.
+        // Optional `parse: 'json'` parses the contents and stores the
+        // serialized JSON string (consumers can re-parse if needed).
+        if (!params.filePath) throw new Error('readFile: filePath required')
+        const enc: BufferEncoding = (params.encoding ?? 'utf-8') as BufferEncoding
+        const text = await fsReadFile(params.filePath, enc)
+        let value: string = String(text)
+        if (params.parse === 'json') {
+          try {
+            value = JSON.stringify(JSON.parse(value))
+          } catch (e: any) {
+            throw new Error(`readFile: invalid JSON in ${params.filePath}: ${e.message}`)
+          }
+        }
+        if (params.saveAs) variables[params.saveAs] = value
+        return {
+          filePath: params.filePath,
+          bytes: Buffer.byteLength(value, enc),
+          savedAs: params.saveAs ?? null
+        }
+      }
+
+      case 'writeFile': {
+        // Write `params.content` to disk. Supports `append: true` and
+        // automatic parent-directory creation. Returns bytes written.
+        if (!params.filePath) throw new Error('writeFile: filePath required')
+        const content: string = params.content ?? ''
+        const enc: BufferEncoding = (params.encoding ?? 'utf-8') as BufferEncoding
+        const target = isAbsolute(params.filePath)
+          ? params.filePath
+          : pathResolve(process.cwd(), params.filePath)
+        await mkdir(dirname(target), { recursive: true })
+        if (params.append) {
+          await fsAppendFile(target, content, enc)
+        } else {
+          await fsWriteFile(target, content, enc)
+        }
+        return {
+          filePath: target,
+          bytes: Buffer.byteLength(content, enc),
+          mode: params.append ? 'append' : 'write'
+        }
+      }
+
+      case 'waitForDownload': {
+        // Wait for a file to appear in the download directory. Polls the
+        // filesystem since puppeteer-core's CDP `Browser.downloadProgress`
+        // event isn't reliably wired across all Chromium revisions.
+        // Either `filePath` (exact match) or `directory` + `pattern` regex.
+        const timeoutMs: number = Number(params.timeout ?? 60000)
+        const pollMs: number = Number(params.pollInterval ?? 500)
+        const start = Date.now()
+
+        if (params.filePath) {
+          const target: string = params.filePath
+          while (Date.now() - start < timeoutMs) {
+            if (control.abort) throw new Error('Workflow stopped')
+            try {
+              const s = await stat(target)
+              if (s.size > 0) {
+                // Wait one more poll to ensure the file isn't still being
+                // written (size unchanged across two polls).
+                await new Promise((r) => setTimeout(r, pollMs))
+                const s2 = await stat(target)
+                if (s2.size === s.size) {
+                  if (params.saveAs) variables[params.saveAs] = target
+                  return { filePath: target, bytes: s2.size, waited_ms: Date.now() - start }
+                }
+              }
+            } catch { /* not yet */ }
+            await new Promise((r) => setTimeout(r, pollMs))
+          }
+          throw new Error(`waitForDownload: timed out waiting for ${target}`)
+        }
+
+        if (!params.directory) {
+          throw new Error('waitForDownload: requires `filePath` or `directory` (+ optional `pattern`)')
+        }
+        const dir: string = params.directory
+        const pattern = params.pattern ? new RegExp(params.pattern) : null
+        const { readdir } = await import('fs/promises')
+        // Snapshot the directory so we only match newly-created files.
+        let baseline: Set<string>
+        try {
+          baseline = new Set(await readdir(dir))
+        } catch (e: any) {
+          throw new Error(`waitForDownload: cannot read directory ${dir}: ${e.message}`)
+        }
+
+        while (Date.now() - start < timeoutMs) {
+          if (control.abort) throw new Error('Workflow stopped')
+          try {
+            const entries = await readdir(dir)
+            const fresh = entries.filter((f) => !baseline.has(f))
+            const matches = pattern ? fresh.filter((f) => pattern.test(f)) : fresh
+            // Skip Chromium's `.crdownload` partials
+            const finished = matches.filter((f) => !f.endsWith('.crdownload') && !f.endsWith('.tmp'))
+            if (finished.length > 0) {
+              const fresh0 = finished[0]
+              const full = pathResolve(dir, fresh0)
+              const s = await stat(full)
+              if (params.saveAs) variables[params.saveAs] = full
+              return { filePath: full, bytes: s.size, waited_ms: Date.now() - start }
+            }
+          } catch { /* ignore */ }
+          await new Promise((r) => setTimeout(r, pollMs))
+        }
+        throw new Error(`waitForDownload: timed out waiting in ${dir}`)
       }
 
       // ── Phase 12.B.1: Captcha solving ───────────────────────────────
