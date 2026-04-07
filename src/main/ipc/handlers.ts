@@ -14,7 +14,10 @@ import { downloadUpdate, installUpdate } from '../auto-updater'
 import { login, register, logout, getCurrentUser, updatePassword, isAuthenticated } from '../auth'
 import { fetchLicense, activateLicense, deactivateLicense, getCurrentLicense, checkProfileLimit, getUsage, getMachineId } from '../license'
 import * as team from '../team'
-import { pushProfiles, pullProfiles, getSyncState, getSyncManifest } from '../sync'
+import {
+  pushProfiles, pullProfiles, getSyncState, getSyncManifest,
+  markPendingChange, enableSyncDaemon, disableSyncDaemon, isDaemonEnabled
+} from '../sync'
 import type { CreateProfileInput, CreateProxyInput, TeamRole, CreateWorkflowInput, UpdateWorkflowInput, ApiServerConfig } from '../../shared/types'
 import { parseNetscapeCookies, toNetscapeFormat } from '../utils/cookies'
 import { DetectionTestRunner } from '../detection-test'
@@ -53,11 +56,13 @@ export function registerIpcHandlers(): void {
       user_data_path: userDataPath
     })
 
+    markPendingChange()
     return db.getProfile(id)
   })
 
   ipcMain.handle('profiles:update', (_event, id: string, data: Record<string, any>) => {
     db.updateProfile(id, data)
+    markPendingChange()
     return db.getProfile(id)
   })
 
@@ -80,6 +85,7 @@ export function registerIpcHandlers(): void {
       user_data_path: userDataPath
     })
 
+    markPendingChange()
     return db.getProfile(newId)
   })
 
@@ -101,12 +107,37 @@ export function registerIpcHandlers(): void {
 
     const newFingerprint = resolveFingerprint(fp.preset, uuidv4())
     db.updateProfile(id, { fingerprint: newFingerprint })
+    markPendingChange()
+    return db.getProfile(id)
+  })
+
+  // Phase 10: switch preset on an existing profile while preserving behavior/timing
+  ipcMain.handle('profiles:changePreset', async (_event, id: string, presetKey: string) => {
+    const profile = db.getProfile(id) as any
+    if (!profile) throw new Error(`Profile ${id} not found`)
+    if (!FINGERPRINT_PRESETS[presetKey]) throw new Error(`Unknown preset: ${presetKey}`)
+
+    const fp = typeof profile.fingerprint === 'string'
+      ? JSON.parse(profile.fingerprint)
+      : profile.fingerprint
+
+    // Snapshot before changing
+    db.saveProfileVersion({ id: uuidv4(), profileId: id, fingerprint: fp, label: `Before preset change to ${presetKey}` })
+
+    // Resolve new fingerprint, then carry over behavior + timing from old one
+    const newFp = resolveFingerprint(presetKey, id)
+    if (fp.behavior) newFp.behavior = fp.behavior
+    if (fp.timing)   newFp.timing   = fp.timing
+
+    db.updateProfile(id, { fingerprint: newFp })
+    markPendingChange()
     return db.getProfile(id)
   })
 
   ipcMain.handle('profiles:delete', async (_event, id: string) => {
     await bm.closeProfile(id).catch(() => {})
     db.deleteProfile(id)
+    markPendingChange()
     // Remove Chromium user-data directory for this profile
     const { rm } = await import('fs/promises')
     const profileDataPath = join(app.getPath('userData'), 'profiles', id)
@@ -147,6 +178,7 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('profiles:setGroup', (_event, profileId: string, groupId: string | null) => {
     db.updateProfileGroup(profileId, groupId)
+    markPendingChange()
   })
 
   // Phase 12.C.4: fingerprint collision detection
@@ -168,6 +200,7 @@ export function registerIpcHandlers(): void {
     }
     if (!Array.isArray(cookies)) throw new Error('Cookies must be an array')
     db.updateCookies(profileId, JSON.stringify(cookies))
+    markPendingChange()
     return cookies.length
   })
 
@@ -187,6 +220,7 @@ export function registerIpcHandlers(): void {
     const cookies = await page.cookies()
     // Also save captured cookies to the DB
     db.updateCookies(profileId, JSON.stringify(cookies))
+    markPendingChange()
     return cookies
   })
 
@@ -211,6 +245,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('cookies:save', async (_event, profileId: string, cookies: any[]) => {
     if (!Array.isArray(cookies)) throw new Error('cookies must be an array')
     db.updateCookies(profileId, JSON.stringify(cookies))
+    markPendingChange()
 
     // Best-effort: push the new set into the live session if there is one.
     const page = await bm.getActivePage(profileId).catch(() => null)
@@ -514,6 +549,8 @@ export function registerIpcHandlers(): void {
       db.updateCookies(newId, cookies)
     }
 
+    markPendingChange()
+
     return db.getProfile(newId)
   })
 
@@ -769,6 +806,18 @@ export function registerIpcHandlers(): void {
     return getSyncManifest()
   })
 
+  ipcMain.handle('sync:daemonEnabled', () => {
+    return isDaemonEnabled()
+  })
+
+  ipcMain.handle('sync:enableDaemon', (_event, encryptionPassword: string) => {
+    return enableSyncDaemon(encryptionPassword)
+  })
+
+  ipcMain.handle('sync:disableDaemon', () => {
+    disableSyncDaemon()
+  })
+
   // ── Automation / RPA ────────────────────────────────────────────────────
 
   const automation = AutomationEngine.getInstance()
@@ -812,19 +861,19 @@ export function registerIpcHandlers(): void {
     db.deleteWorkflow(id)
   })
 
-  ipcMain.handle('workflows:run', async (_event, workflowId: string, profileId: string, variables?: Record<string, string>) => {
-    return automation.executeWorkflow(workflowId, profileId, variables)
+  ipcMain.handle('workflows:run', async (event, workflowId: string, profileId: string, variables?: Record<string, string>) => {
+    return automation.executeWorkflow(workflowId, profileId, variables, event.sender)
   })
 
   // Phase 10.1 — parallel execution against many profiles at once
   ipcMain.handle('workflows:runParallel', async (
-    _event,
+    event,
     workflowId: string,
     profileIds: string[],
     variables?: Record<string, string>,
     concurrency?: number
   ) => {
-    return automation.executeWorkflowParallel(workflowId, profileIds, variables, concurrency ?? 5)
+    return automation.executeWorkflowParallel(workflowId, profileIds, variables, concurrency ?? 5, event.sender)
   })
 
   ipcMain.handle('workflows:stop', (_event, workflowId: string, profileId: string) => {

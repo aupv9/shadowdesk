@@ -385,6 +385,8 @@ export type AutomationActionType =
   | 'loop'
   | 'hover'
   | 'rightClick'
+  | 'doubleClick'
+  | 'waitForNavigation'
   | 'setAttribute'
   | 'httpRequest'
   // Phase 12.B.3 — File transfer
@@ -401,12 +403,13 @@ export interface AutomationStep {
   action: AutomationActionType
   label?: string
   params: Record<string, any>
-  // For conditional: { selector: string, thenSteps: AutomationStep[], elseSteps: AutomationStep[] }
+  /** Retry up to N times on failure before marking the step failed */
+  retries?: number
+  /** Delay in ms between retries (default 1000) */
+  retryDelay?: number
+  // For conditional: { conditionType?, selector, expected?, script?, thenSteps, elseSteps }
   // For loop: { times: number, steps: AutomationStep[] }
-  // For hover: { selector: string }
-  // For rightClick: { selector: string }
-  // For setAttribute: { selector: string, attribute: string, value: string }
-  // For httpRequest: { url: string, method: string, headers?: Record<string,string>, body?: string }
+  // For extractText/evaluate/httpRequest: add saveAs to write result to a variable
 }
 
 export interface AutomationWorkflow {

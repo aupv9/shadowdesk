@@ -4,7 +4,9 @@ import type { SyncState, SyncManifest } from '../types'
 interface SyncStore {
   state: SyncState
   manifest: SyncManifest | null
+  manifestLoaded: boolean
   loading: boolean
+  manifestLoading: boolean
   error: string | null
 
   fetchStatus:   () => Promise<void>
@@ -17,7 +19,9 @@ interface SyncStore {
 export const useSyncStore = create<SyncStore>((set) => ({
   state: { status: 'idle', last_synced_at: null, pending_changes: 0 },
   manifest: null,
+  manifestLoaded: false,
   loading: false,
+  manifestLoading: false,
   error: null,
 
   fetchStatus: async () => {
@@ -53,10 +57,13 @@ export const useSyncStore = create<SyncStore>((set) => ({
   },
 
   fetchManifest: async () => {
+    set({ manifestLoading: true })
     try {
       const manifest = await window.api.sync.manifest()
-      set({ manifest })
-    } catch { /* ignore */ }
+      set({ manifest, manifestLoaded: true, manifestLoading: false })
+    } catch {
+      set({ manifestLoaded: true, manifestLoading: false })
+    }
   },
 
   updateState: (state) => {

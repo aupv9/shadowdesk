@@ -12,6 +12,7 @@ const api = {
     active:             ()                                    => ipcRenderer.invoke('profiles:active'),
     setGroup:           (profileId: string, groupId: string | null) => ipcRenderer.invoke('profiles:setGroup', profileId, groupId),
     rerollFingerprint:  (id: string)                          => ipcRenderer.invoke('profiles:rerollFingerprint', id),
+    changePreset:       (id: string, presetKey: string)       => ipcRenderer.invoke('profiles:changePreset', id, presetKey),
     export:             (id: string)                          => ipcRenderer.invoke('profiles:export', id),
     import:             (buffer: Buffer)                      => ipcRenderer.invoke('profiles:import', buffer),
     // Phase 6: version history
@@ -147,10 +148,13 @@ const api = {
     auditLog:         (params?: { page?: number; limit?: number; user_id?: string; action?: string }) => ipcRenderer.invoke('team:auditLog', params)
   },
   sync: {
-    status:   ()                       => ipcRenderer.invoke('sync:status'),
-    push:     (password: string)       => ipcRenderer.invoke('sync:push', password),
-    pull:     (password: string)       => ipcRenderer.invoke('sync:pull', password),
-    manifest: ()                       => ipcRenderer.invoke('sync:manifest'),
+    status:         ()                       => ipcRenderer.invoke('sync:status'),
+    push:           (password: string)       => ipcRenderer.invoke('sync:push', password),
+    pull:           (password: string)       => ipcRenderer.invoke('sync:pull', password),
+    manifest:       ()                       => ipcRenderer.invoke('sync:manifest'),
+    daemonEnabled:  ()                       => ipcRenderer.invoke('sync:daemonEnabled'),
+    enableDaemon:   (password: string)       => ipcRenderer.invoke('sync:enableDaemon', password),
+    disableDaemon:  ()                       => ipcRenderer.invoke('sync:disableDaemon'),
     onStatus: (cb: (state: any) => void): (() => void) => {
       const handler = (_event: any, state: any) => cb(state)
       ipcRenderer.on('sync:status', handler)
@@ -182,6 +186,15 @@ const api = {
     list:               ()                                            => ipcRenderer.invoke('templates:list'),
     get:                (id: string)                                   => ipcRenderer.invoke('templates:get', id),
     createFromTemplate: (templateId: string, name?: string)            => ipcRenderer.invoke('templates:createFromTemplate', templateId, name)
+  },
+  automation: {
+    /** Subscribe to per-step progress events emitted during a workflow run.
+     *  Returns an unsubscribe function. */
+    onStepProgress: (cb: (data: { workflowId: string; profileId: string; step: any }) => void): (() => void) => {
+      const handler = (_event: any, data: any) => cb(data)
+      ipcRenderer.on('automation:step-progress', handler)
+      return () => { ipcRenderer.removeListener('automation:step-progress', handler) }
+    }
   },
   apiServer: {
     status: ()                                                         => ipcRenderer.invoke('apiServer:status'),

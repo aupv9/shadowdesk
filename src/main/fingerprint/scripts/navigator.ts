@@ -64,6 +64,21 @@ export function buildNavigatorScript(
     configurable: true
   });
 
+  // ── Online status hardening ───────────────────────────────────────────────
+  // Headless Chrome often reports onLine correctly, but some detection scripts
+  // cross-check it against the WebRTC ICE state or network conditions.
+  // Always report true and suppress offline events to avoid mismatches.
+  Object.defineProperty(navigator, 'onLine', {
+    get: () => true,
+    configurable: true
+  });
+  // Intercept window offline events so they never fire during automation
+  const _origAddEL = window.addEventListener.bind(window);
+  window.addEventListener = function(type, listener, options) {
+    if (type === 'offline') return;
+    return _origAddEL(type, listener, options);
+  };
+
   // ── Battery API ───────────────────────────────────────────────────────────
   if (navigator.getBattery) {
     navigator.getBattery = () => Promise.resolve({

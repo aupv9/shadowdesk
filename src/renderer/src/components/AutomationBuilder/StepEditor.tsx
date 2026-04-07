@@ -27,37 +27,41 @@ import {
   Download,
   ShieldCheck,
   KeyRound,
-  Lock
+  Lock,
+  Navigation,
+  RefreshCw
 } from 'lucide-react'
 import type { AutomationStep, AutomationActionType } from '../../types'
 
 const ACTION_META: Record<AutomationActionType, { icon: React.ElementType; label: string; color: string }> = {
-  navigate:        { icon: Globe,              label: 'Navigate',         color: 'text-blue-400' },
-  click:           { icon: MousePointer,       label: 'Click',            color: 'text-green-400' },
-  type:            { icon: Type,               label: 'Type Text',        color: 'text-purple-400' },
-  wait:            { icon: Clock,              label: 'Wait',             color: 'text-yellow-400' },
-  waitForSelector: { icon: Search,             label: 'Wait for Element', color: 'text-orange-400' },
-  screenshot:      { icon: Camera,             label: 'Screenshot',       color: 'text-pink-400' },
-  extractText:     { icon: FileText,           label: 'Extract Text',     color: 'text-cyan-400' },
-  scroll:          { icon: ArrowDownToLine,    label: 'Scroll',           color: 'text-indigo-400' },
-  select:          { icon: List,               label: 'Select Option',    color: 'text-teal-400' },
-  keyPress:        { icon: Keyboard,           label: 'Key Press',        color: 'text-amber-400' },
-  evaluate:        { icon: Code,               label: 'Run Script',       color: 'text-red-400' },
-  conditional:     { icon: GitBranch,          label: 'Conditional',      color: 'text-emerald-400' },
-  loop:            { icon: Repeat,             label: 'Loop',             color: 'text-violet-400' },
-  hover:           { icon: Hand,               label: 'Hover',            color: 'text-sky-400' },
-  rightClick:      { icon: MousePointerClick,  label: 'Right Click',      color: 'text-rose-400' },
-  setAttribute:    { icon: PenTool,            label: 'Set Attribute',    color: 'text-lime-400' },
-  httpRequest:     { icon: Send,               label: 'HTTP Request',     color: 'text-fuchsia-400' },
-  upload:          { icon: Upload,             label: 'Upload File',      color: 'text-sky-300' },
-  download:        { icon: Download,           label: 'Download File',    color: 'text-emerald-300' },
-  solveCaptcha:        { icon: ShieldCheck,    label: 'Solve Captcha',    color: 'text-yellow-300' },
-  injectCaptchaToken:  { icon: KeyRound,       label: 'Inject Captcha Token', color: 'text-amber-300' },
-  useCredential:       { icon: Lock,           label: 'Use Credential',   color: 'text-emerald-400' }
+  navigate:           { icon: Globe,              label: 'Navigate',             color: 'text-blue-400' },
+  click:              { icon: MousePointer,       label: 'Click',                color: 'text-green-400' },
+  doubleClick:        { icon: MousePointerClick,  label: 'Double Click',         color: 'text-green-300' },
+  type:               { icon: Type,               label: 'Type Text',            color: 'text-purple-400' },
+  wait:               { icon: Clock,              label: 'Wait',                 color: 'text-yellow-400' },
+  waitForSelector:    { icon: Search,             label: 'Wait for Element',     color: 'text-orange-400' },
+  waitForNavigation:  { icon: Navigation,         label: 'Wait for Navigation',  color: 'text-blue-300' },
+  screenshot:         { icon: Camera,             label: 'Screenshot',           color: 'text-pink-400' },
+  extractText:        { icon: FileText,           label: 'Extract Text',         color: 'text-cyan-400' },
+  scroll:             { icon: ArrowDownToLine,    label: 'Scroll',               color: 'text-indigo-400' },
+  select:             { icon: List,               label: 'Select Option',        color: 'text-teal-400' },
+  keyPress:           { icon: Keyboard,           label: 'Key Press',            color: 'text-amber-400' },
+  evaluate:           { icon: Code,               label: 'Run Script',           color: 'text-red-400' },
+  conditional:        { icon: GitBranch,          label: 'Conditional',          color: 'text-emerald-400' },
+  loop:               { icon: Repeat,             label: 'Loop',                 color: 'text-violet-400' },
+  hover:              { icon: Hand,               label: 'Hover',                color: 'text-sky-400' },
+  rightClick:         { icon: MousePointerClick,  label: 'Right Click',          color: 'text-rose-400' },
+  setAttribute:       { icon: PenTool,            label: 'Set Attribute',        color: 'text-lime-400' },
+  httpRequest:        { icon: Send,               label: 'HTTP Request',         color: 'text-fuchsia-400' },
+  upload:             { icon: Upload,             label: 'Upload File',          color: 'text-sky-300' },
+  download:           { icon: Download,           label: 'Download File',        color: 'text-emerald-300' },
+  solveCaptcha:       { icon: ShieldCheck,        label: 'Solve Captcha',        color: 'text-yellow-300' },
+  injectCaptchaToken: { icon: KeyRound,           label: 'Inject Captcha Token', color: 'text-amber-300' },
+  useCredential:      { icon: Lock,               label: 'Use Credential',       color: 'text-emerald-400' }
 }
 
 const ALL_ACTIONS: AutomationActionType[] = [
-  'navigate', 'click', 'type', 'wait', 'waitForSelector',
+  'navigate', 'click', 'doubleClick', 'type', 'wait', 'waitForSelector', 'waitForNavigation',
   'screenshot', 'extractText', 'scroll', 'select', 'keyPress', 'evaluate',
   'hover', 'rightClick', 'setAttribute', 'httpRequest',
   'upload', 'download',
@@ -78,34 +82,37 @@ interface StepEditorProps {
 
 function getDefaultParams(action: AutomationActionType): Record<string, any> {
   switch (action) {
-    case 'navigate': return { url: 'https://example.com', waitUntil: 'networkidle2' }
-    case 'click': return { selector: '' }
-    case 'type': return { selector: '', text: '', delay: 50 }
-    case 'wait': return { ms: 1000 }
-    case 'waitForSelector': return { selector: '', visible: true, timeout: 30000 }
-    case 'screenshot': return { fullPage: false }
-    case 'extractText': return { selector: 'body' }
-    case 'scroll': return { y: 500 }
-    case 'select': return { selector: '', value: '' }
-    case 'keyPress': return { key: 'Enter' }
-    case 'evaluate': return { script: '// your code here' }
-    case 'hover': return { selector: '' }
-    case 'rightClick': return { selector: '' }
-    case 'setAttribute': return { selector: '', attribute: '', value: '' }
-    case 'httpRequest': return { url: 'https://api.example.com', method: 'GET', headers: {}, body: '' }
-    case 'upload': return { selector: 'input[type="file"]', filePath: '', timeout: 10000 }
-    case 'download': return { url: '', savePath: '', timeout: 60000 }
-    case 'solveCaptcha': return { type: 'recaptcha-v2', siteKey: '', pageUrl: '', saveAs: 'captchaToken' }
+    case 'navigate':           return { url: 'https://example.com', waitUntil: 'networkidle2' }
+    case 'click':              return { selector: '' }
+    case 'doubleClick':        return { selector: '' }
+    case 'waitForNavigation':  return { waitUntil: 'networkidle2', timeout: 30000 }
+    case 'type':               return { selector: '', text: '', delay: 50 }
+    case 'wait':               return { ms: 1000 }
+    case 'waitForSelector':    return { selector: '', visible: true, timeout: 30000 }
+    case 'screenshot':         return { fullPage: false }
+    case 'extractText':        return { selector: 'body', saveAs: '' }
+    case 'scroll':             return { y: 500 }
+    case 'select':             return { selector: '', value: '' }
+    case 'keyPress':           return { key: 'Enter' }
+    case 'evaluate':           return { script: '// your code here', saveAs: '' }
+    case 'hover':              return { selector: '' }
+    case 'rightClick':         return { selector: '' }
+    case 'setAttribute':       return { selector: '', attribute: '', value: '' }
+    case 'httpRequest':        return { url: 'https://api.example.com', method: 'GET', headers: {}, body: '', saveAs: '' }
+    case 'upload':             return { selector: 'input[type="file"]', filePath: '', timeout: 10000 }
+    case 'download':           return { url: '', savePath: '', timeout: 60000 }
+    case 'solveCaptcha':       return { type: 'recaptcha-v2', siteKey: '', pageUrl: '', saveAs: 'captchaToken' }
     case 'injectCaptchaToken': return { selector: '#g-recaptcha-response', token: '{captchaToken}' }
-    case 'useCredential': return { label: '', prefix: 'cred' }
-    case 'conditional': return { selector: '', thenSteps: [], elseSteps: [] }
-    case 'loop': return { times: 3, steps: [] }
-    default: return {}
+    case 'useCredential':      return { label: '', prefix: 'cred' }
+    case 'conditional':        return { conditionType: 'selector-exists', selector: '', expected: '', script: '', thenSteps: [], elseSteps: [] }
+    case 'loop':               return { times: 3, steps: [] }
+    default:                   return {}
   }
 }
 
 export function StepEditor({ step, index, total, onUpdate, onDelete, onDuplicate, onMove }: StepEditorProps) {
   const [expanded, setExpanded] = useState(false)
+  const [showRetry, setShowRetry] = useState(false)
   const meta = ACTION_META[step.action]
 
   const handleActionChange = (action: AutomationActionType) => {
@@ -117,6 +124,7 @@ export function StepEditor({ step, index, total, onUpdate, onDelete, onDuplicate
   }
 
   const Icon = meta.icon
+  const hasRetry = (step.retries ?? 0) > 0
 
   return (
     <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-hidden">
@@ -130,6 +138,12 @@ export function StepEditor({ step, index, total, onUpdate, onDelete, onDuplicate
         <span className="text-sm font-medium text-white flex-1">
           {step.label || meta.label}
         </span>
+        {hasRetry && (
+          <span className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">
+            <RefreshCw className="w-2.5 h-2.5" />
+            ×{step.retries}
+          </span>
+        )}
         <span className="text-xs text-slate-500">{meta.label}</span>
         {expanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
       </div>
@@ -186,6 +200,45 @@ export function StepEditor({ step, index, total, onUpdate, onDelete, onDuplicate
 
           {/* Action-specific params */}
           <ParamEditor action={step.action} params={step.params} onChange={handleParamChange} />
+
+          {/* Retry policy (collapsible) */}
+          <div className="mt-3 border-t border-slate-700/40 pt-3">
+            <button
+              onClick={() => setShowRetry(!showRetry)}
+              className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Retry policy
+              {hasRetry && <span className="text-amber-400">({step.retries} retries, {step.retryDelay ?? 1000}ms delay)</span>}
+              {showRetry ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+            {showRetry && (
+              <div className="mt-2 flex items-center gap-3">
+                <div className="flex-1">
+                  <label className="text-xs text-slate-500 mb-1 block">Retries (0 = no retry)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={10}
+                    value={step.retries ?? 0}
+                    onChange={(e) => onUpdate({ retries: Math.max(0, parseInt(e.target.value || '0', 10)) })}
+                    className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs text-slate-500 mb-1 block">Retry delay (ms)</label>
+                  <input
+                    type="number"
+                    min={100}
+                    step={500}
+                    value={step.retryDelay ?? 1000}
+                    onChange={(e) => onUpdate({ retryDelay: Math.max(100, parseInt(e.target.value || '1000', 10)) })}
+                    className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -201,7 +254,7 @@ function ParamEditor({
   params: Record<string, any>
   onChange: (key: string, value: any) => void
 }) {
-  const field = (key: string, label: string, type: 'text' | 'number' | 'checkbox' | 'textarea' = 'text') => (
+  const field = (key: string, label: string, type: 'text' | 'number' | 'checkbox' | 'textarea' = 'text', placeholder?: string) => (
     <div className="mb-2" key={key}>
       <label className="text-xs text-slate-500 mb-1 block">{label}</label>
       {type === 'checkbox' ? (
@@ -219,12 +272,14 @@ function ParamEditor({
           value={params[key] ?? ''}
           onChange={(e) => onChange(key, e.target.value)}
           rows={4}
+          placeholder={placeholder}
           className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500 font-mono text-xs"
         />
       ) : (
         <input
           type={type}
           value={params[key] ?? ''}
+          placeholder={placeholder}
           onChange={(e) => onChange(key, type === 'number' ? Number(e.target.value) : e.target.value)}
           className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500"
         />
@@ -232,11 +287,72 @@ function ParamEditor({
     </div>
   )
 
+  const saveAsField = (hint: string) => (
+    <div className="mb-2">
+      <label className="text-xs text-slate-500 mb-1 block">Save result as variable (optional)</label>
+      <input
+        type="text"
+        value={params.saveAs ?? ''}
+        onChange={(e) => onChange('saveAs', e.target.value)}
+        placeholder={`e.g. ${hint}`}
+        className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500 font-mono"
+      />
+      {params.saveAs && (
+        <p className="text-[10px] text-slate-500 mt-0.5">Use <code className="text-ghost-400">{`{${params.saveAs}}`}</code> in later steps</p>
+      )}
+    </div>
+  )
+
   switch (action) {
     case 'navigate':
-      return <>{field('url', 'URL')}{field('timeout', 'Timeout (ms)', 'number')}</>
+      return (
+        <>
+          {field('url', 'URL')}
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Wait until</label>
+            <select value={params.waitUntil ?? 'networkidle2'} onChange={(e) => onChange('waitUntil', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="load">load</option>
+              <option value="domcontentloaded">domcontentloaded</option>
+              <option value="networkidle0">networkidle0</option>
+              <option value="networkidle2">networkidle2</option>
+            </select>
+          </div>
+          {field('timeout', 'Timeout (ms)', 'number')}
+        </>
+      )
     case 'click':
       return <>{field('selector', 'CSS Selector')}{field('timeout', 'Timeout (ms)', 'number')}</>
+    case 'doubleClick':
+      return (
+        <>
+          {field('selector', 'CSS Selector')}
+          {field('timeout', 'Timeout (ms)', 'number')}
+          <div className="mt-1 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Double-clicks the element. Useful for text selection or triggering dblclick event handlers.
+          </div>
+        </>
+      )
+    case 'waitForNavigation':
+      return (
+        <>
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Wait until</label>
+            <select value={params.waitUntil ?? 'networkidle2'} onChange={(e) => onChange('waitUntil', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="load">load</option>
+              <option value="domcontentloaded">domcontentloaded</option>
+              <option value="networkidle0">networkidle0</option>
+              <option value="networkidle2">networkidle2</option>
+            </select>
+          </div>
+          {field('timeout', 'Timeout (ms)', 'number')}
+          <div className="mt-1 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Waits for a page navigation to complete. Place this after a <strong>click</strong> or
+            <strong> keyPress</strong> that triggers a navigation (form submit, link click, etc.).
+          </div>
+        </>
+      )
     case 'type':
       return <>{field('selector', 'CSS Selector')}{field('text', 'Text to type')}{field('delay', 'Delay per key (ms)', 'number')}{field('clear', 'Clear field first', 'checkbox')}</>
     case 'wait':
@@ -246,7 +362,12 @@ function ParamEditor({
     case 'screenshot':
       return <>{field('fullPage', 'Full page', 'checkbox')}</>
     case 'extractText':
-      return <>{field('selector', 'CSS Selector')}</>
+      return (
+        <>
+          {field('selector', 'CSS Selector')}
+          {saveAsField('pageTitle')}
+        </>
+      )
     case 'scroll':
       return <>{field('x', 'Horizontal (px)', 'number')}{field('y', 'Vertical (px)', 'number')}</>
     case 'select':
@@ -254,7 +375,12 @@ function ParamEditor({
     case 'keyPress':
       return <>{field('key', 'Key (e.g. Enter, Tab, Escape)')}</>
     case 'evaluate':
-      return <>{field('script', 'JavaScript code', 'textarea')}</>
+      return (
+        <>
+          {field('script', 'JavaScript code', 'textarea')}
+          {saveAsField('scriptResult')}
+        </>
+      )
     case 'hover':
       return <>{field('selector', 'CSS Selector')}{field('timeout', 'Timeout (ms)', 'number')}</>
     case 'rightClick':
@@ -278,6 +404,7 @@ function ParamEditor({
             </select>
           </div>
           {field('body', 'Request body (JSON)', 'textarea')}
+          {saveAsField('responseBody')}
         </>
       )
     case 'upload':
@@ -376,9 +503,30 @@ function ParamEditor({
     case 'conditional':
       return (
         <>
-          {field('selector', 'Condition CSS Selector')}
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Condition type</label>
+            <select
+              value={params.conditionType ?? 'selector-exists'}
+              onChange={(e) => onChange('conditionType', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500"
+            >
+              <option value="selector-exists">Element exists (selector present)</option>
+              <option value="text-equals">Element text equals value</option>
+              <option value="text-contains">Element text contains value</option>
+              <option value="js-truthy">JavaScript expression is truthy</option>
+            </select>
+          </div>
+          {(params.conditionType === 'selector-exists' || params.conditionType === 'text-equals' || params.conditionType === 'text-contains' || !params.conditionType) && (
+            field('selector', 'CSS Selector')
+          )}
+          {(params.conditionType === 'text-equals' || params.conditionType === 'text-contains') && (
+            field('expected', 'Expected text value')
+          )}
+          {params.conditionType === 'js-truthy' && (
+            field('script', 'JavaScript expression (must return truthy/falsy)', 'textarea', 'e.g. document.title.includes("Success")')
+          )}
           <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
-            If the selector exists on the page, the "then" branch runs; otherwise the "else" branch runs.
+            If the condition matches, the <strong>then</strong> branch runs; otherwise the <strong>else</strong> branch runs.
             Configure branch steps in the workflow JSON.
           </div>
         </>

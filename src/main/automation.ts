@@ -11,6 +11,7 @@ import type {
   AutomationWorkflow
 } from '../shared/types'
 import type { Page, ElementHandle } from 'puppeteer-core'
+import type { WebContents } from 'electron'
 import http from 'http'
 import https from 'https'
 import { createWriteStream } from 'fs'
@@ -44,7 +45,8 @@ export class AutomationEngine {
   async executeWorkflow(
     workflowId: string,
     profileId: string,
-    runtimeVars?: Record<string, string>
+    runtimeVars?: Record<string, string>,
+    webContents?: WebContents
   ): Promise<AutomationRunResult> {
     const db = Database.getInstance()
     const bm = BrowserManager.getInstance()
@@ -58,8 +60,23 @@ export class AutomationEngine {
       variables: workflowRow.variables ? JSON.parse(workflowRow.variables) : undefined
     }
 
-    // Merge stored variables with runtime overrides
-    const variables: Record<string, string> = { ...(workflow.variables ?? {}), ...(runtimeVars ?? {}) }
+    // Resolve profile name for built-in {profileName} variable
+    let profileName = profileId
+    try {
+      const profileRow: any = db.getProfile(profileId)
+      if (profileRow?.name) profileName = profileRow.name
+    } catch { /* non-fatal */ }
+
+    // Merge stored variables with runtime overrides, then inject built-in variables
+    const variables: Record<string, string> = {
+      ...(workflow.variables ?? {}),
+      ...(runtimeVars ?? {}),
+      // Built-in read-only variables (user-defined vars override these if same key)
+      timestamp: new Date().toISOString(),
+      runId: `${workflowId}:${profileId}`,
+      random: Math.random().toString(36).slice(2),
+      profileName
+    }
 
     if (!bm.isRunning(profileId)) {
       throw new Error('Profile must be launched before running automation')
@@ -81,7 +98,7 @@ export class AutomationEngine {
       // Variables are interpolated lazily per-step (not upfront), so actions
       // like `solveCaptcha` can write into the map and have subsequent steps
       // pick up the new values via {captchaToken}-style placeholders.
-      const result = await this.executeSteps(page, workflow.steps, control, stepResults, variables)
+      const result = await this.executeSteps(page, workflow.steps, control, stepResults, variables, webContents, workflowId, profileId)
       if (result === 'stopped') status = 'stopped'
       else if (result === 'failed') {
         status = 'failed'
@@ -126,7 +143,10 @@ export class AutomationEngine {
     steps: AutomationStep[],
     control: { abort: boolean },
     stepResults: AutomationStepResult[],
-    variables: Record<string, string>
+    variables: Record<string, string>,
+    webContents?: WebContents,
+    workflowId?: string,
+    profileId?: string
   ): Promise<'completed' | 'failed' | 'stopped'> {
     for (const step of steps) {
       if (control.abort) return 'stopped'
@@ -140,6 +160,13 @@ export class AutomationEngine {
 
       const result = await this.executeStep(page, liveStep, control, stepResults, variables)
       stepResults.push(result)
+
+      // Stream live progress to renderer
+      if (webContents && !webContents.isDestroyed()) {
+        try {
+          webContents.send('automation:step-progress', { workflowId, profileId, step: result })
+        } catch { /* non-fatal */ }
+      }
 
       if (!result.success) return 'failed'
     }
@@ -166,7 +193,8 @@ export class AutomationEngine {
     workflowId: string,
     profileIds: string[],
     runtimeVars?: Record<string, string>,
-    concurrency: number = 5
+    concurrency: number = 5,
+    webContents?: WebContents
   ): Promise<AutomationRunResult[]> {
     if (profileIds.length === 0) return []
 
@@ -176,7 +204,7 @@ export class AutomationEngine {
     for (let i = 0; i < profileIds.length; i += concurrency) {
       const batch = profileIds.slice(i, i + concurrency)
       const settled = await Promise.allSettled(
-        batch.map((pid) => this.executeWorkflow(workflowId, pid, runtimeVars))
+        batch.map((pid) => this.executeWorkflow(workflowId, pid, runtimeVars, webContents))
       )
       for (let j = 0; j < settled.length; j++) {
         const r = settled[j]
@@ -218,23 +246,37 @@ export class AutomationEngine {
     variables: Record<string, string>
   ): Promise<AutomationStepResult> {
     const start = Date.now()
-    try {
-      const output = await this.runAction(page, step, control, allResults, variables)
-      return {
-        stepId: step.id,
-        action: step.action,
-        success: true,
-        duration_ms: Date.now() - start,
-        output
+    const maxAttempts = Math.max(1, (step.retries ?? 0) + 1)
+    const retryDelay = step.retryDelay ?? 1000
+    let lastError: string = ''
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (control.abort) {
+        return { stepId: step.id, action: step.action, success: false, duration_ms: Date.now() - start, error: 'Workflow stopped' }
       }
-    } catch (err: any) {
-      return {
-        stepId: step.id,
-        action: step.action,
-        success: false,
-        duration_ms: Date.now() - start,
-        error: err.message
+      try {
+        const output = await this.runAction(page, step, control, allResults, variables)
+        return {
+          stepId: step.id,
+          action: step.action,
+          success: true,
+          duration_ms: Date.now() - start,
+          output: attempt > 0 ? { ...output, retriedAfter: attempt } : output
+        }
+      } catch (err: any) {
+        lastError = err.message
+        if (attempt < maxAttempts - 1) {
+          await new Promise((r) => setTimeout(r, retryDelay))
+        }
       }
+    }
+
+    return {
+      stepId: step.id,
+      action: step.action,
+      success: false,
+      duration_ms: Date.now() - start,
+      error: maxAttempts > 1 ? `Failed after ${maxAttempts} attempts: ${lastError}` : lastError
     }
   }
 
@@ -292,7 +334,9 @@ export class AutomationEngine {
           params.selector,
           (el: Element) => el.textContent ?? ''
         )
-        return { text: text.trim() }
+        const trimmed = text.trim()
+        if (params.saveAs) variables[params.saveAs] = trimmed
+        return { text: trimmed }
       }
 
       case 'scroll':
@@ -313,6 +357,7 @@ export class AutomationEngine {
 
       case 'evaluate': {
         const result = await page.evaluate(params.script)
+        if (params.saveAs) variables[params.saveAs] = String(result ?? '')
         return { result }
       }
 
@@ -345,6 +390,7 @@ export class AutomationEngine {
           params.headers,
           params.body
         )
+        if (params.saveAs) variables[params.saveAs] = response.body
         return response
       }
 
@@ -374,15 +420,30 @@ export class AutomationEngine {
       }
 
       case 'conditional': {
-        // Evaluate condition: check if selector exists on page
-        const exists = await page.$(params.selector).then((el: any) => !!el)
-        const branch = exists ? (params.thenSteps ?? []) : (params.elseSteps ?? [])
+        const conditionType: string = params.conditionType ?? 'selector-exists'
+        let matched = false
+
+        if (conditionType === 'selector-exists') {
+          matched = !!(await page.$(params.selector).catch(() => null))
+        } else if (conditionType === 'text-equals' || conditionType === 'text-contains') {
+          const text: string = await page
+            .$eval(params.selector, (el: Element) => el.textContent ?? '')
+            .catch(() => '')
+          const trimmed = text.trim()
+          matched = conditionType === 'text-equals'
+            ? trimmed === (params.expected ?? '')
+            : trimmed.includes(params.expected ?? '')
+        } else if (conditionType === 'js-truthy') {
+          matched = !!(await page.evaluate(params.script ?? 'false'))
+        }
+
+        const branch = matched ? (params.thenSteps ?? []) : (params.elseSteps ?? [])
         if (branch.length > 0) {
           const branchStatus = await this.executeSteps(page, branch, control, allResults, variables)
           if (branchStatus === 'stopped') throw new Error('Workflow stopped')
           if (branchStatus === 'failed') throw new Error('Conditional branch failed')
         }
-        return { condition: params.selector, matched: exists, branchSteps: branch.length }
+        return { conditionType, matched, branchSteps: branch.length }
       }
 
       case 'loop': {
@@ -519,6 +580,18 @@ export class AutomationEngine {
         if (!injected.found) throw new Error(`Captcha target selector not found: ${selector}`)
         return { selector, tokenLength: token.length }
       }
+
+      case 'doubleClick':
+        await page.waitForSelector(params.selector, { timeout: params.timeout ?? 10000 })
+        await page.click(params.selector, { clickCount: 2 })
+        return { selector: params.selector }
+
+      case 'waitForNavigation':
+        await page.waitForNavigation({
+          waitUntil: params.waitUntil ?? 'networkidle2',
+          timeout: params.timeout ?? 30000
+        })
+        return { waitUntil: params.waitUntil ?? 'networkidle2' }
 
       default:
         throw new Error(`Unknown action: ${action}`)
