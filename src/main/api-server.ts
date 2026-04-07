@@ -271,6 +271,57 @@ export class ApiServer {
       return
     }
 
+    // ── Tier 4: Schedule Webhook Triggers ──────────────────────────────
+    // GET  /api/schedules                    — list all schedules
+    // POST /api/webhooks/schedules/:id/trigger — trigger a schedule externally
+
+    if (path === '/api/schedules' && method === 'GET') {
+      const rows = db.getAllSchedules()
+      this.sendJson(res, 200, rows.map((r: any) => ({
+        ...r,
+        enabled: !!r.enabled,
+        profile_ids: JSON.parse(r.profile_ids || '[]')
+      })))
+      return
+    }
+
+    const webhookTriggerMatch = path.match(/^\/api\/webhooks\/schedules\/([^/]+)\/trigger$/)
+    if (webhookTriggerMatch && method === 'POST') {
+      const scheduleId = webhookTriggerMatch[1]
+      const schedRow = db.getAllSchedules().find((r: any) => r.id === scheduleId)
+      if (!schedRow) { this.sendJson(res, 404, { error: 'Schedule not found' }); return }
+
+      const body = await this.readBody(req)
+      // Body may override profile_ids and/or inject runtime variables
+      const profileIds: string[] = (body?.profileIds && Array.isArray(body.profileIds))
+        ? body.profileIds
+        : JSON.parse(schedRow.profile_ids || '[]')
+      const variables: Record<string, string> = body?.variables ?? {}
+
+      if (profileIds.length === 0) {
+        this.sendJson(res, 400, { error: 'No profile ids configured for this schedule' })
+        return
+      }
+
+      const { WorkflowScheduler } = await import('./scheduler')
+      const scheduler = WorkflowScheduler.getInstance()
+      // runSchedule auto-launches profiles and runs in parallel
+      await scheduler.runSchedule(scheduleId, schedRow.workflow_id, profileIds)
+      // If runtime variables were passed, run the workflow again with them
+      // (variables aren't supported by the base scheduler — advanced callers
+      // should use POST /api/workflows/:id/run with explicit profileId instead)
+      this.sendJson(res, 200, {
+        scheduleId,
+        workflowId: schedRow.workflow_id,
+        triggered: profileIds.length,
+        profileIds,
+        note: variables && Object.keys(variables).length > 0
+          ? 'Runtime variables passed — use POST /api/workflows/:id/run for per-variable execution'
+          : undefined
+      })
+      return
+    }
+
     // ── 404 ────────────────────────────────────────────────────────────
     this.sendJson(res, 404, { error: 'Not found', path, method })
   }

@@ -617,6 +617,30 @@ export class Database {
     return this.queryAll('SELECT * FROM proxies ORDER BY created_at DESC')
   }
 
+  getProxy(id: string): any {
+    return this.queryOne('SELECT * FROM proxies WHERE id = ?', [id])
+  }
+
+  /** Return a random healthy proxy, or any proxy if none are healthy. */
+  getRandomProxy(): any {
+    return (
+      this.queryOne('SELECT * FROM proxies WHERE is_healthy = 1 ORDER BY RANDOM() LIMIT 1') ??
+      this.queryOne('SELECT * FROM proxies ORDER BY RANDOM() LIMIT 1')
+    )
+  }
+
+  /** Return the next proxy in round-robin order after the given id. */
+  getNextProxy(currentId: string): any {
+    const all = this.getAllProxies()
+    if (all.length === 0) return null
+    const idx = all.findIndex((p: any) => p.id === currentId)
+    return all[(idx + 1) % all.length]
+  }
+
+  updateProfileProxy(profileId: string, proxyId: string | null): void {
+    this.run('UPDATE profiles SET proxy_id = ? WHERE id = ?', [proxyId, profileId])
+  }
+
   createProxy(proxy: {
     id: string
     name: string
