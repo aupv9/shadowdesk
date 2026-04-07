@@ -652,3 +652,36 @@ export interface Phase8Config {
   /** Math FPU result normalization (deterministic per profile) */
   mathFpuNoise: boolean
 }
+
+// ─── Phase 14.A — Remote Browser Nodes ───────────────────────────────────────
+
+export type NodeStatus = 'online' | 'offline' | 'unknown' | 'error'
+
+export interface RemoteBrowserNode {
+  id: string
+  name: string
+  url: string                  // e.g. https://node-1.example.com:9222
+  authToken?: string
+  region?: string
+  capacity: number             // max concurrent profiles
+  activeProfiles: number
+  status: NodeStatus
+  latencyMs?: number
+  lastCheckedAt?: string
+  createdAt: string
+}
+
+export interface CreateNodeInput {
+  name: string
+  url: string
+  authToken?: string
+  region?: string
+  capacity?: number
+}
+
+export interface NodeHealth {
+  status: NodeStatus
+  latencyMs?: number
+  error?: string
+}
+
