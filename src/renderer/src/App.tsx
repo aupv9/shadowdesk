@@ -9,6 +9,7 @@ import { SettingsPage } from './components/Settings'
 import { AccountPage } from './components/Account'
 import { TeamManager } from './components/TeamManager'
 import { PatchManager } from './components/PatchManager'
+import { Marketplace } from './components/Marketplace'
 import { ErrorBoundary } from './components/UI/ErrorBoundary'
 import { ToastContainer } from './components/UI/Toast'
 import { ConfirmDialog } from './components/UI/ConfirmDialog'
@@ -78,6 +79,9 @@ export default function App() {
         </ErrorBoundary>
         <ErrorBoundary section="Automation">
           {section === 'automation'  && <AutomationBuilder />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Marketplace">
+          {section === 'marketplace' && <Marketplace />}
         </ErrorBoundary>
         <ErrorBoundary section="Team">
           {section === 'team'        && <TeamManager />}

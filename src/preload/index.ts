@@ -234,6 +234,22 @@ const api = {
     test:     (id: string)             => ipcRenderer.invoke('nodes:test', id),
     pickBest: ()                       => ipcRenderer.invoke('nodes:pickBest')
   },
+  // Phase 15.A — Workflow Marketplace
+  marketplace: {
+    list:    (opts?: { category?: string; q?: string })     => ipcRenderer.invoke('marketplace:list', opts),
+    get:     (id: string)                                   => ipcRenderer.invoke('marketplace:get', id),
+    install: (id: string, customName?: string)              => ipcRenderer.invoke('marketplace:install', id, customName)
+  },
+  // Phase 15.C — Outbound Webhooks
+  webhooks: {
+    list:           ()                                      => ipcRenderer.invoke('webhooks:list'),
+    add:            (input: { name: string; url: string; events: string[]; secret?: string }) => ipcRenderer.invoke('webhooks:add', input),
+    update:         (id: string, patch: Record<string, any>) => ipcRenderer.invoke('webhooks:update', id, patch),
+    remove:         (id: string)                            => ipcRenderer.invoke('webhooks:remove', id),
+    getTelegram:    ()                                      => ipcRenderer.invoke('webhooks:telegram:get'),
+    saveTelegram:   (cfg: Record<string, any>)              => ipcRenderer.invoke('webhooks:telegram:save', cfg),
+    dispatch:       (event: string, payload: Record<string, any>) => ipcRenderer.invoke('webhooks:dispatch', event, payload)
+  },
   // Phase 13.E — Structured error events from main process
   onError: (cb: (event: { category: string; message: string; timestamp: string }) => void): (() => void) => {
     const handler = (_ipcEvent: any, appEvent: any) => cb(appEvent)
