@@ -100,7 +100,9 @@ const ACTION_META: Record<AutomationActionType, { icon: React.ElementType; label
   forEachRow:         { icon: Repeat,             label: 'For Each Row',         color: 'text-emerald-400' },
   readFile:           { icon: FileText,           label: 'Read File',            color: 'text-sky-400' },
   writeFile:          { icon: FileText,           label: 'Write File',           color: 'text-sky-500' },
-  waitForDownload:    { icon: Download,           label: 'Wait For Download',    color: 'text-amber-300' }
+  waitForDownload:    { icon: Download,           label: 'Wait For Download',    color: 'text-amber-300' },
+  // Tier 7 RPA — error recovery & resilience
+  tryCatch:           { icon: ShieldCheck,        label: 'Try / Catch',          color: 'text-pink-400' }
 }
 
 const ALL_ACTIONS: AutomationActionType[] = [
@@ -123,7 +125,9 @@ const ALL_ACTIONS: AutomationActionType[] = [
   // Tier 5 RPA
   'getStorage', 'setStorage', 'clearStorage', 'queryIndexedDB',
   // Tier 6 RPA
-  'forEachRow', 'readFile', 'writeFile', 'waitForDownload'
+  'forEachRow', 'readFile', 'writeFile', 'waitForDownload',
+  // Tier 7 RPA
+  'tryCatch'
 ]
 
 interface StepEditorProps {
@@ -185,6 +189,7 @@ function getDefaultParams(action: AutomationActionType): Record<string, any> {
     case 'readFile':           return { filePath: '', encoding: 'utf-8', saveAs: 'fileContent' }
     case 'writeFile':          return { filePath: '', content: '', append: false, encoding: 'utf-8' }
     case 'waitForDownload':    return { directory: '', pattern: '', filePath: '', timeout: 60000, pollInterval: 500, saveAs: 'downloadedFile' }
+    case 'tryCatch':           return { tryBlock: [], catchBlock: [], finallyBlock: [], errorPrefix: 'error' }
     default:                   return {}
   }
 }
