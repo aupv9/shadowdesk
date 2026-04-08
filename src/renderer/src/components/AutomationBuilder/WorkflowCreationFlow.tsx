@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   X,
   Video,
@@ -9,8 +9,11 @@ import {
   Sparkles,
   Clock,
   GraduationCap,
-  Info
+  Info,
+  HelpCircle
 } from 'lucide-react'
+import { MethodGuideModal } from './MethodGuideModal'
+import { trackWorkflowCreationMethodSelected, trackMethodGuideViewed } from '../../utils/workflowAnalytics'
 
 /**
  * Phase 1 — Guided Entry Point for workflow creation.
@@ -118,19 +121,38 @@ export function WorkflowCreationFlow({
   isFirstTime = false
 }: WorkflowCreationFlowProps) {
   const [hovered, setHovered] = useState<WorkflowCreationMethod | null>(null)
+  const [selectedGuide, setSelectedGuide] = useState<WorkflowCreationMethod | null>(null)
+  const [focusedIndex, setFocusedIndex] = useState(0)
 
   const handleSelect = (method: WorkflowCreationMethod) => {
+    trackWorkflowCreationMethodSelected(method, isFirstTime)
     onSelectMethod(method)
   }
 
-  // Close on Escape
-  React.useEffect(() => {
+  const handleShowGuide = (method: WorkflowCreationMethod) => {
+    trackMethodGuideViewed(method)
+    setSelectedGuide(method)
+  }
+
+  // Keyboard navigation
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        onClose()
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setFocusedIndex((prev) => (prev + 1) % METHODS.length)
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setFocusedIndex((prev) => (prev - 1 + METHODS.length) % METHODS.length)
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        handleSelect(METHODS[focusedIndex].id)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, focusedIndex])
 
   return (
     <div
@@ -193,9 +215,10 @@ export function WorkflowCreationFlow({
         {/* Method cards */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {METHODS.map((method) => {
+            {METHODS.map((method, idx) => {
               const Icon = method.icon
               const isHovered = hovered === method.id
+              const isFocused = focusedIndex === idx
               return (
                 <button
                   key={method.id}
@@ -203,11 +226,15 @@ export function WorkflowCreationFlow({
                   onClick={() => handleSelect(method.id)}
                   onMouseEnter={() => setHovered(method.id)}
                   onMouseLeave={() => setHovered(null)}
-                  className={`group relative text-left p-4 rounded-xl border transition-all ${
-                    isHovered
-                      ? 'bg-slate-800 border-ghost-500/60 shadow-lg shadow-ghost-500/10'
-                      : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800'
-                  }`}
+                  onFocus={() => setFocusedIndex(idx)}
+                  className={`group relative text-left p-4 rounded-xl border transition-all transform ${
+                    isFocused
+                      ? 'scale-105 bg-slate-800 border-ghost-500 shadow-lg shadow-ghost-500/20 ring-2 ring-ghost-500/50'
+                      : isHovered
+                        ? 'bg-slate-800 border-ghost-500/60 shadow-lg shadow-ghost-500/10'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800'
+                  } animate-in fade-in slide-in-from-bottom-2 duration-500`}
+                  style={{ animationDelay: `${idx * 50}ms` }}
                 >
                   {method.recommended && (
                     <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 bg-emerald-500 text-white text-[10px] font-semibold rounded-full shadow-md">
@@ -257,14 +284,28 @@ export function WorkflowCreationFlow({
                       </div>
 
                       {isHovered && (
-                        <div className="mt-3 pt-3 border-t border-slate-700/60 flex items-start gap-1.5 text-[11px] text-slate-400">
-                          <Info className="w-3 h-3 shrink-0 mt-0.5 text-slate-500" />
-                          <span>
-                            <span className="text-slate-300 font-medium">
-                              Best for:
-                            </span>{' '}
-                            {method.bestFor}
-                          </span>
+                        <div className="mt-3 pt-3 border-t border-slate-700/60 space-y-2">
+                          <div className="flex items-start gap-1.5 text-[11px] text-slate-400">
+                            <Info className="w-3 h-3 shrink-0 mt-0.5 text-slate-500" />
+                            <span>
+                              <span className="text-slate-300 font-medium">
+                                Best for:
+                              </span>{' '}
+                              {method.bestFor}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleShowGuide(method.id)
+                            }}
+                            className="flex items-center gap-1.5 text-[11px] text-ghost-300 hover:text-ghost-200 font-medium transition-colors"
+                          >
+                            <HelpCircle className="w-3 h-3" />
+                            View step-by-step guide
+                          </button>
                         </div>
                       )}
                     </div>
@@ -289,6 +330,14 @@ export function WorkflowCreationFlow({
           </button>
         </div>
       </div>
+
+      {/* Method guide modal */}
+      {selectedGuide && (
+        <MethodGuideModal
+          method={selectedGuide}
+          onClose={() => setSelectedGuide(null)}
+        />
+      )}
     </div>
   )
 }
