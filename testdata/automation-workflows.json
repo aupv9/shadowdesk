@@ -1,0 +1,685 @@
+[
+  {
+    "id": "738237be-9fe0-4a25-b40f-a3266b3ac859",
+    "name": "Simple Page Navigation",
+    "description": "Navigate to a website and take screenshot",
+    "profileIds": [
+      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb"
+    ],
+    "steps": [
+      {
+        "id": "8f69243e-e408-4a0b-936b-b6af17e252a9",
+        "type": "navigate",
+        "name": "Navigate to Example",
+        "description": "Open example.com",
+        "params": {
+          "url": "https://example.com"
+        },
+        "timeout": 10000
+      },
+      {
+        "id": "0cc6bf40-4ca0-4e0a-941f-74074917a2ab",
+        "type": "wait",
+        "name": "Wait for Page Load",
+        "params": {
+          "selector": "body",
+          "type": "visible"
+        },
+        "timeout": 5000
+      },
+      {
+        "id": "75b08ba7-6679-4dad-8337-82331b0bc438",
+        "type": "screenshot",
+        "name": "Capture Screenshot",
+        "params": {
+          "fullPage": true,
+          "quality": 90
+        }
+      },
+      {
+        "id": "c07b9e5b-43e2-4da4-9f05-8bc99961ace4",
+        "type": "log",
+        "name": "Log Success",
+        "params": {
+          "message": "Successfully navigated to example.com"
+        }
+      }
+    ],
+    "created_at": "2026-04-08T07:53:12.407Z",
+    "updated_at": "2026-04-08T07:53:12.407Z"
+  },
+  {
+    "id": "bde8519a-ca9e-4764-b41c-ad96f7ca4920",
+    "name": "Form Filling & Submission",
+    "description": "Fill and submit a test form with validation",
+    "profileIds": [
+      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb"
+    ],
+    "steps": [
+      {
+        "id": "440da350-3957-4bc0-820a-17fdf4c52683",
+        "type": "navigate",
+        "name": "Navigate to Form",
+        "params": {
+          "url": "https://httpbin.org/forms/post"
+        },
+        "timeout": 10000
+      },
+      {
+        "id": "19c2da01-33a5-4833-b553-b3b883843574",
+        "type": "fill",
+        "name": "Fill Name Field",
+        "selector": "input[name=\"custname\"]",
+        "params": {
+          "value": "John Doe",
+          "clear": true
+        },
+        "timeout": 5000
+      },
+      {
+        "id": "3d5f168c-9793-4917-8144-80934416483f",
+        "type": "fill",
+        "name": "Fill Phone Field",
+        "selector": "input[name=\"custtel\"]",
+        "params": {
+          "value": "1234567890"
+        },
+        "timeout": 5000
+      },
+      {
+        "id": "cc071df1-5be2-401d-92ce-430d82ae6651",
+        "type": "click",
+        "name": "Select Pizza Option",
+        "selector": "input[name=\"size\"][value=\"small\"]",
+        "timeout": 5000
+      },
+      {
+        "id": "bac25753-818a-42e6-b9e2-565edd3b4677",
+        "type": "fill",
+        "name": "Add Special Instructions",
+        "selector": "textarea[name=\"comments\"]",
+        "params": {
+          "value": "No onions, extra cheese please"
+        },
+        "timeout": 5000
+      },
+      {
+        "id": "ac546c0d-4ff6-4f3e-91ef-c07fd658bbca",
+        "type": "screenshot",
+        "name": "Screenshot Filled Form",
+        "params": {
+          "fullPage": false
+        }
+      },
+      {
+        "id": "4da2756d-4dc1-43d8-99e4-166f1c8460e9",
+        "type": "click",
+        "name": "Submit Form",
+        "selector": "button[type=\"submit\"]",
+        "timeout": 5000,
+        "retries": 2
+      },
+      {
+        "id": "acec8e9e-dcd8-48e0-bf27-4c3e1fcb5d9a",
+        "type": "wait",
+        "name": "Wait for Success Page",
+        "params": {
+          "selector": "body",
+          "type": "visible"
+        },
+        "timeout": 10000
+      }
+    ],
+    "created_at": "2026-04-08T07:53:12.408Z",
+    "updated_at": "2026-04-08T07:53:12.408Z"
+  },
+  {
+    "id": "fd8072d2-0ea6-46d4-ab23-e334aa819ff3",
+    "name": "Conditional Login Flow",
+    "description": "Check if logged in, if not then login",
+    "profileIds": [
+      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb",
+      "b119a771-c805-4677-871d-5c8696529927"
+    ],
+    "steps": [
+      {
+        "id": "86784a2b-258a-4c7c-9a2a-bcdf3226a87b",
+        "type": "navigate",
+        "name": "Navigate to Dashboard",
+        "params": {
+          "url": "https://example.com/dashboard"
+        },
+        "timeout": 10000
+      },
+      {
+        "id": "449a0f52-11a8-414a-b551-c7b572849a65",
+        "type": "condition",
+        "name": "Check If Logged In",
+        "params": {
+          "selector": ".user-profile",
+          "type": "exists",
+          "then": [
+            {
+              "id": "8498210b-c0fb-4edc-a762-58c3243f5601",
+              "type": "log",
+              "name": "Already Logged In",
+              "params": {
+                "message": "User is already logged in"
+              }
+            }
+          ],
+          "else": [
+            {
+              "id": "70399088-9c9f-43b9-bdc8-6db7ca79f398",
+              "type": "navigate",
+              "name": "Go to Login Page",
+              "params": {
+                "url": "https://example.com/login"
+              }
+            },
+            {
+              "id": "cbcc0893-6457-4a7f-a217-caf8bda04e83",
+              "type": "fill",
+              "name": "Enter Email",
+              "selector": "input[type=\"email\"]",
+              "params": {
+                "value": "test@example.com"
+              }
+            },
+            {
+              "id": "bdb9c27d-aa9d-4aae-ad0b-93e835128dc0",
+              "type": "fill",
+              "name": "Enter Password",
+              "selector": "input[type=\"password\"]",
+              "params": {
+                "value": "TestPassword123!"
+              }
+            },
+            {
+              "id": "c1dee9fc-83b1-40a9-a9f2-5cea191408c1",
+              "type": "click",
+              "name": "Click Login Button",
+              "selector": "button[type=\"submit\"]"
+            }
+          ]
+        }
+      },
+      {
+        "id": "ed4400f8-6bee-40e4-93a8-45e8a0001026",
+        "type": "screenshot",
+        "name": "Final Screenshot",
+        "params": {
+          "fullPage": true
+        }
+      }
+    ],
+    "created_at": "2026-04-08T07:53:12.408Z",
+    "updated_at": "2026-04-08T07:53:12.408Z"
+  },
+  {
+    "id": "16e31b63-1383-4c71-9f9c-30f03aa63ff6",
+    "name": "Loop - Scrape Product List",
+    "description": "Loop through products and extract data",
+    "profileIds": [
+      "b119a771-c805-4677-871d-5c8696529927"
+    ],
+    "steps": [
+      {
+        "id": "00569c45-3834-4dcc-aeac-20dd8511ee4a",
+        "type": "navigate",
+        "name": "Navigate to Products",
+        "params": {
+          "url": "https://example.com/products"
+        },
+        "timeout": 10000
+      },
+      {
+        "id": "a9405b31-020b-400d-bd10-f250c9b86915",
+        "type": "loop",
+        "name": "Extract Product Information",
+        "params": {
+          "selector": ".product-card",
+          "actions": [
+            {
+              "id": "9fffdedf-9d4d-496b-8298-ae708e59470a",
+              "type": "extract",
+              "name": "Get Product Title",
+              "selector": ".product-title",
+              "params": {
+                "attribute": "text"
+              }
+            },
+            {
+              "id": "5eed6d27-19ac-4e3f-8419-08c3a982e546",
+              "type": "extract",
+              "name": "Get Product Price",
+              "selector": ".product-price",
+              "params": {
+                "attribute": "text",
+                "regex": "\\$([0-9.]+)"
+              }
+            },
+            {
+              "id": "ee45230c-bef0-455c-9f31-e7949386bd0b",
+              "type": "extract",
+              "name": "Get Product Link",
+              "selector": "a.product-link",
+              "params": {
+                "attribute": "href"
+              }
+            },
+            {
+              "id": "852e2c20-503c-4a34-baea-ce9d9004b089",
+              "type": "log",
+              "name": "Log Product Data",
+              "params": {
+                "message": "Extracted product: {{title}} - {{price}}"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "created_at": "2026-04-08T07:53:12.408Z",
+    "updated_at": "2026-04-08T07:53:12.408Z"
+  },
+  {
+    "id": "08f0e2c2-e7b1-44c3-b8b7-76d496697251",
+    "name": "Multi-Step Search & Filter",
+    "description": "Search for items and apply filters",
+    "profileIds": [
+      "b119a771-c805-4677-871d-5c8696529927",
+      "3f995308-9f90-431a-a728-d1e1e9536572"
+    ],
+    "steps": [
+      {
+        "id": "7a6e8043-ebf2-48b7-91b4-466a6b04cf45",
+        "type": "navigate",
+        "name": "Go to Search Page",
+        "params": {
+          "url": "https://example.com/search"
+        },
+        "timeout": 10000
+      },
+      {
+        "id": "69f15bb1-77a0-41df-8dc2-1a116ee5e776",
+        "type": "fill",
+        "name": "Enter Search Query",
+        "selector": "input[name=\"q\"]",
+        "params": {
+          "value": "laptop",
+          "clear": true
+        },
+        "timeout": 5000
+      },
+      {
+        "id": "e306e265-9977-4f05-ad8b-4f8630fe4c50",
+        "type": "keyboard",
+        "name": "Press Enter",
+        "params": {
+          "key": "Enter"
+        }
+      },
+      {
+        "id": "3e789661-5a22-40da-80ca-21ee3cd2941a",
+        "type": "wait",
+        "name": "Wait for Results",
+        "params": {
+          "selector": ".search-results",
+          "type": "visible"
+        },
+        "timeout": 10000
+      },
+      {
+        "id": "bf2ef7e9-00ef-4c72-b779-9fdee26fcb89",
+        "type": "click",
+        "name": "Apply Price Filter",
+        "selector": "input[data-filter=\"price-1000-2000\"]",
+        "timeout": 5000
+      },
+      {
+        "id": "b908a483-84c4-493e-a34a-4dbcdb8d0f0d",
+        "type": "click",
+        "name": "Apply Brand Filter",
+        "selector": "input[data-filter=\"brand-dell\"]",
+        "timeout": 5000
+      },
+      {
+        "id": "1a7db75b-156d-4dd2-9b03-d6b72196796d",
+        "type": "wait",
+        "name": "Wait for Filtered Results",
+        "params": {
+          "selector": ".search-results .item",
+          "type": "visible"
+        },
+        "timeout": 10000
+      },
+      {
+        "id": "0ca8f590-747f-4271-b2e8-315ebcab665d",
+        "type": "extract",
+        "name": "Count Results",
+        "selector": ".search-results .item",
+        "params": {
+          "attribute": "count"
+        }
+      },
+      {
+        "id": "9264a7b2-7723-4384-ae05-1884c0005140",
+        "type": "screenshot",
+        "name": "Capture Filtered Results",
+        "params": {
+          "fullPage": true
+        }
+      }
+    ],
+    "created_at": "2026-04-08T07:53:12.408Z",
+    "updated_at": "2026-04-08T07:53:12.408Z"
+  },
+  {
+    "id": "f37241fb-5dc8-4c4f-8797-7e46388ec8af",
+    "name": "API Call & Data Processing",
+    "description": "Make API call and process response",
+    "profileIds": [
+      "3f995308-9f90-431a-a728-d1e1e9536572"
+    ],
+    "steps": [
+      {
+        "id": "f38bf48a-44e8-4cd6-a667-ce0dfea9e847",
+        "type": "api_call",
+        "name": "Fetch User Data",
+        "params": {
+          "url": "https://jsonplaceholder.typicode.com/users/1",
+          "method": "GET",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "timeout": 10000
+      },
+      {
+        "id": "75c0c33a-ee38-474e-9c4f-28455356fbbe",
+        "type": "js_execute",
+        "name": "Process API Response",
+        "params": {
+          "code": "\n            const userData = JSON.parse(context.apiResponse);\n            return {\n              name: userData.name,\n              email: userData.email,\n              company: userData.company.name\n            };\n          "
+        }
+      },
+      {
+        "id": "851bd6d4-4fe4-4368-a424-e89994199044",
+        "type": "navigate",
+        "name": "Navigate to Form",
+        "params": {
+          "url": "https://httpbin.org/post"
+        },
+        "timeout": 10000
+      },
+      {
+        "id": "b1ed1ba1-54cf-471f-9510-f076bb5d2265",
+        "type": "fill",
+        "name": "Fill with API Data",
+        "selector": "input[name=\"name\"]",
+        "params": {
+          "value": "{{processedData.name}}"
+        }
+      },
+      {
+        "id": "98699ed5-29e4-48dc-a0d4-8bbe699a155f",
+        "type": "fill",
+        "name": "Fill Email",
+        "selector": "input[name=\"email\"]",
+        "params": {
+          "value": "{{processedData.email}}"
+        }
+      },
+      {
+        "id": "3534b834-c71b-42ff-aea5-d662aef65564",
+        "type": "click",
+        "name": "Submit",
+        "selector": "button[type=\"submit\"]"
+      }
+    ],
+    "created_at": "2026-04-08T07:53:12.408Z",
+    "updated_at": "2026-04-08T07:53:12.408Z"
+  },
+  {
+    "id": "26a6a746-3244-4027-becf-5a6001728675",
+    "name": "Error Handling & Retry",
+    "description": "Handle errors gracefully with retries",
+    "profileIds": [
+      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb"
+    ],
+    "steps": [
+      {
+        "id": "b8dbcee3-c522-47bd-86b6-9f66257aea1d",
+        "type": "navigate",
+        "name": "Navigate to Unreliable Service",
+        "params": {
+          "url": "https://example.com/unstable"
+        },
+        "timeout": 10000,
+        "retries": 3,
+        "skipOnError": false
+      },
+      {
+        "id": "6dd24f26-bcb9-4976-8e33-7176798cbea3",
+        "type": "wait",
+        "name": "Wait for Element",
+        "params": {
+          "selector": ".dynamic-content",
+          "type": "visible"
+        },
+        "timeout": 5000,
+        "retries": 2,
+        "skipOnError": true
+      },
+      {
+        "id": "e7949e0f-dc68-4326-a676-ac8c3edb1a86",
+        "type": "condition",
+        "name": "Check If Retries Exhausted",
+        "params": {
+          "type": "expression",
+          "expression": "context.lastError !== null",
+          "then": [
+            {
+              "id": "37b7def7-fcb7-4261-a85f-d5587fb9e3b3",
+              "type": "log",
+              "name": "Log Error",
+              "params": {
+                "message": "Failed after retries: {{context.lastError}}"
+              }
+            },
+            {
+              "id": "f0ebf8a6-e476-4097-b9e8-c6fcf1b14270",
+              "type": "api_call",
+              "name": "Send Error Report",
+              "params": {
+                "url": "https://example.com/api/report-error",
+                "method": "POST",
+                "body": {
+                  "error": "{{context.lastError}}",
+                  "timestamp": "{{timestamp}}"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "created_at": "2026-04-08T07:53:12.408Z",
+    "updated_at": "2026-04-08T07:53:12.408Z"
+  },
+  {
+    "id": "f5bad674-6a88-40cd-b6f1-1ace39da3858",
+    "name": "Social Media Follow & Like",
+    "description": "Follow users and like posts",
+    "profileIds": [
+      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb",
+      "b119a771-c805-4677-871d-5c8696529927",
+      "3f995308-9f90-431a-a728-d1e1e9536572"
+    ],
+    "steps": [
+      {
+        "id": "71823a5c-07d1-4449-a7c5-e0841b868987",
+        "type": "navigate",
+        "name": "Go to Social Media",
+        "params": {
+          "url": "https://example-social.com/feed"
+        },
+        "timeout": 10000
+      },
+      {
+        "id": "9609a08d-65c7-4af8-b2f4-0cb5814c605e",
+        "type": "scroll",
+        "name": "Scroll Down",
+        "params": {
+          "pixels": 500,
+          "smooth": true
+        }
+      },
+      {
+        "id": "530f42ab-8e80-4c13-a070-f056969f7a1b",
+        "type": "loop",
+        "name": "Like Posts",
+        "params": {
+          "selector": ".post-card",
+          "maxIterations": 5,
+          "actions": [
+            {
+              "id": "33651955-3d2c-4f09-a17d-9c065cce5db9",
+              "type": "click",
+              "name": "Click Like Button",
+              "selector": ".like-button"
+            },
+            {
+              "id": "58150b28-7f1b-45ac-a79a-70030e014e11",
+              "type": "wait",
+              "name": "Wait for Animation",
+              "params": {
+                "type": "delay",
+                "ms": 500
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "9add817c-546a-4d41-bc6b-38cf58c1e963",
+        "type": "loop",
+        "name": "Follow Users",
+        "params": {
+          "selector": ".user-card",
+          "maxIterations": 3,
+          "actions": [
+            {
+              "id": "49a94493-1aaf-4928-869c-d66d5050514c",
+              "type": "click",
+              "name": "Click Follow",
+              "selector": ".follow-button"
+            },
+            {
+              "id": "5670835d-0115-46d8-b8a2-4069f67d9352",
+              "type": "wait",
+              "name": "Wait for Follow",
+              "params": {
+                "type": "delay",
+                "ms": 1000
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "created_at": "2026-04-08T07:53:12.409Z",
+    "updated_at": "2026-04-08T07:53:12.409Z"
+  },
+  {
+    "id": "6541394c-3402-47cb-8a44-09f22127eb03",
+    "name": "Data Entry & Validation",
+    "description": "Fill multiple fields with validation",
+    "profileIds": [
+      "b119a771-c805-4677-871d-5c8696529927"
+    ],
+    "steps": [
+      {
+        "id": "0d6cbf40-2b22-4852-b7da-9e4962e67bae",
+        "type": "navigate",
+        "name": "Open Registration Form",
+        "params": {
+          "url": "https://example.com/register"
+        },
+        "timeout": 10000
+      },
+      {
+        "id": "1c6b2460-792f-469f-8a9d-7c9e85d81007",
+        "type": "fill",
+        "name": "Enter Username",
+        "selector": "input[name=\"username\"]",
+        "params": {
+          "value": "testuser_{{timestamp}}"
+        }
+      },
+      {
+        "id": "039a6ea7-ceb3-49ed-b31b-5027eaa11c49",
+        "type": "fill",
+        "name": "Enter Email",
+        "selector": "input[name=\"email\"]",
+        "params": {
+          "value": "test_{{timestamp}}@example.com"
+        }
+      },
+      {
+        "id": "584ed64a-7326-4080-8fa9-a10103754f25",
+        "type": "fill",
+        "name": "Enter Password",
+        "selector": "input[name=\"password\"]",
+        "params": {
+          "value": "SecurePass123!@"
+        }
+      },
+      {
+        "id": "dff4a897-76ef-4cd2-8d88-681f3c548a23",
+        "type": "fill",
+        "name": "Confirm Password",
+        "selector": "input[name=\"confirmPassword\"]",
+        "params": {
+          "value": "SecurePass123!@"
+        }
+      },
+      {
+        "id": "7a8a629e-027b-4552-9f1a-be552a286746",
+        "type": "click",
+        "name": "Accept Terms",
+        "selector": "input[name=\"terms\"]"
+      },
+      {
+        "id": "29bbf77c-24a8-4a88-9978-b83de6f92848",
+        "type": "assert",
+        "name": "Validate Submit Button",
+        "params": {
+          "selector": "button[type=\"submit\"]",
+          "property": "disabled",
+          "value": false,
+          "operator": "equals"
+        }
+      },
+      {
+        "id": "00dfe021-8054-44e8-b546-b34f635b92ee",
+        "type": "click",
+        "name": "Submit Registration",
+        "selector": "button[type=\"submit\"]"
+      },
+      {
+        "id": "59cb75cb-49d5-44d5-a8bf-bb8b95d95700",
+        "type": "wait",
+        "name": "Wait for Confirmation",
+        "params": {
+          "selector": ".success-message",
+          "type": "visible"
+        },
+        "timeout": 10000
+      }
+    ],
+    "created_at": "2026-04-08T07:53:12.409Z",
+    "updated_at": "2026-04-08T07:53:12.409Z"
+  }
+]

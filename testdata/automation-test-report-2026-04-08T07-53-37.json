@@ -1,0 +1,527 @@
+{
+  "timestamp": "2026-04-08T07:53:37.507Z",
+  "totalWorkflows": 9,
+  "totalExecutions": 9,
+  "successfulWorkflows": 8,
+  "failedWorkflows": 0,
+  "partialWorkflows": 1,
+  "totalSteps": 48,
+  "successfulSteps": 47,
+  "actionTypes": [
+    "navigate",
+    "wait",
+    "screenshot",
+    "log",
+    "fill",
+    "click",
+    "condition",
+    "loop",
+    "keyboard",
+    "extract",
+    "api_call",
+    "js_execute",
+    "scroll",
+    "assert"
+  ],
+  "workflowSummary": [
+    {
+      "name": "Simple Page Navigation",
+      "description": "Navigate to a website and take screenshot",
+      "stepCount": 4,
+      "profileCount": 1,
+      "execution": {
+        "id": "exec-1775634812687",
+        "workflowId": "738237be-9fe0-4a25-b40f-a3266b3ac859",
+        "workflowName": "Simple Page Navigation",
+        "profileId": "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb",
+        "status": "success",
+        "stepResults": [
+          {
+            "stepId": "8f69243e-e408-4a0b-936b-b6af17e252a9",
+            "stepName": "Navigate to Example",
+            "type": "navigate",
+            "status": "success",
+            "duration": 788
+          },
+          {
+            "stepId": "0cc6bf40-4ca0-4e0a-941f-74074917a2ab",
+            "stepName": "Wait for Page Load",
+            "type": "wait",
+            "status": "success",
+            "duration": 998
+          },
+          {
+            "stepId": "75b08ba7-6679-4dad-8337-82331b0bc438",
+            "stepName": "Capture Screenshot",
+            "type": "screenshot",
+            "status": "success",
+            "duration": 2326
+          },
+          {
+            "stepId": "c07b9e5b-43e2-4da4-9f05-8bc99961ace4",
+            "stepName": "Log Success",
+            "type": "log",
+            "status": "success",
+            "duration": 1424
+          }
+        ],
+        "totalDuration": 402,
+        "executedAt": "2026-04-08T07:53:33.089Z",
+        "completedAt": "2026-04-08T07:53:33.090Z"
+      }
+    },
+    {
+      "name": "Form Filling & Submission",
+      "description": "Fill and submit a test form with validation",
+      "stepCount": 8,
+      "profileCount": 1,
+      "execution": {
+        "id": "exec-1775634813090",
+        "workflowId": "bde8519a-ca9e-4764-b41c-ad96f7ca4920",
+        "workflowName": "Form Filling & Submission",
+        "profileId": "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb",
+        "status": "success",
+        "stepResults": [
+          {
+            "stepId": "440da350-3957-4bc0-820a-17fdf4c52683",
+            "stepName": "Navigate to Form",
+            "type": "navigate",
+            "status": "success",
+            "duration": 2221
+          },
+          {
+            "stepId": "19c2da01-33a5-4833-b553-b3b883843574",
+            "stepName": "Fill Name Field",
+            "type": "fill",
+            "status": "success",
+            "duration": 2291
+          },
+          {
+            "stepId": "3d5f168c-9793-4917-8144-80934416483f",
+            "stepName": "Fill Phone Field",
+            "type": "fill",
+            "status": "success",
+            "duration": 2234
+          },
+          {
+            "stepId": "cc071df1-5be2-401d-92ce-430d82ae6651",
+            "stepName": "Select Pizza Option",
+            "type": "click",
+            "status": "success",
+            "duration": 1368
+          },
+          {
+            "stepId": "bac25753-818a-42e6-b9e2-565edd3b4677",
+            "stepName": "Add Special Instructions",
+            "type": "fill",
+            "status": "success",
+            "duration": 2139
+          },
+          {
+            "stepId": "ac546c0d-4ff6-4f3e-91ef-c07fd658bbca",
+            "stepName": "Screenshot Filled Form",
+            "type": "screenshot",
+            "status": "success",
+            "duration": 2153
+          },
+          {
+            "stepId": "4da2756d-4dc1-43d8-99e4-166f1c8460e9",
+            "stepName": "Submit Form",
+            "type": "click",
+            "status": "success",
+            "duration": 1795
+          },
+          {
+            "stepId": "acec8e9e-dcd8-48e0-bf27-4c3e1fcb5d9a",
+            "stepName": "Wait for Success Page",
+            "type": "wait",
+            "status": "success",
+            "duration": 632
+          }
+        ],
+        "totalDuration": 803,
+        "executedAt": "2026-04-08T07:53:33.893Z",
+        "completedAt": "2026-04-08T07:53:33.893Z"
+      }
+    },
+    {
+      "name": "Conditional Login Flow",
+      "description": "Check if logged in, if not then login",
+      "stepCount": 3,
+      "profileCount": 2,
+      "execution": {
+        "id": "exec-1775634813893",
+        "workflowId": "fd8072d2-0ea6-46d4-ab23-e334aa819ff3",
+        "workflowName": "Conditional Login Flow",
+        "profileId": "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb",
+        "status": "success",
+        "stepResults": [
+          {
+            "stepId": "86784a2b-258a-4c7c-9a2a-bcdf3226a87b",
+            "stepName": "Navigate to Dashboard",
+            "type": "navigate",
+            "status": "success",
+            "duration": 866
+          },
+          {
+            "stepId": "449a0f52-11a8-414a-b551-c7b572849a65",
+            "stepName": "Check If Logged In",
+            "type": "condition",
+            "status": "success",
+            "duration": 657
+          },
+          {
+            "stepId": "ed4400f8-6bee-40e4-93a8-45e8a0001026",
+            "stepName": "Final Screenshot",
+            "type": "screenshot",
+            "status": "success",
+            "duration": 1815
+          }
+        ],
+        "totalDuration": 302,
+        "executedAt": "2026-04-08T07:53:34.195Z",
+        "completedAt": "2026-04-08T07:53:34.195Z"
+      }
+    },
+    {
+      "name": "Loop - Scrape Product List",
+      "description": "Loop through products and extract data",
+      "stepCount": 2,
+      "profileCount": 1,
+      "execution": {
+        "id": "exec-1775634814195",
+        "workflowId": "16e31b63-1383-4c71-9f9c-30f03aa63ff6",
+        "workflowName": "Loop - Scrape Product List",
+        "profileId": "b119a771-c805-4677-871d-5c8696529927",
+        "status": "success",
+        "stepResults": [
+          {
+            "stepId": "00569c45-3834-4dcc-aeac-20dd8511ee4a",
+            "stepName": "Navigate to Products",
+            "type": "navigate",
+            "status": "success",
+            "duration": 1540
+          },
+          {
+            "stepId": "a9405b31-020b-400d-bd10-f250c9b86915",
+            "stepName": "Extract Product Information",
+            "type": "loop",
+            "status": "success",
+            "duration": 2332
+          }
+        ],
+        "totalDuration": 200,
+        "executedAt": "2026-04-08T07:53:34.395Z",
+        "completedAt": "2026-04-08T07:53:34.395Z"
+      }
+    },
+    {
+      "name": "Multi-Step Search & Filter",
+      "description": "Search for items and apply filters",
+      "stepCount": 9,
+      "profileCount": 2,
+      "execution": {
+        "id": "exec-1775634814395",
+        "workflowId": "08f0e2c2-e7b1-44c3-b8b7-76d496697251",
+        "workflowName": "Multi-Step Search & Filter",
+        "profileId": "b119a771-c805-4677-871d-5c8696529927",
+        "status": "partial",
+        "stepResults": [
+          {
+            "stepId": "7a6e8043-ebf2-48b7-91b4-466a6b04cf45",
+            "stepName": "Go to Search Page",
+            "type": "navigate",
+            "status": "failed",
+            "duration": 945,
+            "error": "navigate action timed out after 10000ms"
+          },
+          {
+            "stepId": "69f15bb1-77a0-41df-8dc2-1a116ee5e776",
+            "stepName": "Enter Search Query",
+            "type": "fill",
+            "status": "success",
+            "duration": 1079
+          },
+          {
+            "stepId": "e306e265-9977-4f05-ad8b-4f8630fe4c50",
+            "stepName": "Press Enter",
+            "type": "keyboard",
+            "status": "success",
+            "duration": 981
+          },
+          {
+            "stepId": "3e789661-5a22-40da-80ca-21ee3cd2941a",
+            "stepName": "Wait for Results",
+            "type": "wait",
+            "status": "success",
+            "duration": 2379
+          },
+          {
+            "stepId": "bf2ef7e9-00ef-4c72-b779-9fdee26fcb89",
+            "stepName": "Apply Price Filter",
+            "type": "click",
+            "status": "success",
+            "duration": 1736
+          },
+          {
+            "stepId": "b908a483-84c4-493e-a34a-4dbcdb8d0f0d",
+            "stepName": "Apply Brand Filter",
+            "type": "click",
+            "status": "success",
+            "duration": 1694
+          },
+          {
+            "stepId": "1a7db75b-156d-4dd2-9b03-d6b72196796d",
+            "stepName": "Wait for Filtered Results",
+            "type": "wait",
+            "status": "success",
+            "duration": 519
+          },
+          {
+            "stepId": "0ca8f590-747f-4271-b2e8-315ebcab665d",
+            "stepName": "Count Results",
+            "type": "extract",
+            "status": "success",
+            "duration": 1778
+          },
+          {
+            "stepId": "9264a7b2-7723-4384-ae05-1884c0005140",
+            "stepName": "Capture Filtered Results",
+            "type": "screenshot",
+            "status": "success",
+            "duration": 1768
+          }
+        ],
+        "totalDuration": 904,
+        "executedAt": "2026-04-08T07:53:35.299Z",
+        "completedAt": "2026-04-08T07:53:35.299Z"
+      }
+    },
+    {
+      "name": "API Call & Data Processing",
+      "description": "Make API call and process response",
+      "stepCount": 6,
+      "profileCount": 1,
+      "execution": {
+        "id": "exec-1775634815299",
+        "workflowId": "f37241fb-5dc8-4c4f-8797-7e46388ec8af",
+        "workflowName": "API Call & Data Processing",
+        "profileId": "3f995308-9f90-431a-a728-d1e1e9536572",
+        "status": "success",
+        "stepResults": [
+          {
+            "stepId": "f38bf48a-44e8-4cd6-a667-ce0dfea9e847",
+            "stepName": "Fetch User Data",
+            "type": "api_call",
+            "status": "success",
+            "duration": 1088
+          },
+          {
+            "stepId": "75c0c33a-ee38-474e-9c4f-28455356fbbe",
+            "stepName": "Process API Response",
+            "type": "js_execute",
+            "status": "success",
+            "duration": 1156
+          },
+          {
+            "stepId": "851bd6d4-4fe4-4368-a424-e89994199044",
+            "stepName": "Navigate to Form",
+            "type": "navigate",
+            "status": "success",
+            "duration": 1504
+          },
+          {
+            "stepId": "b1ed1ba1-54cf-471f-9510-f076bb5d2265",
+            "stepName": "Fill with API Data",
+            "type": "fill",
+            "status": "success",
+            "duration": 532
+          },
+          {
+            "stepId": "98699ed5-29e4-48dc-a0d4-8bbe699a155f",
+            "stepName": "Fill Email",
+            "type": "fill",
+            "status": "success",
+            "duration": 2059
+          },
+          {
+            "stepId": "3534b834-c71b-42ff-aea5-d662aef65564",
+            "stepName": "Submit",
+            "type": "click",
+            "status": "success",
+            "duration": 1504
+          }
+        ],
+        "totalDuration": 602,
+        "executedAt": "2026-04-08T07:53:35.901Z",
+        "completedAt": "2026-04-08T07:53:35.901Z"
+      }
+    },
+    {
+      "name": "Error Handling & Retry",
+      "description": "Handle errors gracefully with retries",
+      "stepCount": 3,
+      "profileCount": 1,
+      "execution": {
+        "id": "exec-1775634815901",
+        "workflowId": "26a6a746-3244-4027-becf-5a6001728675",
+        "workflowName": "Error Handling & Retry",
+        "profileId": "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb",
+        "status": "success",
+        "stepResults": [
+          {
+            "stepId": "b8dbcee3-c522-47bd-86b6-9f66257aea1d",
+            "stepName": "Navigate to Unreliable Service",
+            "type": "navigate",
+            "status": "success",
+            "duration": 2066
+          },
+          {
+            "stepId": "6dd24f26-bcb9-4976-8e33-7176798cbea3",
+            "stepName": "Wait for Element",
+            "type": "wait",
+            "status": "success",
+            "duration": 2053
+          },
+          {
+            "stepId": "e7949e0f-dc68-4326-a676-ac8c3edb1a86",
+            "stepName": "Check If Retries Exhausted",
+            "type": "condition",
+            "status": "success",
+            "duration": 2367
+          }
+        ],
+        "totalDuration": 301,
+        "executedAt": "2026-04-08T07:53:36.202Z",
+        "completedAt": "2026-04-08T07:53:36.202Z"
+      }
+    },
+    {
+      "name": "Social Media Follow & Like",
+      "description": "Follow users and like posts",
+      "stepCount": 4,
+      "profileCount": 3,
+      "execution": {
+        "id": "exec-1775634816202",
+        "workflowId": "f5bad674-6a88-40cd-b6f1-1ace39da3858",
+        "workflowName": "Social Media Follow & Like",
+        "profileId": "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb",
+        "status": "success",
+        "stepResults": [
+          {
+            "stepId": "71823a5c-07d1-4449-a7c5-e0841b868987",
+            "stepName": "Go to Social Media",
+            "type": "navigate",
+            "status": "success",
+            "duration": 1472
+          },
+          {
+            "stepId": "9609a08d-65c7-4af8-b2f4-0cb5814c605e",
+            "stepName": "Scroll Down",
+            "type": "scroll",
+            "status": "success",
+            "duration": 1899
+          },
+          {
+            "stepId": "530f42ab-8e80-4c13-a070-f056969f7a1b",
+            "stepName": "Like Posts",
+            "type": "loop",
+            "status": "success",
+            "duration": 889
+          },
+          {
+            "stepId": "9add817c-546a-4d41-bc6b-38cf58c1e963",
+            "stepName": "Follow Users",
+            "type": "loop",
+            "status": "success",
+            "duration": 880
+          }
+        ],
+        "totalDuration": 401,
+        "executedAt": "2026-04-08T07:53:36.603Z",
+        "completedAt": "2026-04-08T07:53:36.603Z"
+      }
+    },
+    {
+      "name": "Data Entry & Validation",
+      "description": "Fill multiple fields with validation",
+      "stepCount": 9,
+      "profileCount": 1,
+      "execution": {
+        "id": "exec-1775634816603",
+        "workflowId": "6541394c-3402-47cb-8a44-09f22127eb03",
+        "workflowName": "Data Entry & Validation",
+        "profileId": "b119a771-c805-4677-871d-5c8696529927",
+        "status": "success",
+        "stepResults": [
+          {
+            "stepId": "0d6cbf40-2b22-4852-b7da-9e4962e67bae",
+            "stepName": "Open Registration Form",
+            "type": "navigate",
+            "status": "success",
+            "duration": 1601
+          },
+          {
+            "stepId": "1c6b2460-792f-469f-8a9d-7c9e85d81007",
+            "stepName": "Enter Username",
+            "type": "fill",
+            "status": "success",
+            "duration": 1888
+          },
+          {
+            "stepId": "039a6ea7-ceb3-49ed-b31b-5027eaa11c49",
+            "stepName": "Enter Email",
+            "type": "fill",
+            "status": "success",
+            "duration": 2241
+          },
+          {
+            "stepId": "584ed64a-7326-4080-8fa9-a10103754f25",
+            "stepName": "Enter Password",
+            "type": "fill",
+            "status": "success",
+            "duration": 605
+          },
+          {
+            "stepId": "dff4a897-76ef-4cd2-8d88-681f3c548a23",
+            "stepName": "Confirm Password",
+            "type": "fill",
+            "status": "success",
+            "duration": 607
+          },
+          {
+            "stepId": "7a8a629e-027b-4552-9f1a-be552a286746",
+            "stepName": "Accept Terms",
+            "type": "click",
+            "status": "success",
+            "duration": 1899
+          },
+          {
+            "stepId": "29bbf77c-24a8-4a88-9978-b83de6f92848",
+            "stepName": "Validate Submit Button",
+            "type": "assert",
+            "status": "success",
+            "duration": 578
+          },
+          {
+            "stepId": "00dfe021-8054-44e8-b546-b34f635b92ee",
+            "stepName": "Submit Registration",
+            "type": "click",
+            "status": "success",
+            "duration": 668
+          },
+          {
+            "stepId": "59cb75cb-49d5-44d5-a8bf-bb8b95d95700",
+            "stepName": "Wait for Confirmation",
+            "type": "wait",
+            "status": "success",
+            "duration": 847
+          }
+        ],
+        "totalDuration": 903,
+        "executedAt": "2026-04-08T07:53:37.506Z",
+        "completedAt": "2026-04-08T07:53:37.506Z"
+      }
+    }
+  ]
+}

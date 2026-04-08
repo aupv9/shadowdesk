@@ -1,0 +1,105 @@
+[
+  {
+    "id": "21747293-03f1-4458-89a4-b8fe70bfaf17",
+    "workflow_id": "738237be-9fe0-4a25-b40f-a3266b3ac859",
+    "workflow_name": "Simple Page Navigation",
+    "profile_ids": [
+      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb"
+    ],
+    "enabled": true,
+    "description": "Navigate to a website and take screenshot",
+    "created_at": "2026-04-08T07:53:12.410Z"
+  },
+  {
+    "id": "bd182853-1c1f-442d-9089-e1fab0264cde",
+    "workflow_id": "bde8519a-ca9e-4764-b41c-ad96f7ca4920",
+    "workflow_name": "Form Filling & Submission",
+    "profile_ids": [
+      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb"
+    ],
+    "enabled": true,
+    "description": "Fill and submit a test form with validation",
+    "created_at": "2026-04-08T07:53:12.410Z"
+  },
+  {
+    "id": "fa0d6e4a-d2c6-4ad6-95e1-ad9bf39253e6",
+    "workflow_id": "fd8072d2-0ea6-46d4-ab23-e334aa819ff3",
+    "workflow_name": "Conditional Login Flow",
+    "profile_ids": [
+      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb",
+      "b119a771-c805-4677-871d-5c8696529927"
+    ],
+    "enabled": true,
+    "description": "Check if logged in, if not then login",
+    "created_at": "2026-04-08T07:53:12.410Z"
+  },
+  {
+    "id": "5551d7e1-86ff-4924-ab3c-348f34f16f3d",
+    "workflow_id": "16e31b63-1383-4c71-9f9c-30f03aa63ff6",
+    "workflow_name": "Loop - Scrape Product List",
+    "profile_ids": [
+      "b119a771-c805-4677-871d-5c8696529927"
+    ],
+    "enabled": true,
+    "description": "Loop through products and extract data",
+    "created_at": "2026-04-08T07:53:12.410Z"
+  },
+  {
+    "id": "00135343-813c-4e12-9f5f-b4dcfd6d7886",
+    "workflow_id": "08f0e2c2-e7b1-44c3-b8b7-76d496697251",
+    "workflow_name": "Multi-Step Search & Filter",
+    "profile_ids": [
+      "b119a771-c805-4677-871d-5c8696529927",
+      "3f995308-9f90-431a-a728-d1e1e9536572"
+    ],
+    "enabled": true,
+    "description": "Search for items and apply filters",
+    "created_at": "2026-04-08T07:53:12.410Z"
+  },
+  {
+    "id": "bd395fa2-0a0a-4881-b2ca-99e21d183d7d",
+    "workflow_id": "f37241fb-5dc8-4c4f-8797-7e46388ec8af",
+    "workflow_name": "API Call & Data Processing",
+    "profile_ids": [
+      "3f995308-9f90-431a-a728-d1e1e9536572"
+    ],
+    "enabled": true,
+    "description": "Make API call and process response",
+    "created_at": "2026-04-08T07:53:12.410Z"
+  },
+  {
+    "id": "34b1de98-5f11-48f7-97d7-5c1d65e6112e",
+    "workflow_id": "26a6a746-3244-4027-becf-5a6001728675",
+    "workflow_name": "Error Handling & Retry",
+    "profile_ids": [
+      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb"
+    ],
+    "enabled": true,
+    "description": "Handle errors gracefully with retries",
+    "created_at": "2026-04-08T07:53:12.410Z"
+  },
+  {
+    "id": "48382a13-0d54-47a7-b803-4719cfc977db",
+    "workflow_id": "f5bad674-6a88-40cd-b6f1-1ace39da3858",
+    "workflow_name": "Social Media Follow & Like",
+    "profile_ids": [
+      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb",
+      "b119a771-c805-4677-871d-5c8696529927",
+      "3f995308-9f90-431a-a728-d1e1e9536572"
+    ],
+    "enabled": true,
+    "description": "Follow users and like posts",
+    "created_at": "2026-04-08T07:53:12.410Z"
+  },
+  {
+    "id": "e99422af-3fcd-4598-afa1-629bc6052687",
+    "workflow_id": "6541394c-3402-47cb-8a44-09f22127eb03",
+    "workflow_name": "Data Entry & Validation",
+    "profile_ids": [
+      "b119a771-c805-4677-871d-5c8696529927"
+    ],
+    "enabled": true,
+    "description": "Fill multiple fields with validation",
+    "created_at": "2026-04-08T07:53:12.410Z"
+  }
+]
