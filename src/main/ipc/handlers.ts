@@ -1510,11 +1510,37 @@ export function registerIpcHandlers(): void {
 
   const detectionRunner = DetectionTestRunner.getInstance()
 
+  /**
+   * Validate a profile exists in the database
+   */
+  const validateProfileExists = (profileId: string): boolean => {
+    if (!profileId || typeof profileId !== 'string' || profileId.trim() === '') {
+      return false
+    }
+    const profile = db.getProfile(profileId)
+    return !!profile
+  }
+
   ipcMain.handle('detection:runTest', async (_event, profileId: string) => {
+    // Input validation
+    if (!profileId || typeof profileId !== 'string') {
+      throw new Error('Invalid profileId: must be a non-empty string')
+    }
+    if (!validateProfileExists(profileId)) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
+    console.log(`[IPC] detection:runTest requested for profile: ${profileId}`)
     return detectionRunner.runTest(profileId)
   })
 
   ipcMain.handle('detection:results', (_event, profileId?: string) => {
+    // Optional profileId validation
+    if (profileId && typeof profileId !== 'string') {
+      throw new Error('Invalid profileId: must be a string')
+    }
+    if (profileId && !validateProfileExists(profileId)) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
     return detectionRunner.getResults(profileId)
   })
 
@@ -1524,14 +1550,46 @@ export function registerIpcHandlers(): void {
 
   // Phase 7: detection result management + batch testing
   ipcMain.handle('detection:deleteResult', (_event, resultId: string) => {
+    if (!resultId || typeof resultId !== 'string') {
+      throw new Error('Invalid resultId: must be a non-empty string')
+    }
     db.deleteDetectionTestResult(resultId)
   })
 
   ipcMain.handle('detection:clearHistory', (_event, profileId?: string) => {
+    if (profileId && typeof profileId !== 'string') {
+      throw new Error('Invalid profileId: must be a string')
+    }
+    if (profileId && !validateProfileExists(profileId)) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
     db.deleteAllDetectionTestResults(profileId)
   })
 
   ipcMain.handle('detection:batchTest', async (_event, profileIds: string[]) => {
+    // Input validation
+    if (!Array.isArray(profileIds)) {
+      throw new Error('Invalid profileIds: must be an array')
+    }
+    if (profileIds.length === 0) {
+      throw new Error('profileIds array is empty')
+    }
+    if (profileIds.length > 100) {
+      throw new Error('Too many profiles to test at once (max 100)')
+    }
+
+    // Validate all profileIds exist
+    const invalidIds: string[] = []
+    for (const id of profileIds) {
+      if (!validateProfileExists(id)) {
+        invalidIds.push(id)
+      }
+    }
+    if (invalidIds.length > 0) {
+      throw new Error(`Profile(s) not found: ${invalidIds.join(', ')}`)
+    }
+
+    console.log(`[IPC] detection:batchTest requested for ${profileIds.length} profiles`)
     const results: any[] = []
     let completed = 0
     let failed = 0
@@ -1541,7 +1599,8 @@ export function registerIpcHandlers(): void {
         const result = await detectionRunner.runTest(profileId)
         results.push(result)
         completed++
-      } catch {
+      } catch (error) {
+        console.error(`[IPC:batchTest] Failed for ${profileId}:`, error)
         failed++
       }
     }

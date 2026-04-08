@@ -5,10 +5,24 @@ import { Database } from './database'
 import { resolveFingerprint } from './fingerprint/presets'
 import type { DetectionTestResult, DetectionVectorResult } from '../shared/types'
 
+/** Total number of detection vectors (update when adding new vectors) */
+const TOTAL_DETECTION_VECTORS = 45
+
+/** Timeout for individual vector evaluation (ms) */
+const VECTOR_TIMEOUT_MS = 5000
+
+/** Timeout for entire test run (ms) */
+const TEST_TIMEOUT_MS = 30000
+
 /**
  * Detection Test Runner — launches a profile's browser and runs
  * automated checks against common bot-detection vectors.
  * Produces a scored report for the Detection Dashboard.
+ *
+ * Features:
+ * - Timeout protection: each vector has 5s timeout, entire test 30s max
+ * - Logging: all operations logged for debugging
+ * - Error resilience: partial results returned on vector failures
  */
 export class DetectionTestRunner {
   private static instance: DetectionTestRunner
@@ -23,48 +37,77 @@ export class DetectionTestRunner {
   /**
    * Run detection tests for a profile (uses its fingerprint config).
    * Launches a headless browser, evaluates detection vectors, and scores results.
+   *
+   * Timeout: 30s total per profile (protects against hanging page evaluations)
    */
   async runTest(profileId: string): Promise<DetectionTestResult> {
-    const db = Database.getInstance()
-    const profile = db.getProfile(profileId) as any
-    if (!profile) throw new Error(`Profile ${profileId} not found`)
-
-    const fingerprint = typeof profile.fingerprint === 'string'
-      ? JSON.parse(profile.fingerprint)
-      : profile.fingerprint
-
-    const bm = BrowserManager.getInstance()
-
-    // Launch the profile if not already running
-    const wasRunning = bm.isRunning(profileId)
-    if (!wasRunning) {
-      await bm.launchProfile(profileId, fingerprint)
-    }
+    console.log(`[Detection] Starting test for profile: ${profileId}`)
+    const startTime = Date.now()
 
     try {
-      const vectors = await this.evaluateVectors(profileId)
-      const passedCount = vectors.filter(v => v.passed).length
-      const overallScore = Math.round((passedCount / vectors.length) * 100)
-
-      const result: DetectionTestResult = {
-        id: uuidv4(),
-        profileId,
-        profileName: profile.name,
-        testedAt: new Date().toISOString(),
-        overallScore,
-        vectors,
-        status: overallScore >= 90 ? 'passed' : overallScore >= 70 ? 'warning' : 'failed'
+      const db = Database.getInstance()
+      const profile = db.getProfile(profileId) as any
+      if (!profile) {
+        throw new Error(`Profile ${profileId} not found`)
       }
 
-      // Persist result to DB
-      db.saveDetectionTestResult(result)
+      const fingerprint = typeof profile.fingerprint === 'string'
+        ? JSON.parse(profile.fingerprint)
+        : profile.fingerprint
 
-      return result
-    } finally {
-      // Close if we opened it
+      const bm = BrowserManager.getInstance()
+
+      // Launch the profile if not already running
+      const wasRunning = bm.isRunning(profileId)
       if (!wasRunning) {
-        await bm.closeProfile(profileId).catch(() => {})
+        console.log(`[Detection] Launching browser for profile: ${profileId}`)
+        await bm.launchProfile(profileId, fingerprint)
       }
+
+      try {
+        // Wrap evaluation in timeout to prevent hanging
+        const vectors = await this.withTimeout(
+          this.evaluateVectors(profileId),
+          TEST_TIMEOUT_MS,
+          'evaluation'
+        )
+
+        const passedCount = vectors.filter(v => v.passed).length
+        const failedCount = vectors.filter(v => !v.passed).length
+        const overallScore = Math.round((passedCount / vectors.length) * 100)
+
+        console.log(`[Detection] Test complete: ${passedCount}/${vectors.length} passed (score: ${overallScore}%)`)
+
+        const result: DetectionTestResult = {
+          id: uuidv4(),
+          profileId,
+          profileName: profile.name,
+          testedAt: new Date().toISOString(),
+          overallScore,
+          vectors,
+          status: overallScore >= 90 ? 'passed' : overallScore >= 70 ? 'warning' : 'failed'
+        }
+
+        // Persist result to DB
+        db.saveDetectionTestResult(result)
+
+        const elapsed = Date.now() - startTime
+        console.log(`[Detection] Test saved (elapsed: ${elapsed}ms)`)
+
+        return result
+      } finally {
+        // Close if we opened it
+        if (!wasRunning) {
+          console.log(`[Detection] Closing browser for profile: ${profileId}`)
+          await bm.closeProfile(profileId).catch((err) => {
+            console.warn(`[Detection] Error closing browser: ${err.message}`)
+          })
+        }
+      }
+    } catch (error) {
+      const elapsed = Date.now() - startTime
+      console.error(`[Detection] Test failed for profile ${profileId} (elapsed: ${elapsed}ms):`, error)
+      throw error
     }
   }
 
@@ -74,11 +117,40 @@ export class DetectionTestRunner {
     return db.getDetectionTestResults(profileId)
   }
 
-  /** Evaluate all detection vectors inside a running profile's browser */
+  /**
+   * Wrap a promise in a timeout to prevent indefinite hanging.
+   * If timeout is exceeded, returns a rejected promise with timeout error.
+   */
+  private withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+    operation: string
+  ): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)),
+          timeoutMs
+        )
+      )
+    ])
+  }
+
+  /**
+   * Evaluate all detection vectors inside a running profile's browser.
+   * Features:
+   * - 5s timeout per vector (prevents hanging on slow evaluations)
+   * - Partial results: continues even if individual vectors fail
+   * - Logging: each vector logged for debugging
+   */
   private async evaluateVectors(profileId: string): Promise<DetectionVectorResult[]> {
     const bm = BrowserManager.getInstance()
-    const session = (bm as any).sessions?.get(profileId)
-    if (!session) throw new Error('Profile browser session not found')
+    const sessions = bm.getSessions()
+    const session = sessions.get(profileId)
+    if (!session) {
+      throw new Error(`Profile browser session not found for ${profileId}`)
+    }
 
     const pages = await session.browser.pages()
     const page = pages[0] || await session.browser.newPage()
@@ -88,61 +160,83 @@ export class DetectionTestRunner {
 
     const vectors: DetectionVectorResult[] = []
 
-    // Run each test and collect results
-    vectors.push(await this.testWebdriver(page))
-    vectors.push(await this.testChromeRuntime(page))
-    vectors.push(await this.testChromeApp(page))
-    vectors.push(await this.testPlugins(page))
-    vectors.push(await this.testPermissions(page))
-    vectors.push(await this.testNavigatorProps(page))
-    vectors.push(await this.testCanvasFingerprint(page))
-    vectors.push(await this.testWebglVendor(page))
-    vectors.push(await this.testAudioContext(page))
-    vectors.push(await this.testScreenConsistency(page))
-    vectors.push(await this.testTimezone(page))
-    vectors.push(await this.testLanguageConsistency(page))
-    vectors.push(await this.testConnectionApi(page))
-    vectors.push(await this.testStorageQuota(page))
-    vectors.push(await this.testErrorStack(page))
-    vectors.push(await this.testFunctionToString(page))
-    vectors.push(await this.testHeadlessSignals(page))
-    vectors.push(await this.testCdcVariables(page))
-    vectors.push(await this.testPerformanceEntries(page))
-    vectors.push(await this.testNotificationPermission(page))
-    // Phase 6: 10 new vectors
-    vectors.push(await this.testDateNowPrecision(page))
-    vectors.push(await this.testWebAssemblySupport(page))
-    vectors.push(await this.testObjectDefinePropertyConsistency(page))
-    vectors.push(await this.testWorkerWebdriver(page))
-    vectors.push(await this.testCssMediaConsistency(page))
-    vectors.push(await this.testBatteryApiShape(page))
-    vectors.push(await this.testViewportConsistency(page))
-    vectors.push(await this.testSeleniumArtifacts(page))
-    vectors.push(await this.testServiceWorkerSupport(page))
-    vectors.push(await this.testDocumentFocus(page))
-    // Phase 8: 15 new deep detection vectors
-    vectors.push(await this.testIntlLocaleConsistency(page))
-    vectors.push(await this.testUserAgentDataBrands(page))
-    vectors.push(await this.testUserAgentDataPlatform(page))
-    vectors.push(await this.testWebGPUPresence(page))
-    vectors.push(await this.testMathFpuFingerprint(page))
-    vectors.push(await this.testProtoChainIntegrity(page))
-    vectors.push(await this.testMediaCapabilitiesApi(page))
-    vectors.push(await this.testKeyboardApiPresence(page))
-    vectors.push(await this.testWebRtcSdpFingerprint(page))
-    vectors.push(await this.testDevicePixelRatioConsistency(page))
-    vectors.push(await this.testNavigationTimingConsistency(page))
-    vectors.push(await this.testSpeechSynthesisConsistency(page))
-    vectors.push(await this.testTrustTokenApiShape(page))
-    vectors.push(await this.testSharedArrayBufferAvailability(page))
-    vectors.push(await this.testIntlSupportedValues(page))
-    // Phase 12.A.2: 5 network/UA alignment vectors
-    vectors.push(await this.testBinaryUaAlignment(page))
-    vectors.push(await this.testUachBrandsAlignment(page))
-    vectors.push(await this.testUachPlatformAlignment(page))
-    vectors.push(await this.testUachMobileTouchAlignment(page))
-    vectors.push(await this.testAcceptLanguageAlignment(page))
+    // Helper to safely run a vector test with timeout and error handling
+    const runVectorTest = async (testFn: () => Promise<DetectionVectorResult>, name: string) => {
+      try {
+        const result = await this.withTimeout(testFn(), VECTOR_TIMEOUT_MS, name)
+        console.log(`[Detection:Vector] ${name}: ${result.passed ? '✓ PASS' : '✗ FAIL'} - ${result.detail}`)
+        return result
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        console.warn(`[Detection:Vector] ${name}: ERROR - ${detail}`)
+        return {
+          name,
+          category: 'Unknown',
+          passed: false,
+          detail: `Error: ${detail}`
+        }
+      }
+    }
 
+    // Run each test and collect results (Phase 1-5: 20 vectors)
+    vectors.push(await runVectorTest(() => this.testWebdriver(page), 'navigator.webdriver'))
+    vectors.push(await runVectorTest(() => this.testChromeRuntime(page), 'chrome.runtime'))
+    vectors.push(await runVectorTest(() => this.testChromeApp(page), 'chrome.app'))
+    vectors.push(await runVectorTest(() => this.testPlugins(page), 'navigator.plugins'))
+    vectors.push(await runVectorTest(() => this.testPermissions(page), 'Permissions API'))
+    vectors.push(await runVectorTest(() => this.testNavigatorProps(page), 'Navigator props'))
+    vectors.push(await runVectorTest(() => this.testCanvasFingerprint(page), 'Canvas fingerprint'))
+    vectors.push(await runVectorTest(() => this.testWebglVendor(page), 'WebGL vendor'))
+    vectors.push(await runVectorTest(() => this.testAudioContext(page), 'AudioContext'))
+    vectors.push(await runVectorTest(() => this.testScreenConsistency(page), 'Screen consistency'))
+    vectors.push(await runVectorTest(() => this.testTimezone(page), 'Timezone'))
+    vectors.push(await runVectorTest(() => this.testLanguageConsistency(page), 'Language consistency'))
+    vectors.push(await runVectorTest(() => this.testConnectionApi(page), 'Connection API'))
+    vectors.push(await runVectorTest(() => this.testStorageQuota(page), 'Storage quota'))
+    vectors.push(await runVectorTest(() => this.testErrorStack(page), 'Error stack'))
+    vectors.push(await runVectorTest(() => this.testFunctionToString(page), 'Function.toString'))
+    vectors.push(await runVectorTest(() => this.testHeadlessSignals(page), 'Headless signals'))
+    vectors.push(await runVectorTest(() => this.testCdcVariables(page), 'CDC variables'))
+    vectors.push(await runVectorTest(() => this.testPerformanceEntries(page), 'Performance entries'))
+    vectors.push(await runVectorTest(() => this.testNotificationPermission(page), 'Notification permission'))
+
+    // Phase 6: 10 new vectors
+    vectors.push(await runVectorTest(() => this.testDateNowPrecision(page), 'Date.now precision'))
+    vectors.push(await runVectorTest(() => this.testWebAssemblySupport(page), 'WebAssembly support'))
+    vectors.push(await runVectorTest(() => this.testObjectDefinePropertyConsistency(page), 'Object.defineProperty'))
+    vectors.push(await runVectorTest(() => this.testWorkerWebdriver(page), 'Worker webdriver'))
+    vectors.push(await runVectorTest(() => this.testCssMediaConsistency(page), 'CSS media consistency'))
+    vectors.push(await runVectorTest(() => this.testBatteryApiShape(page), 'Battery API shape'))
+    vectors.push(await runVectorTest(() => this.testViewportConsistency(page), 'Viewport consistency'))
+    vectors.push(await runVectorTest(() => this.testSeleniumArtifacts(page), 'Selenium artifacts'))
+    vectors.push(await runVectorTest(() => this.testServiceWorkerSupport(page), 'Service Worker support'))
+    vectors.push(await runVectorTest(() => this.testDocumentFocus(page), 'Document focus'))
+
+    // Phase 8: 15 new deep detection vectors
+    vectors.push(await runVectorTest(() => this.testIntlLocaleConsistency(page), 'Intl locale consistency'))
+    vectors.push(await runVectorTest(() => this.testUserAgentDataBrands(page), 'UserAgentData brands'))
+    vectors.push(await runVectorTest(() => this.testUserAgentDataPlatform(page), 'UserAgentData platform'))
+    vectors.push(await runVectorTest(() => this.testWebGPUPresence(page), 'WebGPU presence'))
+    vectors.push(await runVectorTest(() => this.testMathFpuFingerprint(page), 'Math FPU fingerprint'))
+    vectors.push(await runVectorTest(() => this.testProtoChainIntegrity(page), 'Proto chain integrity'))
+    vectors.push(await runVectorTest(() => this.testMediaCapabilitiesApi(page), 'Media capabilities'))
+    vectors.push(await runVectorTest(() => this.testKeyboardApiPresence(page), 'Keyboard API'))
+    vectors.push(await runVectorTest(() => this.testWebRtcSdpFingerprint(page), 'WebRTC SDP'))
+    vectors.push(await runVectorTest(() => this.testDevicePixelRatioConsistency(page), 'Device pixel ratio'))
+    vectors.push(await runVectorTest(() => this.testNavigationTimingConsistency(page), 'Navigation timing'))
+    vectors.push(await runVectorTest(() => this.testSpeechSynthesisConsistency(page), 'Speech synthesis'))
+    vectors.push(await runVectorTest(() => this.testTrustTokenApiShape(page), 'Trust Token API'))
+    vectors.push(await runVectorTest(() => this.testSharedArrayBufferAvailability(page), 'SharedArrayBuffer'))
+    vectors.push(await runVectorTest(() => this.testIntlSupportedValues(page), 'Intl supported values'))
+
+    // Phase 12.A.2: 5 network/UA alignment vectors
+    vectors.push(await runVectorTest(() => this.testBinaryUaAlignment(page), 'Binary UA alignment'))
+    vectors.push(await runVectorTest(() => this.testUachBrandsAlignment(page), 'UACH brands alignment'))
+    vectors.push(await runVectorTest(() => this.testUachPlatformAlignment(page), 'UACH platform alignment'))
+    vectors.push(await runVectorTest(() => this.testUachMobileTouchAlignment(page), 'UACH mobile/touch alignment'))
+    vectors.push(await runVectorTest(() => this.testAcceptLanguageAlignment(page), 'Accept-Language alignment'))
+
+    console.log(`[Detection:Vectors] Total: ${vectors.length}/${TOTAL_DETECTION_VECTORS}`)
     return vectors
   }
 

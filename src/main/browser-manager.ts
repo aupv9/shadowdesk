@@ -86,6 +86,11 @@ export class BrowserManager {
     return this.binaryInfo
   }
 
+  /** Get active browser sessions (for detection testing and other operations) */
+  getSessions(): Map<string, ActiveSession> {
+    return this.sessions
+  }
+
   /**
    * Phase 12.A.1 — Rewrite the spoofed UA to match the real Chromium binary major version.
    *
