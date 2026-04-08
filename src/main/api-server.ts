@@ -322,6 +322,152 @@ export class ApiServer {
       return
     }
 
+    // ── Phase 18: Inbound workflow webhook triggers ────────────────────
+    // POST /api/webhooks/workflows/:id/run — Fire-and-forget execution.
+    //   • Auto-launches profile if not already running.
+    //   • Accepts runtime `variables` and optional `profileId`.
+    //   • Returns 202 Accepted with a runId reference so the caller can
+    //     poll `/api/workflows/:id/runs/last` for the result.
+    //   • Errors during background execution are logged to the run history.
+    const webhookWorkflowMatch = path.match(/^\/api\/webhooks\/workflows\/([^/]+)\/run$/)
+    if (webhookWorkflowMatch && method === 'POST') {
+      const workflowId = webhookWorkflowMatch[1]
+      const wfRow = db.getWorkflow(workflowId) as any
+      if (!wfRow) { this.sendJson(res, 404, { error: 'Workflow not found' }); return }
+
+      const profileId: string | undefined = body?.profileId
+      if (!profileId) { this.sendJson(res, 400, { error: 'profileId required in body' }); return }
+
+      const profileRow = db.getProfile(profileId) as any
+      if (!profileRow) { this.sendJson(res, 404, { error: 'Profile not found' }); return }
+
+      const variables: Record<string, string> = (body?.variables && typeof body.variables === 'object')
+        ? body.variables
+        : {}
+
+      const runId = `webhook-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+      // Launch profile if it is not already running, then fire the workflow.
+      // Intentionally do NOT await — respond 202 immediately, execute async.
+      const runPromise = (async () => {
+        try {
+          if (!bm.isRunning(profileId)) {
+            const fingerprint = typeof profileRow.fingerprint === 'string'
+              ? JSON.parse(profileRow.fingerprint)
+              : profileRow.fingerprint
+            const allProxies = db.getAllProxies() as any[]
+            const { proxy } = bm.pickProxy(profileRow, allProxies)
+            let cookies: any[] = []
+            try { cookies = JSON.parse(profileRow.cookies || '[]') } catch { /* ignore */ }
+            await bm.launchProfile(profileId, fingerprint, proxy, cookies.length > 0 ? cookies : undefined)
+            db.updateProfileLastUsed(profileId)
+          }
+          return await engine.executeWorkflow(workflowId, profileId, variables)
+        } catch (err: any) {
+          console.error(`[webhook ${runId}] workflow ${workflowId} failed:`, err?.message ?? err)
+          return { status: 'failed', error: err?.message ?? String(err) }
+        }
+      })()
+      // Avoid unhandled-rejection crashes if caller never observes the promise.
+      runPromise.catch(() => { /* already logged */ })
+
+      res.writeHead(202)
+      res.end(JSON.stringify({
+        accepted: true,
+        runId,
+        workflowId,
+        profileId,
+        message: 'Workflow execution started. Poll /api/workflows/:id/runs/last for result.'
+      }))
+      return
+    }
+
+    // GET /api/workflows/:id/runs/last — Latest run for external callers polling after a webhook trigger.
+    const workflowRunsLastMatch = path.match(/^\/api\/workflows\/([^/]+)\/runs\/last$/)
+    if (workflowRunsLastMatch && method === 'GET') {
+      const rows = db.getWorkflowRuns(workflowRunsLastMatch[1], 1)
+      if (!rows || rows.length === 0) { this.sendJson(res, 404, { error: 'No runs for workflow' }); return }
+      const r = rows[0] as any
+      this.sendJson(res, 200, {
+        ...r,
+        step_results: (() => { try { return JSON.parse(r.step_results) } catch { return [] } })(),
+        variables: (() => { try { return r.variables ? JSON.parse(r.variables) : null } catch { return null } })()
+      })
+      return
+    }
+
+    // GET /api/workflows/:id/runs/export?format=csv|json&limit=500&perStep=1
+    // Exports workflow run history inline for retrieval by external tools.
+    const workflowRunsExportMatch = path.match(/^\/api\/workflows\/([^/]+)\/runs\/export$/)
+    if (workflowRunsExportMatch && method === 'GET') {
+      const workflowId = workflowRunsExportMatch[1]
+      const format = (url.searchParams.get('format') ?? 'csv').toLowerCase()
+      const limitRaw = Number(url.searchParams.get('limit') ?? '500')
+      const limit = Math.max(1, Math.min(isNaN(limitRaw) ? 500 : limitRaw, 5000))
+      const perStep = url.searchParams.get('perStep') === '1' || url.searchParams.get('perStep') === 'true'
+      const statusFilter = url.searchParams.get('status') ?? undefined
+
+      const rawRows = db.getWorkflowRuns(workflowId, limit)
+      const rows = statusFilter ? rawRows.filter((r: any) => r.status === statusFilter) : rawRows
+
+      if (format === 'json') {
+        const payload = rows.map((r: any) => ({
+          run_id: r.id,
+          workflow_id: r.workflow_id,
+          profile_id: r.profile_id,
+          status: r.status,
+          started_at: r.started_at,
+          completed_at: r.completed_at,
+          duration_ms: r.duration_ms,
+          error: r.error,
+          steps: (() => { try { return JSON.parse(r.step_results || '[]') } catch { return [] } })(),
+          variables: (() => { try { return r.variables ? JSON.parse(r.variables) : null } catch { return null } })()
+        }))
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ exportedAt: new Date().toISOString(), count: payload.length, runs: payload }))
+        return
+      }
+
+      // CSV branch — reuse the same column layout as the IPC export.
+      const csvEscape = (v: unknown): string => {
+        if (v == null) return ''
+        const s = typeof v === 'string' ? v : JSON.stringify(v)
+        return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+      }
+      const lines: string[] = []
+      if (perStep) {
+        lines.push(['run_id','workflow_id','profile_id','run_status','step_index','step_id','action','success','error','duration_ms','started_at'].join(','))
+        for (const r of rows as any[]) {
+          let steps: any[] = []
+          try { steps = JSON.parse(r.step_results || '[]') } catch { /* ignore */ }
+          steps.forEach((s, idx) => {
+            lines.push([
+              csvEscape(r.id), csvEscape(r.workflow_id), csvEscape(r.profile_id), csvEscape(r.status),
+              csvEscape(idx), csvEscape(s?.stepId ?? s?.id ?? ''), csvEscape(s?.action ?? ''),
+              csvEscape(s?.success !== false), csvEscape(s?.error ?? ''),
+              csvEscape(typeof s?.durationMs === 'number' ? s.durationMs : ''),
+              csvEscape(r.started_at)
+            ].join(','))
+          })
+        }
+      } else {
+        lines.push(['run_id','workflow_id','profile_id','status','started_at','completed_at','duration_ms','step_count','failed_steps','error'].join(','))
+        for (const r of rows as any[]) {
+          let steps: any[] = []
+          try { steps = JSON.parse(r.step_results || '[]') } catch { /* ignore */ }
+          const failed = steps.filter((s: any) => s && s.success === false).length
+          lines.push([
+            csvEscape(r.id), csvEscape(r.workflow_id), csvEscape(r.profile_id), csvEscape(r.status),
+            csvEscape(r.started_at), csvEscape(r.completed_at), csvEscape(r.duration_ms ?? ''),
+            csvEscape(steps.length), csvEscape(failed), csvEscape(r.error ?? '')
+          ].join(','))
+        }
+      }
+      res.writeHead(200, { 'Content-Type': 'text/csv' })
+      res.end(lines.join('\n'))
+      return
+    }
+
     // ── 404 ────────────────────────────────────────────────────────────
     this.sendJson(res, 404, { error: 'Not found', path, method })
   }

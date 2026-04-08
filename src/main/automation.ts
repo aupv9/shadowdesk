@@ -94,6 +94,144 @@ function interpolateParams(
   )
 }
 
+/**
+ * Phase 18 — Minimal JSONPath getter.
+ *
+ * Supports the common subset:
+ *   $            — root
+ *   $.a.b.c      — dot access
+ *   $.a[0]       — array index
+ *   $.a[*]       — all array items (returns array)
+ *   $.a.0.b      — numeric keys in dot form (convenience)
+ *   $["a.b"]     — quoted key with literal dot
+ *
+ * Returns undefined if any segment misses. For `[*]` the caller gets back
+ * the raw array and is responsible for stringifying it.
+ */
+export function jsonPathGet(obj: any, path: string): any {
+  if (!path || path === '$') return obj
+  let cleaned = path.startsWith('$.') ? path.slice(2) : path.startsWith('$') ? path.slice(1) : path
+  if (cleaned.startsWith('.')) cleaned = cleaned.slice(1)
+
+  const tokens: (string | number | '*')[] = []
+  let i = 0
+  let buf = ''
+  while (i < cleaned.length) {
+    const ch = cleaned[i]
+    if (ch === '.') {
+      if (buf) { tokens.push(/^-?\d+$/.test(buf) ? Number(buf) : buf); buf = '' }
+      i++
+      continue
+    }
+    if (ch === '[') {
+      if (buf) { tokens.push(/^-?\d+$/.test(buf) ? Number(buf) : buf); buf = '' }
+      const end = cleaned.indexOf(']', i)
+      if (end < 0) return undefined
+      const inside = cleaned.slice(i + 1, end).trim()
+      if (inside === '*') tokens.push('*')
+      else if (/^-?\d+$/.test(inside)) tokens.push(Number(inside))
+      else tokens.push(inside.replace(/^['"]|['"]$/g, ''))
+      i = end + 1
+      continue
+    }
+    buf += ch
+    i++
+  }
+  if (buf) tokens.push(/^-?\d+$/.test(buf) ? Number(buf) : buf)
+
+  let current: any = obj
+  for (const tok of tokens) {
+    if (current == null) return undefined
+    if (tok === '*') {
+      if (!Array.isArray(current)) return undefined
+      return current
+    }
+    if (typeof tok === 'number') {
+      if (!Array.isArray(current)) return undefined
+      const idx = tok < 0 ? current.length + tok : tok
+      current = current[idx]
+      continue
+    }
+    current = current[tok]
+  }
+  return current
+}
+
+/**
+ * Phase 18 — Apply a transform pipeline to a raw string value.
+ *
+ * `transform` may be a single op or an array of ops applied in order.
+ * Ops:
+ *   trim | upper | lower | number | length
+ *   jsonPath:$.a.b       — parse as JSON and extract
+ *   regex:pattern        — first capture group (or full match if no groups)
+ *   split:sep:index      — split by sep, take index (default 0)
+ *   replace:find:with    — literal or `re:pattern` replace
+ *   prefix:str           — prepend str
+ *   suffix:str           — append str
+ *
+ * Errors are swallowed — a failed transform yields an empty string so a
+ * downstream step can test with `var-empty` instead of blowing up the run.
+ */
+export function applyTransforms(raw: string, transform: string | string[] | undefined): string {
+  if (!transform) return raw
+  const ops = Array.isArray(transform) ? transform : [transform]
+  let v: string = raw
+  for (const op of ops) {
+    if (!op) continue
+    if (op === 'trim')                            v = v.trim()
+    else if (op === 'upper' || op === 'uppercase') v = v.toUpperCase()
+    else if (op === 'lower' || op === 'lowercase') v = v.toLowerCase()
+    else if (op === 'number') {
+      const n = Number(v)
+      v = Number.isFinite(n) ? String(n) : ''
+    }
+    else if (op === 'length') v = String(v.length)
+    else if (op.startsWith('jsonPath:')) {
+      const path = op.slice('jsonPath:'.length)
+      try {
+        const parsed = JSON.parse(v)
+        const picked = jsonPathGet(parsed, path)
+        v = picked === undefined
+          ? ''
+          : typeof picked === 'string' ? picked : JSON.stringify(picked)
+      } catch { v = '' }
+    }
+    else if (op.startsWith('regex:')) {
+      const pat = op.slice('regex:'.length)
+      try {
+        const m = v.match(new RegExp(pat))
+        v = m ? (m[1] ?? m[0] ?? '') : ''
+      } catch { v = '' }
+    }
+    else if (op.startsWith('split:')) {
+      const rest = op.slice('split:'.length)
+      const firstColon = rest.indexOf(':')
+      const sep = firstColon >= 0 ? rest.slice(0, firstColon) : rest
+      const idx = firstColon >= 0 ? Number(rest.slice(firstColon + 1)) || 0 : 0
+      const parts = v.split(sep || ',')
+      v = parts[idx < 0 ? parts.length + idx : idx] ?? ''
+    }
+    else if (op.startsWith('replace:')) {
+      const rest = op.slice('replace:'.length)
+      const sepIdx = rest.indexOf(':')
+      if (sepIdx > 0) {
+        const find = rest.slice(0, sepIdx)
+        const wth = rest.slice(sepIdx + 1)
+        if (find.startsWith('re:')) {
+          try { v = v.replace(new RegExp(find.slice(3), 'g'), wth) } catch { /* noop */ }
+        } else {
+          v = v.split(find).join(wth)
+        }
+      }
+    }
+    else if (op.startsWith('prefix:')) v = op.slice('prefix:'.length) + v
+    else if (op.startsWith('suffix:')) v = v + op.slice('suffix:'.length)
+    // Unknown ops are ignored silently to keep workflows forward-compatible.
+  }
+  return v
+}
+
 /** Per-profile network interception state. Each entry holds the rules and a
  *  reference to the handler so we can detach it on `clearIntercepts` or when
  *  the workflow ends. */
@@ -467,7 +605,14 @@ export class AutomationEngine {
       interceptRequest: ['urlPattern'],
       setCookies: [],
       deleteCookies: [],
-      getCookies: []
+      getCookies: [],
+      // Phase 18 — Data pipelines & advanced control flow
+      extractJson: [],               // at least one of: variable | value | script | selector
+      forEachElement: ['selector'],
+      whileLoop: [],                 // condition validated by runtime
+      waitForRequest: ['urlPattern'],
+      waitForResponse: ['urlPattern'],
+      paginate: ['nextSelector']
     }
 
     const KNOWN_ACTIONS = new Set([
@@ -488,7 +633,9 @@ export class AutomationEngine {
       // Tier 7
       'tryCatch',
       // Tier 9
-      'dragAndDrop', 'keyCombo', 'selectContextMenu', 'setRangeInput', 'scrollIntoView', 'switchFrame'
+      'dragAndDrop', 'keyCombo', 'selectContextMenu', 'setRangeInput', 'scrollIntoView', 'switchFrame',
+      // Phase 18 — Data pipelines & advanced control flow
+      'extractJson', 'forEachElement', 'whileLoop', 'waitForRequest', 'waitForResponse', 'paginate'
     ])
 
     // Pre-collect ids that produce variables so {var} references resolve.
@@ -500,6 +647,17 @@ export class AutomationEngine {
           const prefix = s.params?.prefix || 'cred'
           producedVars.add(`${prefix}.username`)
           producedVars.add(`${prefix}.password`)
+        }
+        // Phase 18: forEachElement exposes el.* variables inside its body
+        if (s.action === 'forEachElement') {
+          const prefix = s.params?.prefix || 'el'
+          for (const k of ['index', 'total', 'text', 'html', 'tag', 'href', 'value', 'selector']) {
+            producedVars.add(`${prefix}.${k}`)
+          }
+        }
+        if (s.action === 'paginate') {
+          producedVars.add('pg.index')
+          producedVars.add('pg.count')
         }
         // Recurse into nested step containers
         if (Array.isArray(s.params?.thenSteps)) collectProduced(s.params.thenSteps)
@@ -976,8 +1134,10 @@ export class AutomationEngine {
           (el: Element) => el.textContent ?? ''
         )
         const trimmed = text.trim()
-        if (params.saveAs) variables[params.saveAs] = trimmed
-        return { text: trimmed }
+        // Phase 18: optional transform pipeline before saveAs
+        const finalValue = applyTransforms(trimmed, params.transform)
+        if (params.saveAs) variables[params.saveAs] = finalValue
+        return { text: finalValue }
       }
 
       case 'scroll':
@@ -1000,7 +1160,12 @@ export class AutomationEngine {
         // If switchFrame was called earlier, run in that frame's context.
         const evalCtx = this.activeFrame ?? page
         const result = await evalCtx.evaluate(params.script)
-        if (params.saveAs) variables[params.saveAs] = String(result ?? '')
+        const raw = result == null
+          ? ''
+          : typeof result === 'string' ? result : JSON.stringify(result)
+        // Phase 18: optional transform pipeline
+        const finalValue = applyTransforms(raw, params.transform)
+        if (params.saveAs) variables[params.saveAs] = finalValue
         return { result }
       }
 
@@ -1033,8 +1198,24 @@ export class AutomationEngine {
           params.headers,
           params.body
         )
-        if (params.saveAs) variables[params.saveAs] = response.body
-        return response
+        // Phase 18: `extractPath` pulls a JSONPath out of the response body
+        // before applying any `transform` pipeline. Useful for REST APIs:
+        //   { url, extractPath: '$.data.token', saveAs: 'authToken' }
+        let toSave: string = response.body
+        if (params.extractPath) {
+          try {
+            const parsed = JSON.parse(response.body)
+            const picked = jsonPathGet(parsed, params.extractPath)
+            toSave = picked === undefined
+              ? ''
+              : typeof picked === 'string' ? picked : JSON.stringify(picked)
+          } catch {
+            toSave = ''
+          }
+        }
+        const finalValue = applyTransforms(toSave, params.transform)
+        if (params.saveAs) variables[params.saveAs] = finalValue
+        return { ...response, extracted: params.extractPath ? finalValue : undefined }
       }
 
       // ── Phase 12.B.3: File transfer ──────────────────────────────────
@@ -2438,6 +2619,416 @@ export class AutomationEngine {
         }
         if (params.saveAs) variables[params.saveAs] = JSON.stringify(summary)
         return summary
+      }
+
+      // ── Phase 18: Data pipelines & advanced control flow ────────────
+
+      case 'extractJson': {
+        // Pull a nested field out of a JSON source using a JSONPath expression.
+        // Source priority: `variable` > `value` > `script` (page.evaluate) >
+        // `selector` (read textContent). The result is stringified into the
+        // target variable (or the step return value) so downstream steps can
+        // reference it as any other variable.
+        let raw: string = ''
+        if (params.variable) {
+          raw = variables[params.variable] ?? ''
+        } else if (typeof params.value === 'string') {
+          raw = params.value
+        } else if (params.script) {
+          const evalCtx = this.activeFrame ?? page
+          const result = await evalCtx.evaluate(params.script)
+          raw = typeof result === 'string' ? result : JSON.stringify(result ?? '')
+        } else if (params.selector) {
+          raw = await page
+            .$eval(params.selector, (el: Element) => el.textContent ?? '')
+            .catch(() => '')
+          raw = raw.trim()
+        } else {
+          throw new Error('extractJson: provide one of variable, value, script, or selector')
+        }
+
+        if (!raw) {
+          const def: string = params.default ?? ''
+          if (params.saveAs) variables[params.saveAs] = def
+          return { path: params.path ?? '$', found: false, value: def }
+        }
+
+        let parsed: any
+        try {
+          parsed = JSON.parse(raw)
+        } catch (e: any) {
+          if (params.optional) {
+            const def: string = params.default ?? ''
+            if (params.saveAs) variables[params.saveAs] = def
+            return { path: params.path ?? '$', found: false, value: def, parseError: e.message }
+          }
+          throw new Error(`extractJson: invalid JSON — ${e.message}`)
+        }
+
+        const path: string = params.path ?? '$'
+        const extracted = jsonPathGet(parsed, path)
+        const asString = extracted === undefined
+          ? (params.default ?? '')
+          : typeof extracted === 'string'
+            ? extracted
+            : JSON.stringify(extracted)
+        const finalValue = applyTransforms(asString, params.transform)
+        if (params.saveAs) variables[params.saveAs] = finalValue
+        return { path, found: extracted !== undefined, value: finalValue }
+      }
+
+      case 'forEachElement': {
+        // Iterate over every DOM element matching `params.selector`.
+        //
+        // Inside the inner steps the current element is exposed via variables:
+        //   {el.index}     — 0-based position
+        //   {el.total}     — total matched count (before limit/skip)
+        //   {el.text}      — textContent (trimmed, clipped to 500 chars)
+        //   {el.html}      — innerHTML (clipped to 500 chars)
+        //   {el.tag}       — tagName (lowercase)
+        //   {el.href}      — href attribute (for <a>)
+        //   {el.value}     — value attribute (for inputs)
+        //   {el.selector}  — a precise [data-sd-fee-*="n"] selector that
+        //                    reliably targets this specific element even if
+        //                    the DOM mutates during iteration
+        //
+        // Supports: prefix, limit, skip, reverse, failFast (default true).
+        // Tagging is per-run-unique so concurrent forEachElement loops do
+        // not collide on the same attribute.
+        if (!params.selector) throw new Error('forEachElement: selector required')
+        const innerSteps: AutomationStep[] = params.steps ?? []
+        const prefix: string = (params.prefix ?? 'el').replace(/\.$/, '')
+        const limit: number = Number(params.limit ?? 0)
+        const skip: number = Number(params.skip ?? 0)
+        const failFast: boolean = params.failFast !== false
+        const reverse: boolean = params.reverse === true
+
+        // A unique attribute so nested loops (or concurrent profiles running
+        // the same workflow in parallel) don't stomp on each other.
+        const tagAttr = `data-sd-fee-${Date.now().toString(36).slice(-6)}-${Math.random().toString(36).slice(2, 6)}`
+
+        const total: number = await page.$$eval(
+          params.selector,
+          (els: Element[], attr: string) => {
+            els.forEach((el, i) => el.setAttribute(attr, String(i)))
+            return els.length
+          },
+          tagAttr
+        )
+
+        if (total === 0) {
+          return { selector: params.selector, total: 0, iterations: 0, completed: 0, failed: 0 }
+        }
+
+        let indices: number[] = Array.from({ length: total }, (_, i) => i).slice(skip)
+        if (limit > 0) indices = indices.slice(0, limit)
+        if (reverse) indices.reverse()
+
+        const errors: { index: number; error: string }[] = []
+        let completed = 0
+
+        try {
+          for (const idx of indices) {
+            if (control.abort) throw new Error('Workflow stopped')
+
+            // Re-read element metadata each iteration — the DOM may have
+            // mutated due to the previous iteration's steps.
+            const meta = await page.$eval(
+              `[${tagAttr}="${idx}"]`,
+              (el: Element) => ({
+                text: (el.textContent ?? '').trim().slice(0, 500),
+                html: ((el as HTMLElement).innerHTML ?? '').slice(0, 500),
+                tag: el.tagName.toLowerCase(),
+                href: (el as HTMLAnchorElement).href ?? '',
+                value: (el as HTMLInputElement).value ?? ''
+              })
+            ).catch(() => null)
+
+            if (!meta) {
+              // Element vanished (e.g. list refreshed). Skip gracefully.
+              errors.push({ index: idx, error: 'Element disappeared between iterations' })
+              if (failFast) break
+              continue
+            }
+
+            const injected: string[] = []
+            const set = (k: string, v: string) => {
+              variables[`${prefix}.${k}`] = v
+              injected.push(`${prefix}.${k}`)
+            }
+            set('index', String(idx))
+            set('total', String(total))
+            set('text', meta.text)
+            set('html', meta.html)
+            set('tag', meta.tag)
+            set('href', meta.href)
+            set('value', meta.value)
+            set('selector', `[${tagAttr}="${idx}"]`)
+
+            try {
+              const status = await this.executeSteps(page, innerSteps, control, allResults, variables)
+              if (status === 'stopped') throw new Error('Workflow stopped')
+              if (status === 'failed') throw new Error(`Iteration ${idx} failed`)
+              completed++
+            } catch (err: any) {
+              errors.push({ index: idx, error: err.message ?? String(err) })
+              if (failFast) {
+                for (const k of injected) delete variables[k]
+                throw err
+              }
+            } finally {
+              for (const k of injected) delete variables[k]
+            }
+          }
+        } finally {
+          // Best-effort cleanup of the tagging attribute so subsequent steps
+          // / DOM inspectors don't see our bookkeeping.
+          try {
+            await page.$$eval(
+              `[${tagAttr}]`,
+              (els: Element[], attr: string) => els.forEach((el) => el.removeAttribute(attr)),
+              tagAttr
+            )
+          } catch { /* page may have navigated away — non-fatal */ }
+        }
+
+        return {
+          selector: params.selector,
+          total,
+          iterations: indices.length,
+          completed,
+          failed: errors.length,
+          errors: errors.slice(0, 20)
+        }
+      }
+
+      case 'whileLoop': {
+        // Conditional loop: run `params.steps` while a condition holds.
+        //
+        // conditionType:
+        //   selector-exists  — params.selector must be present in the DOM
+        //   selector-missing — params.selector must NOT be present
+        //   text-contains    — params.selector's textContent includes expected
+        //   js-truthy        — params.script returns truthy in page context
+        //   var-equals       — variables[params.variable] === params.expected
+        //   var-truthy       — variables[params.variable] is not empty/false/0
+        //
+        // Safety: hard-capped at `maxIterations` (default 100) to prevent
+        // runaway loops. Set `invert: true` to flip the condition (acts as
+        // an "until" loop). Optional `delayMs` adds a pause between passes.
+        const innerSteps: AutomationStep[] = params.steps ?? []
+        const maxIterations: number = Number(params.maxIterations ?? 100)
+        const delayMs: number = Number(params.delayMs ?? 0)
+        const conditionType: string = params.conditionType ?? 'selector-exists'
+        const invert: boolean = params.invert === true
+
+        const checkCondition = async (): Promise<boolean> => {
+          let matched = false
+          switch (conditionType) {
+            case 'selector-exists':
+              matched = !!(await page.$(params.selector ?? '').catch(() => null))
+              break
+            case 'selector-missing':
+              matched = !(await page.$(params.selector ?? '').catch(() => null))
+              break
+            case 'text-contains': {
+              const text: string = await page
+                .$eval(params.selector ?? 'body', (el: Element) => el.textContent ?? '')
+                .catch(() => '')
+              matched = text.includes(params.expected ?? '')
+              break
+            }
+            case 'js-truthy':
+              matched = !!(await page.evaluate(params.script ?? 'false').catch(() => false))
+              break
+            case 'var-equals':
+              matched = String(variables[params.variable ?? ''] ?? '') === String(params.expected ?? '')
+              break
+            case 'var-truthy': {
+              const val = String(variables[params.variable ?? ''] ?? '')
+              matched = val !== '' && val !== '0' && val !== 'false' && val !== 'null' && val !== 'undefined'
+              break
+            }
+            default:
+              throw new Error(`whileLoop: unknown conditionType "${conditionType}"`)
+          }
+          return invert ? !matched : matched
+        }
+
+        let iterations = 0
+        while (iterations < maxIterations) {
+          if (control.abort) throw new Error('Workflow stopped')
+          const shouldRun = await checkCondition()
+          if (!shouldRun) break
+          const status = await this.executeSteps(page, innerSteps, control, allResults, variables)
+          if (status === 'stopped') throw new Error('Workflow stopped')
+          if (status === 'failed') throw new Error(`whileLoop: iteration ${iterations + 1} failed`)
+          iterations++
+          if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs))
+        }
+
+        const hitMax = iterations >= maxIterations
+        return { iterations, maxIterations, hitMax, conditionType, invert }
+      }
+
+      case 'waitForRequest': {
+        // Block until a request matching `urlPattern` is sent. `urlPattern`
+        // supports glob-ish `*` wildcards; set `regex: true` to treat it
+        // as a full regular expression. Optional `method` filter constrains
+        // to a specific HTTP verb.
+        if (!params.urlPattern) throw new Error('waitForRequest: urlPattern required')
+        const timeout = Number(params.timeout ?? 30000)
+        const method: string | undefined = params.method
+          ? String(params.method).toUpperCase()
+          : undefined
+        const re = params.regex === true
+          ? new RegExp(params.urlPattern as string)
+          : globToRegex(params.urlPattern as string)
+
+        try {
+          const req = await page.waitForRequest(
+            (request) => re.test(request.url())
+              && (!method || request.method().toUpperCase() === method),
+            { timeout }
+          )
+          const url = req.url()
+          if (params.saveAs) variables[params.saveAs] = url
+          return { url, method: req.method(), headers: req.headers() }
+        } catch (err: any) {
+          throw new Error(`waitForRequest: timed out after ${timeout}ms (${err.message})`)
+        }
+      }
+
+      case 'waitForResponse': {
+        // Block until a response matching `urlPattern` arrives. Optional
+        // `status` filter (e.g. 200) requires a matching HTTP status code.
+        // By default the response body is captured — set `captureBody: false`
+        // for binary / large responses where the body is not needed.
+        if (!params.urlPattern) throw new Error('waitForResponse: urlPattern required')
+        const timeout = Number(params.timeout ?? 30000)
+        const status: number | undefined = params.status !== undefined
+          ? Number(params.status)
+          : undefined
+        const re = params.regex === true
+          ? new RegExp(params.urlPattern as string)
+          : globToRegex(params.urlPattern as string)
+
+        try {
+          const res = await page.waitForResponse(
+            (response) => {
+              if (!re.test(response.url())) return false
+              if (status !== undefined && response.status() !== status) return false
+              return true
+            },
+            { timeout }
+          )
+          const url = res.url()
+          const resStatus = res.status()
+          let body: string = ''
+          if (params.captureBody !== false) {
+            try { body = await res.text() } catch { /* binary / drained — leave empty */ }
+          }
+          // Phase 18: support optional JSONPath extraction + transforms on the
+          // response body before assigning it to a variable. Keeps the
+          // common "wait for API call, pull out a field" pattern one step.
+          let toSave: string = body
+          if (params.extractPath) {
+            try {
+              const parsed = JSON.parse(body)
+              const picked = jsonPathGet(parsed, params.extractPath)
+              toSave = picked === undefined
+                ? ''
+                : typeof picked === 'string' ? picked : JSON.stringify(picked)
+            } catch { toSave = '' }
+          }
+          const finalValue = applyTransforms(toSave, params.transform)
+          if (params.saveAs) variables[params.saveAs] = finalValue
+          return {
+            url,
+            status: resStatus,
+            bytes: body.length,
+            extracted: params.extractPath ? finalValue : undefined
+          }
+        } catch (err: any) {
+          throw new Error(`waitForResponse: timed out after ${timeout}ms (${err.message})`)
+        }
+      }
+
+      case 'paginate': {
+        // Pagination helper: run `steps` against the current page, then click
+        // `nextSelector` and repeat until:
+        //   - `maxPages` iterations exhausted
+        //   - `nextSelector` is no longer visible / present
+        //   - `nextSelector` is disabled (unless stopWhenDisabled: false)
+        //
+        // Inside each page iteration the 0-based counter is exposed as
+        // `{pg.index}` and a 1-based counter as `{pg.count}`. `waitForNavigation`
+        // should be set to true for classic multi-page pagination (new URL
+        // per page); leave false for SPA / XHR pagination and rely on
+        // `waitAfterClick` + a `waitForSelector` step inside `steps`.
+        const nextSelector: string = params.nextSelector
+        if (!nextSelector) throw new Error('paginate: nextSelector required')
+        const innerSteps: AutomationStep[] = params.steps ?? []
+        const maxPages: number = Number(params.maxPages ?? 50)
+        const waitAfterClick: number = Number(params.waitAfterClick ?? 1000)
+        const waitNav: boolean = params.waitForNavigation === true
+        const stopWhenDisabled: boolean = params.stopWhenDisabled !== false
+
+        let pagesVisited = 0
+        let reason: 'max-pages' | 'no-next' | 'next-disabled' = 'max-pages'
+
+        for (pagesVisited = 0; pagesVisited < maxPages; pagesVisited++) {
+          if (control.abort) throw new Error('Workflow stopped')
+
+          variables['pg.index'] = String(pagesVisited)
+          variables['pg.count'] = String(pagesVisited + 1)
+          try {
+            const status = await this.executeSteps(page, innerSteps, control, allResults, variables)
+            if (status === 'stopped') throw new Error('Workflow stopped')
+            if (status === 'failed') throw new Error(`paginate: page ${pagesVisited + 1} steps failed`)
+          } finally {
+            delete variables['pg.index']
+            delete variables['pg.count']
+          }
+
+          // Probe the next button's state before clicking.
+          const nextState = await page.$eval(nextSelector, (el: Element) => {
+            const html = el as HTMLElement
+            const disabled = (html as any).disabled === true
+              || el.getAttribute('aria-disabled') === 'true'
+              || el.classList.contains('disabled')
+            // offsetParent is null for display:none — best proxy for "visible"
+            // without paying for getBoundingClientRect on hidden ancestors.
+            const visible = html.offsetParent !== null
+              || html.getClientRects().length > 0
+            return { disabled, visible }
+          }).catch(() => null)
+
+          if (!nextState || !nextState.visible) {
+            reason = 'no-next'
+            pagesVisited++
+            break
+          }
+          if (stopWhenDisabled && nextState.disabled) {
+            reason = 'next-disabled'
+            pagesVisited++
+            break
+          }
+
+          await page.click(nextSelector)
+          if (waitNav) {
+            await page.waitForNavigation({
+              waitUntil: 'networkidle2',
+              timeout: 30000
+            }).catch(() => { /* SPA — no nav event, fall through to delay */ })
+          }
+          if (waitAfterClick > 0) {
+            await new Promise((r) => setTimeout(r, waitAfterClick))
+          }
+        }
+
+        if (params.saveAs) variables[params.saveAs] = String(pagesVisited)
+        return { pages: pagesVisited, reason, nextSelector }
       }
 
       default:

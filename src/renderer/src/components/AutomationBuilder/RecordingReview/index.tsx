@@ -263,7 +263,7 @@ export function RecordingReview({ sessionId, profileId, onClose, onSaved }: Prop
             </div>
 
             {/* Save bar */}
-            {(phase === 'analyzed' || phase === 'refined') && (
+            {(phase === 'analyzed' || phase === 'refined' || phase === 'saving') && (
               <div className="flex items-center gap-3 px-4 py-3 border-t border-slate-800 bg-slate-900 shrink-0">
                 <input
                   value={workflowName}

@@ -30,7 +30,7 @@ const DEFAULT_OPTIONS: Required<RefineOptions> = {
 export class RecordingRefiner {
   async refine(
     analysis: RecordingAnalysis,
-    options: RefineOptions = {}
+    options: Partial<RefineOptions> = {}
   ): Promise<RefinedRecording> {
     const opts: Required<RefineOptions> = { ...DEFAULT_OPTIONS, ...options }
     if (opts.maxAiCalls === undefined) {

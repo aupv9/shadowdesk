@@ -499,6 +499,13 @@ export type AutomationActionType =
   | 'setRangeInput'
   | 'scrollIntoView'
   | 'switchFrame'
+  // Phase 18 RPA — Data pipelines & advanced control flow
+  | 'extractJson'
+  | 'forEachElement'
+  | 'whileLoop'
+  | 'waitForRequest'
+  | 'waitForResponse'
+  | 'paginate'
 
 export interface AutomationStep {
   id: string
@@ -526,6 +533,10 @@ export interface AutomationStep {
   // For loop: { times: number, steps: AutomationStep[] }
   // For tryCatch: { tryBlock: AutomationStep[], catchBlock: AutomationStep[], finallyBlock?: AutomationStep[], errorPrefix?: string }
   // For extractText/evaluate/httpRequest: add saveAs to write result to a variable
+  // Phase 18: any saveAs-producing step can include `transform` (string | string[])
+  //   with ops like: trim | upper | lower | number | length |
+  //                  jsonPath:$.x.y | regex:pattern | split:sep:index |
+  //                  replace:find:with | prefix:str | suffix:str
 }
 
 export interface AutomationWorkflow {

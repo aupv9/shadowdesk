@@ -124,7 +124,7 @@
 
 ## 6. Automation / RPA Engine
 
-### Action Types (22)
+### Action Types (28)
 - [x] navigate
 - [x] click / rightClick / doubleClick
 - [x] type (with variable interpolation)
@@ -137,9 +137,9 @@
 - [x] keyPress
 - [x] setAttribute
 - [x] screenshot
-- [x] extractText
-- [x] evaluate (JS execution)
-- [x] httpRequest
+- [x] extractText (+ transform pipeline)
+- [x] evaluate (JS execution, + transform pipeline)
+- [x] httpRequest (+ JSONPath + transform)
 - [x] conditional (if/else)
 - [x] loop (repeat N times)
 - [x] solveCaptcha
@@ -147,6 +147,19 @@
 - [x] upload
 - [x] download
 - [x] useCredential (vault injection)
+- [x] **Phase 18** — extractJson (JSONPath from var/value/script/selector)
+- [x] **Phase 18** — forEachElement (iterate matched DOM elements, exposes `el.*`)
+- [x] **Phase 18** — whileLoop (5 condition types, safety-capped)
+- [x] **Phase 18** — waitForRequest (URL glob or regex + method filter)
+- [x] **Phase 18** — waitForResponse (URL + status + JSONPath body extract)
+- [x] **Phase 18** — paginate (click next until disabled/missing/maxPages)
+
+### Transform Pipeline (Phase 18)
+- [x] Reusable `transform` field on any step that saves a value
+- [x] Ops: `trim`, `upper`, `lower`, `number`, `length`
+- [x] Ops with argument: `jsonPath:$.a.b`, `regex:pattern`, `split:sep:index`, `replace:find:with` (or `replace:re:pattern:with`), `prefix:str`, `suffix:str`
+- [x] Chains accepted as `"trim|upper|prefix:PRE-"` or `["trim", "upper"]`
+- [x] Applied uniformly in `extractText`, `evaluate`, `httpRequest`, `extractJson`, `waitForResponse`
 
 ### Workflow Management
 - [x] Create / update / delete workflows
@@ -162,6 +175,10 @@
 - [x] Live progress streaming to UI
 - [x] Stop / abort running execution
 - [x] Execution history
+- [x] **Phase 18** — Export run history as CSV / JSON (per-run or per-step, status filter, variable include, save dialog)
+- [x] **Phase 18** — Inbound webhook trigger: `POST /api/webhooks/workflows/:id/run` (async, auto-launches profile, 202 Accepted)
+- [x] **Phase 18** — Polling endpoint: `GET /api/workflows/:id/runs/last`
+- [x] **Phase 18** — Inline export over HTTP: `GET /api/workflows/:id/runs/export?format=csv|json`
 
 ### Workflow Templates (6 built-in)
 - [x] Web Page Scraper

@@ -1,6 +1,7 @@
 import { ipcMain, dialog } from 'electron'
 import { v4 as uuidv4 } from 'uuid'
 import { join, basename } from 'path'
+import { writeFile } from 'fs/promises'
 import { app } from 'electron'
 import AdmZip from 'adm-zip'
 import { Database } from '../database'
@@ -48,6 +49,159 @@ import { ScriptAnalyzer } from '../script-analyzer'
 import { RecordingRefiner } from '../recording-refiner'
 import type { CreateNodeInput, CreateWebhookInput, TelegramConfig, MarketplaceCategory, WebhookConfig } from '../../shared/types'
 import type { AutomationStep, DetectionVectorResult, RefineOptions } from '../../shared/types'
+
+// ── Phase 18: Run history export helpers ──────────────────────────────────
+
+/** Escape a single CSV field — wrap in quotes and double any embedded quotes. */
+function csvField(value: unknown): string {
+  if (value == null) return ''
+  const s = typeof value === 'string' ? value : JSON.stringify(value)
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`
+  }
+  return s
+}
+
+/** Phase 18: Serialize workflow runs to CSV or JSON. */
+interface ExportRunsOptions {
+  format: 'csv' | 'json'
+  /** When true each step of every run becomes its own row (CSV only). */
+  perStep?: boolean
+  /** Max number of runs to include (default 500, enforced cap 5000). */
+  limit?: number
+  /** Only include runs with this status. */
+  status?: 'completed' | 'failed' | 'stopped'
+  /** Include resolved variables in the export (default true). */
+  includeVariables?: boolean
+}
+
+interface ExportedRunRow {
+  run_id: string
+  workflow_id: string
+  profile_id: string
+  status: string
+  started_at: string
+  completed_at: string
+  duration_ms: number | null
+  step_count: number
+  failed_steps: number
+  error: string | null
+  variables?: Record<string, string> | null
+}
+
+interface ExportedStepRow {
+  run_id: string
+  workflow_id: string
+  profile_id: string
+  run_status: string
+  step_index: number
+  step_id: string
+  action: string
+  success: boolean
+  error: string | null
+  duration_ms: number | null
+  started_at: string
+}
+
+function serializeRunsToJson(rows: any[], opts: ExportRunsOptions): string {
+  const runs: ExportedRunRow[] = rows.map((r) => {
+    const steps = (() => { try { return JSON.parse(r.step_results || '[]') } catch { return [] } })()
+    const failed = steps.filter((s: any) => s && s.success === false).length
+    const row: ExportedRunRow = {
+      run_id: r.id,
+      workflow_id: r.workflow_id,
+      profile_id: r.profile_id,
+      status: r.status,
+      started_at: r.started_at,
+      completed_at: r.completed_at,
+      duration_ms: r.duration_ms ?? null,
+      step_count: steps.length,
+      failed_steps: failed,
+      error: r.error ?? null
+    }
+    if (opts.includeVariables !== false) {
+      try { row.variables = r.variables ? JSON.parse(r.variables) : null } catch { row.variables = null }
+    }
+    return row
+  })
+  return JSON.stringify({ exportedAt: new Date().toISOString(), count: runs.length, runs }, null, 2)
+}
+
+function serializeRunsToCsv(rows: any[], opts: ExportRunsOptions): string {
+  if (opts.perStep) {
+    const header = [
+      'run_id', 'workflow_id', 'profile_id', 'run_status',
+      'step_index', 'step_id', 'action', 'success', 'error',
+      'duration_ms', 'started_at'
+    ]
+    const lines = [header.join(',')]
+    for (const r of rows) {
+      let steps: any[] = []
+      try { steps = JSON.parse(r.step_results || '[]') } catch { /* ignore */ }
+      steps.forEach((s, idx) => {
+        const row: ExportedStepRow = {
+          run_id: r.id,
+          workflow_id: r.workflow_id,
+          profile_id: r.profile_id,
+          run_status: r.status,
+          step_index: idx,
+          step_id: s?.stepId ?? s?.id ?? '',
+          action: s?.action ?? '',
+          success: s?.success !== false,
+          error: s?.error ?? null,
+          duration_ms: typeof s?.durationMs === 'number' ? s.durationMs : null,
+          started_at: r.started_at
+        }
+        lines.push([
+          csvField(row.run_id),
+          csvField(row.workflow_id),
+          csvField(row.profile_id),
+          csvField(row.run_status),
+          csvField(row.step_index),
+          csvField(row.step_id),
+          csvField(row.action),
+          csvField(row.success),
+          csvField(row.error),
+          csvField(row.duration_ms),
+          csvField(row.started_at)
+        ].join(','))
+      })
+    }
+    return lines.join('\n')
+  }
+
+  const header = [
+    'run_id', 'workflow_id', 'profile_id', 'status',
+    'started_at', 'completed_at', 'duration_ms',
+    'step_count', 'failed_steps', 'error'
+  ]
+  if (opts.includeVariables !== false) header.push('variables')
+  const lines = [header.join(',')]
+  for (const r of rows) {
+    let steps: any[] = []
+    try { steps = JSON.parse(r.step_results || '[]') } catch { /* ignore */ }
+    const failed = steps.filter((s: any) => s && s.success === false).length
+    const base = [
+      csvField(r.id),
+      csvField(r.workflow_id),
+      csvField(r.profile_id),
+      csvField(r.status),
+      csvField(r.started_at),
+      csvField(r.completed_at),
+      csvField(r.duration_ms ?? ''),
+      csvField(steps.length),
+      csvField(failed),
+      csvField(r.error ?? '')
+    ]
+    if (opts.includeVariables !== false) {
+      let vars: any = null
+      try { vars = r.variables ? JSON.parse(r.variables) : null } catch { /* ignore */ }
+      base.push(csvField(vars))
+    }
+    lines.push(base.join(','))
+  }
+  return lines.join('\n')
+}
 
 // ── Handler registration ───────────────────────────────────────────────────
 
@@ -998,6 +1152,45 @@ export function registerIpcHandlers(): void {
       variables: r.variables ? JSON.parse(r.variables) : null
     }))
   })
+
+  // ── Phase 18: Export run history (CSV / JSON) ─────────────────────────
+  // workflowId is optional — pass undefined/null to export across all workflows.
+  ipcMain.handle(
+    'workflows:runs:export',
+    async (_event, workflowId: string | null | undefined, options: ExportRunsOptions) => {
+      const opts: ExportRunsOptions = {
+        format: options?.format === 'json' ? 'json' : 'csv',
+        perStep: !!options?.perStep,
+        includeVariables: options?.includeVariables !== false,
+        status: options?.status,
+        limit: Math.max(1, Math.min(Number(options?.limit ?? 500), 5000))
+      }
+
+      const rawRows = workflowId
+        ? db.getWorkflowRuns(workflowId, opts.limit)
+        : db.getRecentWorkflowRuns(opts.limit)
+
+      const rows = opts.status ? rawRows.filter((r: any) => r.status === opts.status) : rawRows
+      const content = opts.format === 'json'
+        ? serializeRunsToJson(rows, opts)
+        : serializeRunsToCsv(rows, opts)
+
+      const defaultName = `workflow-runs-${workflowId ?? 'all'}-${new Date().toISOString().slice(0, 10)}.${opts.format}`
+      const result = await dialog.showSaveDialog({
+        title: 'Export workflow run history',
+        defaultPath: defaultName,
+        filters: opts.format === 'json'
+          ? [{ name: 'JSON', extensions: ['json'] }]
+          : [{ name: 'CSV', extensions: ['csv'] }]
+      })
+      if (result.canceled || !result.filePath) {
+        return { canceled: true, rowCount: rows.length, content }
+      }
+
+      await writeFile(result.filePath, content, 'utf8')
+      return { canceled: false, path: result.filePath, rowCount: rows.length, format: opts.format }
+    }
+  )
 
   // ── Tier 3: Workflow versioning ───────────────────────────────────────
 
