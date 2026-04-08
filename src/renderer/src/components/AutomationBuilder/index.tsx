@@ -817,6 +817,7 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={(_, targetIndex) => handleDrop(targetIndex)}
+                    previousActionType={selectedWorkflow.steps[idx - 1]?.action}
                   />
                 ))}
 
