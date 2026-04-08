@@ -3,17 +3,50 @@ import type { Database as SqlDatabase } from 'sql.js'
 import { join } from 'path'
 import { app } from 'electron'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
+import {
+  encryptCookies,
+  safeDecryptCookies,
+  encryptProxyCredential,
+  safeDecryptProxyCredential,
+  deriveMasterKey,
+} from './crypto/profile-encryption'
+import { getMachineId } from './license'
+
+// Phase 4.1: Profile data encryption
+// Master key is deterministic per-machine (derived from machine ID + app secret)
+// This ensures same key on app restart while tying encryption to hardware.
+const APP_ENCRYPTION_SECRET = 'ghost-browser-profile-encryption-v1'
 
 export class Database {
   private static instance: Database
   private db!: SqlDatabase
   private dbPath!: string
+  private masterKey: Buffer | null = null
 
   static getInstance(): Database {
     if (!Database.instance) {
       Database.instance = new Database()
     }
     return Database.instance
+  }
+
+  /**
+   * Phase 4.1: Lazy master key derivation.
+   * Derived from machine ID + app secret for deterministic per-device key.
+   * Cached in memory after first access.
+   */
+  private getMasterKey(): Buffer {
+    if (!this.masterKey) {
+      try {
+        const machineId = getMachineId()
+        this.masterKey = deriveMasterKey(APP_ENCRYPTION_SECRET, machineId)
+      } catch (error) {
+        // Fallback: use app secret alone if machine ID unavailable
+        console.warn('[Database] Machine ID unavailable, using fallback encryption key')
+        this.masterKey = deriveMasterKey(APP_ENCRYPTION_SECRET)
+      }
+    }
+    return this.masterKey
   }
 
   async initialize(): Promise<void> {
@@ -259,6 +292,15 @@ export class Database {
       this.db.exec(`ALTER TABLE profiles ADD COLUMN sync_excluded INTEGER DEFAULT 0`)
     } catch { /* exists */ }
 
+    // Phase 4.1: Encryption version tracking for cookies and proxy credentials
+    // 0 = plain-text (legacy), 1 = AES-256-GCM encrypted
+    try {
+      this.db.exec(`ALTER TABLE profiles ADD COLUMN cookies_encryption_version INTEGER DEFAULT 0`)
+    } catch { /* exists */ }
+    try {
+      this.db.exec(`ALTER TABLE proxies ADD COLUMN credentials_encryption_version INTEGER DEFAULT 0`)
+    } catch { /* exists */ }
+
     // Tier 2 RPA — extended workflow run logging
     try {
       this.db.exec(`ALTER TABLE workflow_runs ADD COLUMN duration_ms INTEGER`)
@@ -484,8 +526,24 @@ export class Database {
 
   // ── Profile CRUD ──────────────────────────────────────────────────────────
 
+  /**
+   * Phase 4.1: Row-level helper that transparently decrypts sensitive fields.
+   * Applied in all profile read methods so consumers always see plaintext data.
+   */
+  private decryptProfileRow(row: any): any {
+    if (!row) return row
+    if (row.cookies !== undefined) {
+      row.cookies = this.decryptCookiesField(
+        row.cookies,
+        row.cookies_encryption_version,
+        row.id,
+      )
+    }
+    return row
+  }
+
   getAllProfiles(): any[] {
-    return this.queryAll(`
+    const rows = this.queryAll(`
       SELECT p.*,
              pr.host || ':' || CAST(pr.port AS TEXT) AS proxy_label,
              pr.type AS proxy_type,
@@ -497,6 +555,7 @@ export class Database {
       WHERE p.status != 'archived'
       ORDER BY p.created_at DESC
     `)
+    return rows.map((row) => this.decryptProfileRow(row))
   }
 
   /**
@@ -538,7 +597,7 @@ export class Database {
     const total = countResult?.count ?? 0
 
     // Fetch paginated results
-    const profiles = this.queryAll(
+    const rows = this.queryAll(
       `
       SELECT p.*,
              pr.host || ':' || CAST(pr.port AS TEXT) AS proxy_label,
@@ -555,6 +614,7 @@ export class Database {
       [...params, normalizedLimit, normalizedOffset]
     )
 
+    const profiles = rows.map((row) => this.decryptProfileRow(row))
     const hasMore = normalizedOffset + normalizedLimit < total
 
     return { profiles, total, hasMore }
@@ -585,7 +645,7 @@ export class Database {
   }
 
   getProfile(id: string): any {
-    return this.queryOne(`
+    const row = this.queryOne(`
       SELECT p.*,
              pr.host || ':' || CAST(pr.port AS TEXT) AS proxy_label,
              pr.type AS proxy_type,
@@ -596,6 +656,7 @@ export class Database {
       LEFT JOIN profile_groups pg ON p.group_id = pg.id
       WHERE p.id = ?
     `, [id])
+    return this.decryptProfileRow(row)
   }
 
   createProfile(profile: {
@@ -658,6 +719,27 @@ export class Database {
   }
 
   /**
+   * Phase 4.3: Restore archived profiles (undo bulk-delete)
+   * Flips status from 'archived' back to 'active'.
+   * Only works if cleanup worker hasn't removed directories yet.
+   * @param ids - Array of profile IDs to restore (max 1000)
+   * @returns Number of profiles restored
+   */
+  bulkRestoreProfiles(ids: string[]): number {
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 1000) {
+      throw new Error(`Bulk restore requires 1-1000 profile IDs, got ${ids.length}`)
+    }
+
+    const placeholders = ids.map(() => '?').join(',')
+    this.run(
+      `UPDATE profiles SET status = 'active' WHERE id IN (${placeholders}) AND status = 'archived'`,
+      ids
+    )
+
+    return ids.length
+  }
+
+  /**
    * Phase 2.2: Bulk assign proxy to profiles
    * @param profileIds - Array of profile IDs (max 1000)
    * @param proxyId - Proxy ID to assign (or null to unassign)
@@ -707,7 +789,7 @@ export class Database {
   }
 
   getSyncableProfiles(): any[] {
-    return this.queryAll(`
+    const rows = this.queryAll(`
       SELECT p.*,
              pr.host || ':' || CAST(pr.port AS TEXT) AS proxy_label,
              pr.type AS proxy_type
@@ -716,6 +798,7 @@ export class Database {
       WHERE p.status != 'archived' AND COALESCE(p.sync_excluded, 0) = 0
       ORDER BY p.created_at DESC
     `)
+    return rows.map((row) => this.decryptProfileRow(row))
   }
 
   cloneProfile(params: {
@@ -742,13 +825,58 @@ export class Database {
     )
   }
 
+  /**
+   * Phase 4.1: Update cookies with transparent encryption.
+   * Stored format: AES-256-GCM encrypted base64 string.
+   * On write, always encrypts and sets encryption_version = 1.
+   */
   updateCookies(id: string, cookies: string): void {
-    this.run('UPDATE profiles SET cookies = ? WHERE id = ?', [cookies, id])
+    try {
+      const encrypted = encryptCookies(cookies, this.getMasterKey(), id)
+      this.run(
+        'UPDATE profiles SET cookies = ?, cookies_encryption_version = 1 WHERE id = ?',
+        [encrypted, id],
+      )
+    } catch (error) {
+      console.error(`[Database] Failed to encrypt cookies for profile ${id}:`, error)
+      // Fallback to plain-text if encryption unavailable (don't fail the write)
+      this.run('UPDATE profiles SET cookies = ?, cookies_encryption_version = 0 WHERE id = ?', [
+        cookies,
+        id,
+      ])
+    }
   }
 
+  /**
+   * Phase 4.1: Get cookies with transparent decryption.
+   * Handles both encrypted (version 1) and legacy plain-text (version 0) formats.
+   * Returns JSON array string ready for JSON.parse().
+   */
   getCookies(id: string): string {
-    const row = this.queryOne('SELECT cookies FROM profiles WHERE id = ?', [id])
-    return row?.cookies ?? '[]'
+    const row = this.queryOne(
+      'SELECT cookies, cookies_encryption_version FROM profiles WHERE id = ?',
+      [id],
+    )
+    if (!row) return '[]'
+    return this.decryptCookiesField(row.cookies, row.cookies_encryption_version, id)
+  }
+
+  /**
+   * Phase 4.1: Internal helper to decrypt a cookies field based on version flag.
+   * Backward compatible with legacy plain-text data.
+   */
+  private decryptCookiesField(
+    cookies: string | null | undefined,
+    version: number | null | undefined,
+    profileId: string,
+  ): string {
+    if (!cookies) return '[]'
+
+    // Version 0 or null = legacy plain-text
+    if (!version || version === 0) return cookies
+
+    // Version 1 = encrypted
+    return safeDecryptCookies(cookies, this.getMasterKey(), profileId) || '[]'
   }
 
   // ── Group CRUD ─────────────────────────────────────────────────────────────
@@ -775,12 +903,42 @@ export class Database {
 
   // ── Proxy CRUD ────────────────────────────────────────────────────────────
 
+  /**
+   * Phase 4.1: Row-level helper that decrypts proxy credentials.
+   * Backward compatible with version 0 (plain-text) and version 1 (encrypted).
+   */
+  private decryptProxyRow(row: any): any {
+    if (!row) return row
+    const version = row.credentials_encryption_version ?? 0
+    if (version === 1) {
+      if (row.username) {
+        row.username = safeDecryptProxyCredential(
+          row.username,
+          this.getMasterKey(),
+          row.id,
+          'username',
+        )
+      }
+      if (row.password) {
+        row.password = safeDecryptProxyCredential(
+          row.password,
+          this.getMasterKey(),
+          row.id,
+          'password',
+        )
+      }
+    }
+    return row
+  }
+
   getAllProxies(): any[] {
-    return this.queryAll('SELECT * FROM proxies ORDER BY created_at DESC')
+    const rows = this.queryAll('SELECT * FROM proxies ORDER BY created_at DESC')
+    return rows.map((row) => this.decryptProxyRow(row))
   }
 
   getProxy(id: string): any {
-    return this.queryOne('SELECT * FROM proxies WHERE id = ?', [id])
+    const row = this.queryOne('SELECT * FROM proxies WHERE id = ?', [id])
+    return this.decryptProxyRow(row)
   }
 
   /** Return a random healthy proxy, or any proxy if none are healthy. */
@@ -803,6 +961,11 @@ export class Database {
     this.run('UPDATE profiles SET proxy_id = ? WHERE id = ?', [proxyId, profileId])
   }
 
+  /**
+   * Phase 4.1: Create proxy with transparent credential encryption.
+   * Username/password are encrypted using AES-256-GCM before storage.
+   * credentials_encryption_version = 1 indicates encrypted format.
+   */
   createProxy(proxy: {
     id: string
     name: string
@@ -813,19 +976,50 @@ export class Database {
     password?: string
     country?: string
   }): void {
+    let encUsername: string | null = null
+    let encPassword: string | null = null
+    let encVersion = 0
+
+    try {
+      if (proxy.username) {
+        encUsername = encryptProxyCredential(
+          proxy.username,
+          this.getMasterKey(),
+          proxy.id,
+          'username',
+        )
+      }
+      if (proxy.password) {
+        encPassword = encryptProxyCredential(
+          proxy.password,
+          this.getMasterKey(),
+          proxy.id,
+          'password',
+        )
+      }
+      encVersion = 1
+    } catch (error) {
+      console.error(`[Database] Failed to encrypt proxy credentials for ${proxy.id}:`, error)
+      // Fallback to plain-text on encryption failure
+      encUsername = proxy.username ?? null
+      encPassword = proxy.password ?? null
+      encVersion = 0
+    }
+
     this.run(
-      `INSERT INTO proxies (id, name, type, host, port, username, password, country)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO proxies (id, name, type, host, port, username, password, country, credentials_encryption_version)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         proxy.id,
         proxy.name,
         proxy.type,
         proxy.host,
         proxy.port,
-        proxy.username ?? null,
-        proxy.password ?? null,
-        proxy.country ?? null
-      ]
+        encUsername,
+        encPassword,
+        proxy.country ?? null,
+        encVersion,
+      ],
     )
   }
 
