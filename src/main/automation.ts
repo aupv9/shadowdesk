@@ -14,6 +14,7 @@ import type {
 } from '../shared/types'
 import type { Page, ElementHandle } from 'puppeteer-core'
 import type { WebContents } from 'electron'
+import { app } from 'electron'
 import http from 'http'
 import https from 'https'
 import { createWriteStream } from 'fs'
@@ -80,6 +81,61 @@ function parseCsv(text: string, delimiter = ','): Record<string, string>[] {
       header.forEach((h, idx) => { obj[h] = r[idx] ?? '' })
       return obj
     })
+}
+
+/**
+ * Phase 18.1 — File path validation for security.
+ *
+ * Prevents directory traversal attacks (LFI) by validating that file paths
+ * are contained within the app's userData directory. Rejects paths that:
+ *   - Use absolute paths outside userData
+ *   - Use ../../../ traversal attacks
+ *   - Point to sensitive system files
+ *
+ * Returns the validated absolute path if safe, otherwise throws.
+ */
+function validateFilePath(filePath: string): string {
+  if (!filePath || typeof filePath !== 'string') {
+    throw new Error('filePath must be a non-empty string')
+  }
+
+  const userData = app.getPath('userData')
+
+  // Handle absolute paths
+  if (isAbsolute(filePath)) {
+    const normalized = pathResolve(filePath)
+    const relative = normalized.split(userData).pop() || ''
+
+    // Check if path escapes userData
+    if (!normalized.startsWith(userData)) {
+      throw new Error(
+        `File access denied: absolute path outside userData directory. ` +
+        `Restricted to: ${userData}`
+      )
+    }
+    return normalized
+  }
+
+  // Handle relative paths — resolve relative to userData
+  const normalized = pathResolve(userData, filePath)
+
+  // Ensure it's still within userData (prevent ../)
+  try {
+    const relative = pathResolve(normalized).substring(userData.length + 1)
+    if (relative.startsWith('..')) {
+      throw new Error(
+        `File access denied: path escape attempt (../) detected. ` +
+        `Use relative paths within the user data directory.`
+      )
+    }
+  } catch {
+    throw new Error(
+      `File access denied: invalid path. ` +
+      `Use relative paths within the user data directory.`
+    )
+  }
+
+  return normalized
 }
 
 /** Replace {key} placeholders in step params with variable values.
@@ -294,6 +350,87 @@ export class AutomationEngine {
     return AutomationEngine.instance
   }
 
+  /**
+   * Phase 18.1: Pre-flight validation of regex patterns in workflow steps.
+   * Catches invalid regex early instead of at runtime.
+   */
+  private validateWorkflowRegex(steps: AutomationStep[]): void {
+    for (const step of steps) {
+      // Check for regex in various action types
+      if (step.action === 'whileLoop' && step.params?.pattern) {
+        try {
+          new RegExp(step.params.pattern as string)
+        } catch (e: any) {
+          throw new Error(
+            `Invalid regex in step "${step.label}" (whileLoop pattern): ${e.message}`
+          )
+        }
+      }
+
+      if (step.action === 'waitForRequest' && step.params?.urlPattern && step.params?.regex === true) {
+        try {
+          new RegExp(step.params.urlPattern as string)
+        } catch (e: any) {
+          throw new Error(
+            `Invalid regex in step "${step.label}" (waitForRequest urlPattern): ${e.message}`
+          )
+        }
+      }
+
+      if (step.action === 'waitForResponse' && step.params?.urlPattern && step.params?.regex === true) {
+        try {
+          new RegExp(step.params.urlPattern as string)
+        } catch (e: any) {
+          throw new Error(
+            `Invalid regex in step "${step.label}" (waitForResponse urlPattern): ${e.message}`
+          )
+        }
+      }
+
+      if (step.action === 'waitForDownload' && step.params?.pattern) {
+        try {
+          new RegExp(step.params.pattern as string)
+        } catch (e: any) {
+          throw new Error(
+            `Invalid regex in step "${step.label}" (waitForDownload pattern): ${e.message}`
+          )
+        }
+      }
+
+      // Recursively validate nested steps
+      if (step.action === 'conditional' && step.params?.thenSteps) {
+        this.validateWorkflowRegex(step.params.thenSteps)
+      }
+      if (step.action === 'conditional' && step.params?.elseSteps) {
+        this.validateWorkflowRegex(step.params.elseSteps)
+      }
+      if (step.action === 'loop' && step.params?.steps) {
+        this.validateWorkflowRegex(step.params.steps)
+      }
+      if (step.action === 'whileLoop' && step.params?.steps) {
+        this.validateWorkflowRegex(step.params.steps)
+      }
+      if (step.action === 'forEachRow' && step.params?.steps) {
+        this.validateWorkflowRegex(step.params.steps)
+      }
+      if (step.action === 'forEachElement' && step.params?.steps) {
+        this.validateWorkflowRegex(step.params.steps)
+      }
+      if (step.action === 'tryCatch' && step.params?.tryBlock) {
+        this.validateWorkflowRegex(step.params.tryBlock)
+      }
+      if (step.action === 'tryCatch' && step.params?.catchBlock) {
+        this.validateWorkflowRegex(step.params.catchBlock)
+      }
+      if (step.action === 'tryCatch' && step.params?.finallyBlock) {
+        this.validateWorkflowRegex(step.params.finallyBlock)
+      }
+      if (step.action === 'parallelSteps' && step.params?.steps) {
+        this.validateWorkflowRegex(step.params.steps)
+      }
+    }
+  }
+
   async executeWorkflow(
     workflowId: string,
     profileId: string,
@@ -318,6 +455,13 @@ export class AutomationEngine {
       ...workflowRow,
       steps: JSON.parse(workflowRow.steps),
       variables: workflowRow.variables ? JSON.parse(workflowRow.variables) : undefined
+    }
+
+    // Phase 18.1: Pre-flight validation of regex patterns
+    try {
+      this.validateWorkflowRegex(workflow.steps)
+    } catch (e: any) {
+      throw new Error(`Workflow validation failed: ${e.message}`)
     }
 
     // Resolve profile name for built-in {profileName} variable
@@ -1552,7 +1696,7 @@ export class AutomationEngine {
         if (Array.isArray(params.rows)) {
           rows = params.rows
         } else if (params.filePath) {
-          const filePath: string = params.filePath
+          const filePath: string = validateFilePath(params.filePath)
           let raw: string
           try {
             raw = await fsReadFile(filePath, 'utf-8')
@@ -1627,9 +1771,11 @@ export class AutomationEngine {
         // Read a text file into a workflow variable. Defaults to UTF-8.
         // Optional `parse: 'json'` parses the contents and stores the
         // serialized JSON string (consumers can re-parse if needed).
+        // Paths are restricted to userData directory for security.
         if (!params.filePath) throw new Error('readFile: filePath required')
+        const filePath = validateFilePath(params.filePath)
         const enc: BufferEncoding = (params.encoding ?? 'utf-8') as BufferEncoding
-        const text = await fsReadFile(params.filePath, enc)
+        const text = await fsReadFile(filePath, enc)
         let value: string = String(text)
         if (params.parse === 'json') {
           try {
@@ -1649,20 +1795,19 @@ export class AutomationEngine {
       case 'writeFile': {
         // Write `params.content` to disk. Supports `append: true` and
         // automatic parent-directory creation. Returns bytes written.
+        // Paths are restricted to userData directory for security.
         if (!params.filePath) throw new Error('writeFile: filePath required')
+        const filePath = validateFilePath(params.filePath)
         const content: string = params.content ?? ''
         const enc: BufferEncoding = (params.encoding ?? 'utf-8') as BufferEncoding
-        const target = isAbsolute(params.filePath)
-          ? params.filePath
-          : pathResolve(process.cwd(), params.filePath)
-        await mkdir(dirname(target), { recursive: true })
+        await mkdir(dirname(filePath), { recursive: true })
         if (params.append) {
-          await fsAppendFile(target, content, enc)
+          await fsAppendFile(filePath, content, enc)
         } else {
-          await fsWriteFile(target, content, enc)
+          await fsWriteFile(filePath, content, enc)
         }
         return {
-          filePath: target,
+          filePath: filePath,
           bytes: Buffer.byteLength(content, enc),
           mode: params.append ? 'append' : 'write'
         }
@@ -1815,6 +1960,29 @@ export class AutomationEngine {
         } else {
           throw new Error('useCredential requires either id or label')
         }
+
+        // Phase 18.1: Audit log credential access for compliance
+        const db = Database.getInstance()
+        try {
+          db.insertAuditLog({
+            user_id: 'system',  // TODO: Get from IPC context
+            user_name: 'automation',
+            action: 'credential_access',
+            target_id: cred.id,
+            target_name: cred.label,
+            timestamp: new Date().toISOString(),
+            ip_address: 'localhost',
+            metadata: {
+              workflow_id: profileId || 'unknown',
+              step_id: step.id,
+              action_type: 'useCredential'
+            }
+          })
+        } catch (auditErr) {
+          // Log audit failure but don't fail the workflow
+          console.error('[useCredential] Failed to record audit log:', auditErr)
+        }
+
         const prefix: string = params.prefix || 'cred'
         variables[`${prefix}.username`] = cred.username
         variables[`${prefix}.password`] = cred.password
@@ -2680,6 +2848,10 @@ export class AutomationEngine {
       case 'forEachElement': {
         // Iterate over every DOM element matching `params.selector`.
         //
+        // IMPORTANT: Use {el.selector} in inner steps to reliably reference the
+        // current element, even if the DOM mutates. Example:
+        //   step 'click' { selector: '{el.selector}' }
+        //
         // Inside the inner steps the current element is exposed via variables:
         //   {el.index}     — 0-based position
         //   {el.total}     — total matched count (before limit/skip)
@@ -2693,9 +2865,12 @@ export class AutomationEngine {
         //                    the DOM mutates during iteration
         //
         // Supports: prefix, limit, skip, reverse, failFast (default true).
+        // Hard-capped at MAX_ELEMENTS=1,000 to prevent memory exhaustion.
         // Tagging is per-run-unique so concurrent forEachElement loops do
         // not collide on the same attribute.
         if (!params.selector) throw new Error('forEachElement: selector required')
+
+        const MAX_ELEMENTS = 1_000
         const innerSteps: AutomationStep[] = params.steps ?? []
         const prefix: string = (params.prefix ?? 'el').replace(/\.$/, '')
         const limit: number = Number(params.limit ?? 0)
@@ -2707,7 +2882,7 @@ export class AutomationEngine {
         // the same workflow in parallel) don't stomp on each other.
         const tagAttr = `data-sd-fee-${Date.now().toString(36).slice(-6)}-${Math.random().toString(36).slice(2, 6)}`
 
-        const total: number = await page.$$eval(
+        let total: number = await page.$$eval(
           params.selector,
           (els: Element[], attr: string) => {
             els.forEach((el, i) => el.setAttribute(attr, String(i)))
@@ -2715,6 +2890,14 @@ export class AutomationEngine {
           },
           tagAttr
         )
+
+        // Hard cap to prevent memory exhaustion and performance issues
+        if (total > MAX_ELEMENTS) {
+          throw new Error(
+            `forEachElement: ${total} elements exceed max ${MAX_ELEMENTS}. ` +
+            `Use 'limit' param or adjust selector to be more specific.`
+          )
+        }
 
         if (total === 0) {
           return { selector: params.selector, total: 0, iterations: 0, completed: 0, failed: 0 }
@@ -2745,9 +2928,13 @@ export class AutomationEngine {
             ).catch(() => null)
 
             if (!meta) {
-              // Element vanished (e.g. list refreshed). Skip gracefully.
-              errors.push({ index: idx, error: 'Element disappeared between iterations' })
-              if (failFast) break
+              // Element vanished (e.g. list refreshed, DOM mutation).
+              // Log and skip unless failFast is true.
+              const msg = `Element at index ${idx} disappeared (DOM mutation)`
+              errors.push({ index: idx, error: msg })
+              if (failFast) {
+                throw new Error(msg)
+              }
               continue
             }
 
@@ -2813,11 +3000,16 @@ export class AutomationEngine {
         //   var-equals       — variables[params.variable] === params.expected
         //   var-truthy       — variables[params.variable] is not empty/false/0
         //
-        // Safety: hard-capped at `maxIterations` (default 100) to prevent
+        // Safety: hard-capped at MAX_ITERATIONS = 10,000 to prevent
         // runaway loops. Set `invert: true` to flip the condition (acts as
         // an "until" loop). Optional `delayMs` adds a pause between passes.
+        const MAX_ITERATIONS = 10_000
         const innerSteps: AutomationStep[] = params.steps ?? []
-        const maxIterations: number = Number(params.maxIterations ?? 100)
+        let maxIterations: number = Number(params.maxIterations ?? 100)
+        // Enforce hard cap to prevent infinite loops
+        if (maxIterations > MAX_ITERATIONS) {
+          maxIterations = MAX_ITERATIONS
+        }
         const delayMs: number = Number(params.delayMs ?? 0)
         const conditionType: string = params.conditionType ?? 'selector-exists'
         const invert: boolean = params.invert === true
@@ -2856,19 +3048,34 @@ export class AutomationEngine {
         }
 
         let iterations = 0
+        const loopStart = Date.now()
+        const MAX_DURATION_MS = 5 * 60 * 1000  // 5 minutes max total time
+
         while (iterations < maxIterations) {
           if (control.abort) throw new Error('Workflow stopped')
+
+          // Check for overall timeout
+          if (Date.now() - loopStart > MAX_DURATION_MS) {
+            throw new Error(`whileLoop exceeded maximum duration of 5 minutes after ${iterations} iterations`)
+          }
+
           const shouldRun = await checkCondition()
           if (!shouldRun) break
+
           const status = await this.executeSteps(page, innerSteps, control, allResults, variables)
           if (status === 'stopped') throw new Error('Workflow stopped')
           if (status === 'failed') throw new Error(`whileLoop: iteration ${iterations + 1} failed`)
           iterations++
+
           if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs))
         }
 
         const hitMax = iterations >= maxIterations
-        return { iterations, maxIterations, hitMax, conditionType, invert }
+        if (hitMax) {
+          throw new Error(`whileLoop exceeded maximum of ${maxIterations} iterations (hard limit)`)
+        }
+
+        return { iterations, maxIterations, conditionType, invert }
       }
 
       case 'waitForRequest': {
