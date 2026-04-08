@@ -1,10 +1,18 @@
-import React from 'react'
+import React, { useState, useMemo } from 'react'
 import { X, ChevronRight, Play } from 'lucide-react'
 import type { WorkflowCreationMethod } from './WorkflowCreationFlow'
+import { GuideRating } from './GuideRating'
+import { assignVariant, getVariantConfig } from '../../utils/abTestingEngine'
+import {
+  trackVideoWatched,
+  trackGuideRated,
+  trackVariantAssigned
+} from '../../utils/workflowAnalytics'
 
 interface MethodGuideModalProps {
   method: WorkflowCreationMethod
   onClose: () => void
+  userId?: string
 }
 
 interface GuideStep {
@@ -138,8 +146,31 @@ const GUIDES: Record<WorkflowCreationMethod, { title: string; description: strin
   }
 }
 
-export function MethodGuideModal({ method, onClose }: MethodGuideModalProps) {
+export function MethodGuideModal({
+  method,
+  onClose,
+  userId = 'default'
+}: MethodGuideModalProps) {
   const guide = GUIDES[method]
+  const [hasRated, setHasRated] = useState(false)
+
+  // Assign variant for A/B testing
+  const variant = useMemo(() => {
+    const assigned = assignVariant(userId)
+    trackVariantAssigned(method, assigned)
+    return assigned
+  }, [userId, method])
+
+  const variantConfig = getVariantConfig(variant)
+
+  const handleGuideRated = (isHelpful: boolean) => {
+    trackGuideRated(method, isHelpful)
+    setHasRated(true)
+  }
+
+  const handleVideoWatched = () => {
+    trackVideoWatched(method, 0) // timestamp tracked internally
+  }
 
   return (
     <div
@@ -155,11 +186,16 @@ export function MethodGuideModal({ method, onClose }: MethodGuideModalProps) {
       >
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-slate-700/60">
-          <div>
+          <div className="flex-1">
             <h2 id="guide-title" className="text-lg font-semibold text-white">
               {guide.title}
             </h2>
             <p className="text-sm text-slate-400 mt-1">{guide.description}</p>
+            {process.env.NODE_ENV === 'development' && (
+              <p className="text-xs text-slate-600 mt-1">
+                (Variant: {variant})
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -172,8 +208,8 @@ export function MethodGuideModal({ method, onClose }: MethodGuideModalProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          {/* Video embed (optional) */}
-          {guide.videoUrl && (
+          {/* Video embed (show based on variant) */}
+          {guide.videoUrl && variantConfig.showVideo && (
             <div className="mb-6">
               <div className="aspect-video bg-slate-800 rounded-lg border border-slate-700 flex items-center justify-center overflow-hidden">
                 <iframe
@@ -185,47 +221,72 @@ export function MethodGuideModal({ method, onClose }: MethodGuideModalProps) {
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                   className="w-full h-full"
+                  onLoad={handleVideoWatched}
                 />
               </div>
             </div>
           )}
 
           {/* Steps */}
-          <div className="space-y-3">
-            {guide.steps.map((step, idx) => (
-              <div
-                key={step.number}
-                className="flex gap-4 p-4 bg-slate-800/50 border border-slate-700/50 rounded-lg hover:bg-slate-800/70 transition-colors"
-              >
-                {/* Step number */}
-                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-ghost-500/20 border border-ghost-500/30 flex items-center justify-center">
-                  <span className="text-sm font-semibold text-ghost-400">{step.number}</span>
-                </div>
+          {variantConfig.showSteps && (
+            <div className="space-y-3">
+              {guide.steps.map((step, idx) => (
+                <div
+                  key={step.number}
+                  className="flex gap-4 p-4 bg-slate-800/50 border border-slate-700/50 rounded-lg hover:bg-slate-800/70 transition-colors"
+                >
+                  {/* Step number */}
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-ghost-500/20 border border-ghost-500/30 flex items-center justify-center">
+                    <span className="text-sm font-semibold text-ghost-400">
+                      {step.number}
+                    </span>
+                  </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start gap-2 mb-1">
-                    <h3 className="text-sm font-medium text-white">{step.title}</h3>
-                    {idx < guide.steps.length - 1 && (
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-600 mt-0.5 shrink-0" />
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2 mb-1">
+                      <h3 className="text-sm font-medium text-white">
+                        {step.title}
+                      </h3>
+                      {idx < guide.steps.length - 1 && (
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-600 mt-0.5 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 mb-2">
+                      {step.description}
+                    </p>
+                    {variantConfig.showTiming && (
+                      <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                        <Play className="w-3 h-3" />
+                        {step.time}
+                      </div>
                     )}
                   </div>
-                  <p className="text-xs text-slate-400 mb-2">{step.description}</p>
-                  <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                    <Play className="w-3 h-3" />
-                    {step.time}
-                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {/* Total time */}
           <div className="mt-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
             <p className="text-sm text-emerald-300 font-medium">
-              ⏱️ Total time: {method === 'record' ? '2–5 minutes' : method === 'template' ? '5–10 minutes' : method === 'ai' ? '5–10 minutes' : '15–45 minutes'}
+              ⏱️ Total time:{' '}
+              {method === 'record'
+                ? '2–5 minutes'
+                : method === 'template'
+                  ? '5–10 minutes'
+                  : method === 'ai'
+                    ? '5–10 minutes'
+                    : '15–45 minutes'}
             </p>
           </div>
+
+          {/* Guide rating */}
+          {!hasRated && (
+            <div className="mt-4">
+              <GuideRating method={method} onRate={handleGuideRated} />
+            </div>
+          )}
         </div>
 
         {/* Footer */}
