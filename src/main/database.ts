@@ -283,6 +283,24 @@ export class Database {
       CREATE INDEX IF NOT EXISTS idx_wf_versions_workflow ON workflow_versions(workflow_id);
     `)
 
+    // Phase 17 — recording sessions
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS recording_sessions (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        stopped_at TEXT,
+        events TEXT NOT NULL DEFAULT '[]',
+        page_title TEXT,
+        start_url TEXT,
+        capture_screenshots INTEGER DEFAULT 0,
+        capture_network INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'recording'
+      );
+      CREATE INDEX IF NOT EXISTS idx_recording_sessions_profile ON recording_sessions(profile_id);
+      CREATE INDEX IF NOT EXISTS idx_recording_sessions_status ON recording_sessions(status);
+    `)
+
     // Phase 12.C.3 — encrypted credential vault
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS credentials (
@@ -1060,6 +1078,78 @@ export class Database {
 
   deleteProfileVersion(versionId: string): void {
     this.run(`DELETE FROM profile_versions WHERE id = ?`, [versionId])
+  }
+
+  // ── Recording Sessions (Phase 17) ────────────────────────────────────────
+
+  createRecordingSession(session: {
+    id: string
+    profileId: string
+    startedAt: string
+    startUrl?: string
+    captureScreenshots: boolean
+    captureNetwork: boolean
+  }): void {
+    this.run(
+      `INSERT INTO recording_sessions (id, profile_id, started_at, start_url, capture_screenshots, capture_network, events, status)
+       VALUES (?, ?, ?, ?, ?, ?, '[]', 'recording')`,
+      [
+        session.id,
+        session.profileId,
+        session.startedAt,
+        session.startUrl ?? null,
+        session.captureScreenshots ? 1 : 0,
+        session.captureNetwork ? 1 : 0
+      ]
+    )
+  }
+
+  updateRecordingSession(id: string, patch: {
+    events?: any[]
+    stoppedAt?: string
+    pageTitle?: string
+    status?: string
+  }): void {
+    const fields: string[] = []
+    const values: any[] = []
+    if (patch.events !== undefined) { fields.push('events = ?'); values.push(JSON.stringify(patch.events)) }
+    if (patch.stoppedAt !== undefined) { fields.push('stopped_at = ?'); values.push(patch.stoppedAt) }
+    if (patch.pageTitle !== undefined) { fields.push('page_title = ?'); values.push(patch.pageTitle) }
+    if (patch.status !== undefined) { fields.push('status = ?'); values.push(patch.status) }
+    if (fields.length === 0) return
+    values.push(id)
+    this.run(`UPDATE recording_sessions SET ${fields.join(', ')} WHERE id = ?`, values)
+  }
+
+  getRecordingSession(id: string): any {
+    const row = this.queryOne('SELECT * FROM recording_sessions WHERE id = ?', [id])
+    if (!row) return null
+    return {
+      ...row,
+      events: JSON.parse(row.events || '[]'),
+      captureScreenshots: !!row.capture_screenshots,
+      captureNetwork: !!row.capture_network,
+    }
+  }
+
+  listRecordingSessions(profileId?: string): any[] {
+    const rows = profileId
+      ? this.queryAll(
+          'SELECT id, profile_id, started_at, stopped_at, page_title, start_url, capture_screenshots, capture_network, status FROM recording_sessions WHERE profile_id = ? ORDER BY started_at DESC',
+          [profileId]
+        )
+      : this.queryAll(
+          'SELECT id, profile_id, started_at, stopped_at, page_title, start_url, capture_screenshots, capture_network, status FROM recording_sessions ORDER BY started_at DESC'
+        )
+    return rows.map((r) => ({
+      ...r,
+      captureScreenshots: !!r.capture_screenshots,
+      captureNetwork: !!r.capture_network,
+    }))
+  }
+
+  deleteRecordingSession(id: string): void {
+    this.run('DELETE FROM recording_sessions WHERE id = ?', [id])
   }
 
   // ── Workflow Versions (Tier 3) ────────────────────────────────────────────

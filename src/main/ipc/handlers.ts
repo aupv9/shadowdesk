@@ -44,8 +44,10 @@ import {
   analyzeDetection, healSelector,
   getBehaviorArchetypes, getBehaviorArchetype
 } from '../ai-assistant'
+import { ScriptAnalyzer } from '../script-analyzer'
+import { RecordingRefiner } from '../recording-refiner'
 import type { CreateNodeInput, CreateWebhookInput, TelegramConfig, MarketplaceCategory, WebhookConfig } from '../../shared/types'
-import type { AutomationStep, DetectionVectorResult } from '../../shared/types'
+import type { AutomationStep, DetectionVectorResult, RefineOptions } from '../../shared/types'
 
 // ── Handler registration ───────────────────────────────────────────────────
 
@@ -428,9 +430,9 @@ export function registerIpcHandlers(): void {
 
   // ── Visual recorder (Phase 12.B.2) ────────────────────────────────────────
 
-  ipcMain.handle('recorder:start', async (_event, profileId: string, captureScreenshots?: boolean) => {
-    await Recorder.getInstance().start(profileId, captureScreenshots ?? false)
-    return { recording: true }
+  ipcMain.handle('recorder:start', async (_event, profileId: string, captureScreenshots?: boolean, captureNetwork?: boolean) => {
+    const sessionId = await Recorder.getInstance().start(profileId, captureScreenshots ?? false, captureNetwork ?? false)
+    return { recording: true, sessionId }
   })
 
   ipcMain.handle('recorder:stop', async (_event, profileId: string) => {
@@ -1438,4 +1440,110 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ai:behaviorArchetypes', () => getBehaviorArchetypes())
 
   ipcMain.handle('ai:behaviorArchetype', (_e, id: string) => getBehaviorArchetype(id))
+
+  // ── Phase 17 — Script-to-Workflow (Recording Analysis & Refinement) ────────
+
+  const scriptAnalyzer = new ScriptAnalyzer()
+  const recordingRefiner = new RecordingRefiner()
+
+  // Session management
+  ipcMain.handle('recording:sessions:list', (_e, profileId?: string) =>
+    db.listRecordingSessions(profileId)
+  )
+
+  ipcMain.handle('recording:sessions:get', (_e, id: string) => {
+    const session = db.getRecordingSession(id)
+    if (!session) throw new Error(`Recording session ${id} not found`)
+    return session
+  })
+
+  ipcMain.handle('recording:sessions:delete', (_e, id: string) => {
+    db.deleteRecordingSession(id)
+  })
+
+  // Quick step preview without full analysis
+  ipcMain.handle('recording:previewSteps', (_e, sessionId: string) => {
+    const session = db.getRecordingSession(sessionId)
+    if (!session) throw new Error(`Session ${sessionId} not found`)
+    return scriptAnalyzer.eventsToSteps(session.events)
+  })
+
+  // Full pattern analysis
+  ipcMain.handle('recording:analyze', async (_e, sessionId: string) => {
+    const session = db.getRecordingSession(sessionId)
+    if (!session) throw new Error(`Session ${sessionId} not found`)
+    db.updateRecordingSession(sessionId, { status: 'analyzing' })
+    try {
+      const analysis = scriptAnalyzer.analyze({
+        id: session.id,
+        profileId: session.profile_id,
+        startedAt: session.started_at,
+        stoppedAt: session.stopped_at,
+        events: session.events,
+        pageTitle: session.page_title,
+        startUrl: session.start_url,
+        captureScreenshots: session.captureScreenshots,
+        captureNetwork: session.captureNetwork,
+        status: 'analyzing'
+      })
+      // Don't update status to 'refined' — that's done after AI refine
+      return analysis
+    } catch (err) {
+      db.updateRecordingSession(sessionId, { status: 'stopped' })
+      throw err
+    }
+  })
+
+  // AI batch refinement
+  ipcMain.handle('recording:refine', async (_e, sessionId: string, options?: RefineOptions) => {
+    const session = db.getRecordingSession(sessionId)
+    if (!session) throw new Error(`Session ${sessionId} not found`)
+    // Re-analyze to get fresh analysis
+    const analysis = scriptAnalyzer.analyze({
+      id: session.id,
+      profileId: session.profile_id,
+      startedAt: session.started_at,
+      stoppedAt: session.stopped_at,
+      events: session.events,
+      pageTitle: session.page_title,
+      startUrl: session.start_url,
+      captureScreenshots: session.captureScreenshots,
+      captureNetwork: session.captureNetwork,
+      status: 'analyzing'
+    })
+    const refined = await recordingRefiner.refine(analysis, options)
+    db.updateRecordingSession(sessionId, { status: 'refined' })
+    return refined
+  })
+
+  // Save refined steps as a new workflow
+  ipcMain.handle('recording:saveAsWorkflow', async (_e, sessionId: string, name: string, description?: string) => {
+    const session = db.getRecordingSession(sessionId)
+    if (!session) throw new Error(`Session ${sessionId} not found`)
+    const analysis = scriptAnalyzer.analyze({
+      id: session.id,
+      profileId: session.profile_id,
+      startedAt: session.started_at,
+      stoppedAt: session.stopped_at,
+      events: session.events,
+      pageTitle: session.page_title,
+      startUrl: session.start_url,
+      captureScreenshots: session.captureScreenshots,
+      captureNetwork: session.captureNetwork,
+      status: 'stopped'
+    })
+    const workflowId = uuidv4()
+    const variables = Object.fromEntries(
+      analysis.extractedVariables.filter((v) => v.autoApply).map((v) => [v.name, v.value])
+    )
+    db.createWorkflow({
+      id: workflowId,
+      name: name || analysis.suggestedWorkflow.name,
+      description: description || analysis.suggestedWorkflow.description || '',
+      steps: analysis.suggestedWorkflow.steps,
+      variables
+    })
+    db.updateRecordingSession(sessionId, { status: 'saved' })
+    return db.getWorkflow(workflowId)
+  })
 }

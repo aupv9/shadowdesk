@@ -934,6 +934,117 @@ export interface AiSelectorHealResult {
   reasoning: string
 }
 
+// ─── Phase 17 — Script-to-Workflow Generation ─────────────────────────────────
+
+/** Extended recorded event with Phase 17 rich metadata */
+export interface RecordedEvent {
+  type: 'click' | 'input' | 'change' | 'submit' | 'navigate' | 'scroll' | 'keypress'
+  selector: string
+  value?: string
+  url?: string
+  tag?: string
+  label?: string
+  timestamp: number
+  // Phase 17 additions
+  screenshotPath?: string
+  domSnapshot?: string
+  networkRequests?: string[]
+  timingMs?: number
+}
+
+/** A complete recording session (Phase 17) */
+export interface RecordingSession {
+  id: string
+  profileId: string
+  startedAt: string
+  stoppedAt?: string
+  events: RecordedEvent[]
+  pageTitle?: string
+  startUrl?: string
+  captureScreenshots: boolean
+  captureNetwork: boolean
+  status: 'recording' | 'stopped' | 'analyzing' | 'refined' | 'saved'
+}
+
+/** A structural pattern detected in a recording */
+export interface DetectedPattern {
+  type: 'loop' | 'conditional' | 'repeated-selector' | 'form-group' | 'navigation-chain'
+  stepIndices: number[]
+  confidence: number
+  suggestedReplacement?: AutomationStep
+  description: string
+}
+
+/** A value that should become a workflow variable */
+export interface ExtractedVariable {
+  name: string
+  value: string
+  occurrences: number[]
+  type: 'url' | 'text-input' | 'selector-value' | 'credential' | 'numeric' | 'date'
+  confidence: number
+  autoApply: boolean
+}
+
+/** Wait optimization suggestion */
+export interface WaitOptimization {
+  stepIndex: number
+  originalTimingMs: number
+  suggestedWaitMs: number
+  strategy: 'waitForSelector' | 'fixed-wait' | 'no-wait'
+  reason: string
+}
+
+/** Selector quality assessment */
+export interface SelectorQualityReport {
+  stepIndex: number
+  selector: string
+  quality: 'excellent' | 'good' | 'fragile' | 'brittle'
+  reason: string
+  suggestedSelector?: string
+}
+
+/** Output from ScriptAnalyzer (Phase 17.B) */
+export interface RecordingAnalysis {
+  sessionId: string
+  rawStepCount: number
+  optimizedStepCount: number
+  detectedPatterns: DetectedPattern[]
+  extractedVariables: ExtractedVariable[]
+  waitOptimizations: WaitOptimization[]
+  selectorQuality: SelectorQualityReport[]
+  suggestedWorkflow: AutomationWorkflow
+  analysisNotes: string[]
+}
+
+/** A single refinement suggestion from AI */
+export interface RefinementSuggestion {
+  stepId: string
+  type: 'selector-heal' | 'step-fix' | 'add-retry' | 'add-error-handler' | 'add-wait' | 'parameterize'
+  before: Partial<AutomationStep>
+  after: Partial<AutomationStep>
+  reason: string
+  applied: boolean
+}
+
+/** Output from RecordingRefiner AI pipeline (Phase 17.C) */
+export interface RefinedRecording {
+  sessionId: string
+  originalSteps: AutomationStep[]
+  refinedSteps: AutomationStep[]
+  appliedSuggestions: RefinementSuggestion[]
+  summary: string
+  aiNotes: string
+}
+
+/** Options for the AI refine pipeline */
+export interface RefineOptions {
+  healFragileSelectors: boolean
+  addRetryOnNetworkActions: boolean
+  addErrorHandlers: boolean
+  generateStepLabels: boolean
+  maxAiCalls?: number
+}
+
 /** Phase 16.D — Behaviour archetype definition */
 export interface BehaviorArchetype {
   id: string

@@ -26,6 +26,7 @@ import { WorkflowCreateModal } from './WorkflowCreateModal'
 import { TemplatePickerModal } from './TemplatePickerModal'
 import { SchedulesModal } from './SchedulesModal'
 import { VariablesEditor } from './VariablesEditor'
+import { RecordingReview } from './RecordingReview'
 import type { AutomationStep, AutomationStepResult } from '../../types'
 
 export function AutomationBuilder() {
@@ -52,6 +53,8 @@ export function AutomationBuilder() {
   const [recordingProfileId, setRecordingProfileId] = useState<string | null>(null)
   const [recordedCount, setRecordedCount] = useState(0)
   const [recorderError, setRecorderError] = useState<string | null>(null)
+  // Phase 17 — Recording Review
+  const [reviewSessionId, setReviewSessionId] = useState<string | null>(null)
   // Live step progress stream
   const [liveSteps, setLiveSteps] = useState<AutomationStepResult[]>([])
   // Import file ref
@@ -181,7 +184,8 @@ export function AutomationBuilder() {
     if (!selectedProfileId) return
     setRecorderError(null)
     try {
-      await window.api.recorder.start(selectedProfileId)
+      // Phase 17: capture network events for richer analysis
+      await window.api.recorder.start(selectedProfileId, true, true)
       setRecording(true)
       setRecordingProfileId(selectedProfileId)
       setRecordedCount(0)
@@ -191,18 +195,24 @@ export function AutomationBuilder() {
   }
 
   const handleStopRecording = async () => {
-    if (!recordingProfileId || !selectedWorkflow) {
+    if (!recordingProfileId) {
       setRecording(false)
       setRecordingProfileId(null)
       return
     }
     try {
       const result = await window.api.recorder.stop(recordingProfileId)
-      const newSteps = result.steps || []
-      if (newSteps.length > 0) {
-        await updateWorkflow(selectedWorkflow.id, {
-          steps: [...selectedWorkflow.steps, ...newSteps]
-        })
+      // Phase 17: open Recording Review panel if we got a sessionId
+      if (result.sessionId) {
+        setReviewSessionId(result.sessionId)
+      } else if (selectedWorkflow) {
+        // Fallback: append steps directly (old behavior)
+        const newSteps = result.steps || []
+        if (newSteps.length > 0) {
+          await updateWorkflow(selectedWorkflow.id, {
+            steps: [...selectedWorkflow.steps, ...newSteps]
+          })
+        }
       }
     } catch (e: any) {
       setRecorderError(e?.message ?? 'Failed to stop recorder')
@@ -776,6 +786,20 @@ export function AutomationBuilder() {
           workflow={selectedWorkflow}
           profiles={profiles}
           onClose={() => setShowSchedules(false)}
+        />
+      )}
+
+      {/* Phase 17 — Recording Review panel */}
+      {reviewSessionId && recordingProfileId == null && (
+        <RecordingReview
+          sessionId={reviewSessionId}
+          profileId={selectedProfileId}
+          onClose={() => setReviewSessionId(null)}
+          onSaved={async (workflowId) => {
+            setReviewSessionId(null)
+            await fetchWorkflows()
+            if (workflowId) selectWorkflow(workflowId)
+          }}
         />
       )}
     </div>
