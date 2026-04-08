@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Trash2, Copy, Link2, FolderOpen, X, Check } from 'lucide-react'
+import { Trash2, Copy, Link2, FolderOpen, X, Check, Play, Square } from 'lucide-react'
 import { useProxyStore } from '../../stores/proxyStore'
 import { useGroupStore } from '../../stores/groupStore'
 
@@ -8,6 +8,8 @@ import { useGroupStore } from '../../stores/groupStore'
  *
  * Floating toolbar shown when profiles are selected in selection mode.
  * Provides bulk operations:
+ * - Launch (launch selected profiles in parallel)
+ * - Close (close selected profiles in parallel)
  * - Delete (uses bulkDelete API with async cleanup)
  * - Clone (iterates individual clones)
  * - Assign Proxy (bulk operation)
@@ -20,6 +22,8 @@ interface BulkActionsToolbarProps {
   onClearSelection: () => void
   onSelectAll: () => void
   allSelected: boolean
+  onBulkLaunch: () => Promise<void>
+  onBulkClose: () => Promise<void>
   onBulkDelete: () => Promise<void>
   onBulkClone: () => Promise<void>
   onBulkAssignProxy: (proxyId: string | null) => Promise<void>
@@ -33,6 +37,8 @@ export function BulkActionsToolbar({
   onClearSelection,
   onSelectAll,
   allSelected,
+  onBulkLaunch,
+  onBulkClose,
   onBulkDelete,
   onBulkClone,
   onBulkAssignProxy,
@@ -70,6 +76,30 @@ export function BulkActionsToolbar({
           {allSelected ? 'Deselect all' : 'Select all'}
         </button>
       </div>
+
+      <div className="w-px h-4 bg-slate-600" />
+
+      {/* Launch */}
+      <button
+        onClick={() => handleAction(onBulkLaunch)}
+        disabled={isActing}
+        className="btn-ghost text-xs flex items-center gap-1.5 disabled:opacity-50 text-green-400 hover:text-green-300"
+        title="Launch all selected profiles"
+      >
+        <Play className="w-3.5 h-3.5" />
+        Launch all
+      </button>
+
+      {/* Close */}
+      <button
+        onClick={() => handleAction(onBulkClose)}
+        disabled={isActing}
+        className="btn-ghost text-xs flex items-center gap-1.5 disabled:opacity-50 text-orange-400 hover:text-orange-300"
+        title="Close all selected profiles"
+      >
+        <Square className="w-3.5 h-3.5" />
+        Close all
+      </button>
 
       <div className="w-px h-4 bg-slate-600" />
 

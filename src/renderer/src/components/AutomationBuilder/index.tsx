@@ -37,7 +37,7 @@ export function AutomationBuilder() {
     runWorkflow, runWorkflowParallel, stopWorkflow, stopWorkflowAll, clearError
   } = useAutomationStore()
 
-  const { profiles, activeSessions } = useProfileStore()
+  const { profiles, activeSessions, fetchActiveSessions } = useProfileStore()
   const [showCreate, setShowCreate] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [showSchedules, setShowSchedules] = useState(false)
@@ -94,6 +94,13 @@ export function AutomationBuilder() {
     })
     return unsubscribe
   }, [selectedWorkflow?.id])
+
+  // Fetch active sessions on mount and refresh every 3 seconds
+  useEffect(() => {
+    fetchActiveSessions()
+    const interval = setInterval(fetchActiveSessions, 3000)
+    return () => clearInterval(interval)
+  }, [fetchActiveSessions])
 
   const handleAddStep = () => {
     if (!selectedWorkflow) return
