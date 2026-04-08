@@ -50,11 +50,14 @@ import {
   Brackets,
   IterationCcw,
   Network,
-  SkipForward
+  SkipForward,
+  Eye
 } from 'lucide-react'
 import type { AutomationStep, AutomationActionType } from '../../types'
 import { ActionBrowser } from './ActionBrowser'
 import { ACTION_META } from './actionMetadata'
+import { ParameterValidator } from './ParameterValidator'
+import { SelectorHelper } from './SelectorHelper'
 
 
 interface StepEditorProps {
@@ -137,11 +140,18 @@ export function StepEditor({ step, index, total, onUpdate, onDelete, onDuplicate
   const [expanded, setExpanded] = useState(false)
   const [showRetry, setShowRetry] = useState(false)
   const [showActionBrowser, setShowActionBrowser] = useState(false)
+  const [showSelectorHelper, setShowSelectorHelper] = useState(false)
+  const [selectorFieldKey, setSelectorFieldKey] = useState<string>('')
   const meta = ACTION_META[step.action]
 
   const handleActionChange = (action: AutomationActionType) => {
     onUpdate({ action, params: getDefaultParams(action), label: ACTION_META[action].label })
     setShowActionBrowser(false)
+  }
+
+  const handleSelectorSelect = (selector: string) => {
+    onUpdate({ params: { ...step.params, [selectorFieldKey]: selector } })
+    setShowSelectorHelper(false)
   }
 
   const handleParamChange = (key: string, value: any) => {
@@ -236,7 +246,23 @@ export function StepEditor({ step, index, total, onUpdate, onDelete, onDuplicate
           )}
 
           {/* Action-specific params */}
-          <ParamEditor action={step.action} params={step.params} onChange={handleParamChange} />
+          <ParamEditor
+            action={step.action}
+            params={step.params}
+            onChange={handleParamChange}
+            onShowSelectorHelper={(key) => {
+              setSelectorFieldKey(key)
+              setShowSelectorHelper(true)
+            }}
+          />
+
+          {/* Selector helper modal */}
+          {showSelectorHelper && (
+            <SelectorHelper
+              onSelect={handleSelectorSelect}
+              onClose={() => setShowSelectorHelper(false)}
+            />
+          )}
 
           {/* Retry policy (collapsible) */}
           <div className="mt-3 border-t border-slate-700/40 pt-3">
@@ -285,44 +311,69 @@ export function StepEditor({ step, index, total, onUpdate, onDelete, onDuplicate
 function ParamEditor({
   action,
   params,
-  onChange
+  onChange,
+  onShowSelectorHelper
 }: {
   action: AutomationActionType
   params: Record<string, any>
   onChange: (key: string, value: any) => void
+  onShowSelectorHelper: (key: string) => void
 }) {
-  const field = (key: string, label: string, type: 'text' | 'number' | 'checkbox' | 'textarea' = 'text', placeholder?: string) => (
-    <div className="mb-2" key={key}>
-      <label className="text-xs text-slate-500 mb-1 block">{label}</label>
-      {type === 'checkbox' ? (
-        <label className="flex items-center gap-2 text-sm text-slate-300">
-          <input
-            type="checkbox"
-            checked={params[key] ?? false}
-            onChange={(e) => onChange(key, e.target.checked)}
-            className="rounded border-slate-600 bg-slate-700"
-          />
-          {label}
-        </label>
-      ) : type === 'textarea' ? (
-        <textarea
-          value={params[key] ?? ''}
-          onChange={(e) => onChange(key, e.target.value)}
-          rows={4}
-          placeholder={placeholder}
-          className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500 font-mono text-xs"
-        />
-      ) : (
-        <input
-          type={type}
-          value={params[key] ?? ''}
-          placeholder={placeholder}
-          onChange={(e) => onChange(key, type === 'number' ? Number(e.target.value) : e.target.value)}
-          className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500"
-        />
-      )}
-    </div>
-  )
+  const field = (key: string, label: string, type: 'text' | 'number' | 'checkbox' | 'textarea' = 'text', placeholder?: string) => {
+    const isSelectorField = key === 'selector' || key.includes('Selector') || key.includes('selector')
+    const hasValidator = isSelectorField || key === 'url' || key.includes('timeout') || key.includes('ms') || key.includes('delay')
+
+    return (
+      <div className="mb-2" key={key}>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-slate-500">{label}</label>
+          {isSelectorField && (
+            <button
+              onClick={() => onShowSelectorHelper(key)}
+              className="text-[10px] text-ghost-400 hover:text-ghost-300 transition-colors flex items-center gap-1"
+            >
+              <Eye className="w-3 h-3" />
+              Helper
+            </button>
+          )}
+        </div>
+
+        {type === 'checkbox' ? (
+          <label className="flex items-center gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={params[key] ?? false}
+              onChange={(e) => onChange(key, e.target.checked)}
+              className="rounded border-slate-600 bg-slate-700"
+            />
+            {label}
+          </label>
+        ) : type === 'textarea' ? (
+          <>
+            <textarea
+              value={params[key] ?? ''}
+              onChange={(e) => onChange(key, e.target.value)}
+              rows={4}
+              placeholder={placeholder}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500 font-mono text-xs"
+            />
+            {hasValidator && <ParameterValidator paramKey={key} value={params[key] ?? ''} paramType={isSelectorField ? 'selector' : 'text'} />}
+          </>
+        ) : (
+          <>
+            <input
+              type={type}
+              value={params[key] ?? ''}
+              placeholder={placeholder}
+              onChange={(e) => onChange(key, type === 'number' ? Number(e.target.value) : e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500"
+            />
+            {hasValidator && <ParameterValidator paramKey={key} value={params[key] ?? ''} paramType={isSelectorField ? 'selector' : type === 'number' ? 'number' : 'text'} />}
+          </>
+        )}
+      </div>
+    )
+  }
 
   const saveAsField = (hint: string) => (
     <div className="mb-2">
