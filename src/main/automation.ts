@@ -2813,11 +2813,16 @@ export class AutomationEngine {
         //   var-equals       — variables[params.variable] === params.expected
         //   var-truthy       — variables[params.variable] is not empty/false/0
         //
-        // Safety: hard-capped at `maxIterations` (default 100) to prevent
+        // Safety: hard-capped at MAX_ITERATIONS = 10,000 to prevent
         // runaway loops. Set `invert: true` to flip the condition (acts as
         // an "until" loop). Optional `delayMs` adds a pause between passes.
+        const MAX_ITERATIONS = 10_000
         const innerSteps: AutomationStep[] = params.steps ?? []
-        const maxIterations: number = Number(params.maxIterations ?? 100)
+        let maxIterations: number = Number(params.maxIterations ?? 100)
+        // Enforce hard cap to prevent infinite loops
+        if (maxIterations > MAX_ITERATIONS) {
+          maxIterations = MAX_ITERATIONS
+        }
         const delayMs: number = Number(params.delayMs ?? 0)
         const conditionType: string = params.conditionType ?? 'selector-exists'
         const invert: boolean = params.invert === true
@@ -2856,19 +2861,34 @@ export class AutomationEngine {
         }
 
         let iterations = 0
+        const loopStart = Date.now()
+        const MAX_DURATION_MS = 5 * 60 * 1000  // 5 minutes max total time
+
         while (iterations < maxIterations) {
           if (control.abort) throw new Error('Workflow stopped')
+
+          // Check for overall timeout
+          if (Date.now() - loopStart > MAX_DURATION_MS) {
+            throw new Error(`whileLoop exceeded maximum duration of 5 minutes after ${iterations} iterations`)
+          }
+
           const shouldRun = await checkCondition()
           if (!shouldRun) break
+
           const status = await this.executeSteps(page, innerSteps, control, allResults, variables)
           if (status === 'stopped') throw new Error('Workflow stopped')
           if (status === 'failed') throw new Error(`whileLoop: iteration ${iterations + 1} failed`)
           iterations++
+
           if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs))
         }
 
         const hitMax = iterations >= maxIterations
-        return { iterations, maxIterations, hitMax, conditionType, invert }
+        if (hitMax) {
+          throw new Error(`whileLoop exceeded maximum of ${maxIterations} iterations (hard limit)`)
+        }
+
+        return { iterations, maxIterations, conditionType, invert }
       }
 
       case 'waitForRequest': {
