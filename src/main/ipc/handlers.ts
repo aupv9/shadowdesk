@@ -38,7 +38,7 @@ import {
 } from '../validators/profile-validator'
 import { ValidationError, NotFoundError } from '../error-handler'
 import { ChromiumPatchManager } from '../fingerprint/chromium-patches'
-import { WorkflowScheduler, buildScheduleRow } from '../scheduler'
+import { WorkflowScheduler, buildScheduleRow, validateCronExpression } from '../scheduler'
 import { driftFingerprint } from '../fingerprint-drift'
 import { runWarmUp } from '../warmup'
 import { detectCollisions } from '../fingerprint/collision-detector'
@@ -1438,6 +1438,8 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('schedules:update', (_event, id: string, data: any) => {
     if (data.cron) {
+      // Phase 19.1: Reject malformed cron updates the same way create does.
+      validateCronExpression(data.cron)
       const next = scheduler.nextRun(data.cron)
       data.next_run_at = next ? next.toISOString() : null
     }

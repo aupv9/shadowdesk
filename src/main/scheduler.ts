@@ -227,6 +227,10 @@ export function buildScheduleRow(input: {
   enabled?: boolean
   name?: string
 }): WorkflowSchedule {
+  // Phase 19.1: Validate cron up-front so create/update handlers throw a
+  // descriptive error instead of silently storing a row that will never fire.
+  validateCronExpression(input.cron)
+
   const scheduler = WorkflowScheduler.getInstance()
   const next = scheduler.nextRun(input.cron)
   return {
@@ -239,5 +243,90 @@ export function buildScheduleRow(input: {
     last_run_at: null,
     next_run_at: next ? next.toISOString() : null,
     created_at: new Date().toISOString()
+  }
+}
+
+/**
+ * Phase 19.1 — Strict 5-field cron validator.
+ *
+ * Validates the same subset that `WorkflowScheduler.matchField()` actually
+ * supports: `*`, exact integers, comma lists, ranges (`N-M`), step values
+ * (`*\/N`, `N-M/S`). Throws a descriptive Error on any malformed input —
+ * IPC handlers should let this propagate so the renderer toast layer can
+ * surface it to the user.
+ *
+ * Field bounds:
+ *   minute       0-59
+ *   hour         0-23
+ *   day-of-month 1-31
+ *   month        1-12
+ *   day-of-week  0-6  (0 = Sunday)
+ */
+export function validateCronExpression(cron: string): void {
+  if (typeof cron !== 'string' || !cron.trim()) {
+    throw new Error('Cron expression is required')
+  }
+  const parts = cron.trim().split(/\s+/)
+  if (parts.length !== 5) {
+    throw new Error(
+      `Cron expression must have 5 fields (minute hour day-of-month month day-of-week), got ${parts.length}`,
+    )
+  }
+  const bounds: [number, number, string][] = [
+    [0, 59, 'minute'],
+    [0, 23, 'hour'],
+    [1, 31, 'day-of-month'],
+    [1, 12, 'month'],
+    [0, 6,  'day-of-week'],
+  ]
+  for (let i = 0; i < 5; i++) {
+    const [min, max, label] = bounds[i]
+    validateCronField(parts[i], min, max, label)
+  }
+}
+
+function validateCronField(field: string, min: number, max: number, label: string): void {
+  if (!field) throw new Error(`Cron field "${label}" is empty`)
+  for (const tokRaw of field.split(',')) {
+    const tok = tokRaw.trim()
+    if (!tok) throw new Error(`Cron field "${label}" has empty list element`)
+
+    let body = tok
+    let stepStr: string | null = null
+    const slashIdx = tok.indexOf('/')
+    if (slashIdx >= 0) {
+      body = tok.substring(0, slashIdx)
+      stepStr = tok.substring(slashIdx + 1)
+      const step = Number(stepStr)
+      if (!Number.isInteger(step) || step <= 0) {
+        throw new Error(`Cron field "${label}" has invalid step "${stepStr}"`)
+      }
+    }
+
+    if (body === '*' || body === '') continue
+
+    if (body.includes('-')) {
+      const [aStr, bStr] = body.split('-')
+      const a = Number(aStr)
+      const b = Number(bStr)
+      if (!Number.isInteger(a) || !Number.isInteger(b)) {
+        throw new Error(`Cron field "${label}" range "${body}" is not numeric`)
+      }
+      if (a < min || a > max || b < min || b > max) {
+        throw new Error(`Cron field "${label}" range "${body}" out of bounds [${min}-${max}]`)
+      }
+      if (a > b) {
+        throw new Error(`Cron field "${label}" range "${body}" must have low <= high`)
+      }
+      continue
+    }
+
+    const n = Number(body)
+    if (!Number.isInteger(n)) {
+      throw new Error(`Cron field "${label}" value "${body}" is not numeric`)
+    }
+    if (n < min || n > max) {
+      throw new Error(`Cron field "${label}" value ${n} out of bounds [${min}-${max}]`)
+    }
   }
 }

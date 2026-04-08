@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   TrendingUp, AlertTriangle, CheckCircle, Clock, Zap, RefreshCw,
   XCircle, BarChart3, Activity
@@ -23,6 +23,26 @@ interface ActionMetric {
   max_ms: number
   failure_rate: number
 }
+
+/**
+ * Phase 19.1 — Module-level cache that survives MetricsTab unmount/remount.
+ *
+ * The Run Dashboard parent uses conditional rendering (`{tab === 'metrics' && <MetricsTab />}`),
+ * which destroys this component every time the user switches tabs. Without a
+ * cache outside React state, every tab switch retriggered two IPC roundtrips
+ * (`workflows.metrics` + `workflows.actionMetrics`) — a noticeable flash even
+ * with the new backend cache.
+ *
+ * Keyed by workflow filter so different filters don't pollute each other.
+ * TTL matches the backend cache so a manual refresh always wins.
+ */
+interface MetricsCacheEntry {
+  metrics: WorkflowMetrics | null
+  actionMetrics: ActionMetric[]
+  fetchedAt: number
+}
+const METRICS_CACHE = new Map<string, MetricsCacheEntry>()
+const METRICS_CACHE_TTL_MS = 30_000
 
 function formatMs(ms: number): string {
   if (!ms || ms <= 0) return '0ms'
@@ -60,23 +80,55 @@ function MiniBars({ data }: { data: { date: string; total: number; failed: numbe
 export function MetricsTab() {
   const [workflowFilter, setWorkflowFilter] = useState<string>('')
   const [workflows, setWorkflows] = useState<{ id: string; name: string }[]>([])
-  const [metrics, setMetrics] = useState<WorkflowMetrics | null>(null)
-  const [actionMetrics, setActionMetrics] = useState<ActionMetric[]>([])
+  const [metrics, setMetrics] = useState<WorkflowMetrics | null>(() => {
+    const cached = METRICS_CACHE.get('')
+    return cached && Date.now() - cached.fetchedAt < METRICS_CACHE_TTL_MS ? cached.metrics : null
+  })
+  const [actionMetrics, setActionMetrics] = useState<ActionMetric[]>(() => {
+    const cached = METRICS_CACHE.get('')
+    return cached && Date.now() - cached.fetchedAt < METRICS_CACHE_TTL_MS ? cached.actionMetrics : []
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const inFlightRef = useRef<string | null>(null)
 
-  const fetchAll = async () => {
+  /**
+   * Phase 19.1: `force=true` bypasses both the renderer cache and (via the
+   * separate Refresh button) the backend cache TTL. Default reads return
+   * cached data instantly when fresh — fixing the tab-switch flash.
+   */
+  const fetchAll = async (force = false) => {
+    const cacheKey = workflowFilter
+    if (!force) {
+      const cached = METRICS_CACHE.get(cacheKey)
+      if (cached && Date.now() - cached.fetchedAt < METRICS_CACHE_TTL_MS) {
+        setMetrics(cached.metrics)
+        setActionMetrics(cached.actionMetrics)
+        return
+      }
+    }
+    // De-dupe concurrent fetches for the same key (e.g. effect + user click).
+    if (inFlightRef.current === cacheKey) return
+    inFlightRef.current = cacheKey
+
     setLoading(true)
     setError(null)
     try {
       const m = await window.api.workflows.metrics(workflowFilter || undefined)
-      setMetrics(m)
       const am = await window.api.workflows.actionMetrics(workflowFilter || undefined, 200)
-      setActionMetrics(am || [])
+      const safeAm = am || []
+      setMetrics(m)
+      setActionMetrics(safeAm)
+      METRICS_CACHE.set(cacheKey, {
+        metrics: m,
+        actionMetrics: safeAm,
+        fetchedAt: Date.now(),
+      })
     } catch (e: any) {
       setError(e?.message ?? 'Failed to load metrics')
     } finally {
       setLoading(false)
+      if (inFlightRef.current === cacheKey) inFlightRef.current = null
     }
   }
 
@@ -107,7 +159,7 @@ export function MetricsTab() {
           ))}
         </select>
         <button
-          onClick={fetchAll}
+          onClick={() => fetchAll(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
