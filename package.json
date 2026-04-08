@@ -18,6 +18,10 @@
     "test:multilogin:generate": "npx tsx scripts/generate-multilogin-testdata.ts",
     "test:multilogin:run": "npx tsx src/main/test-multilogin.ts",
     "test:multilogin": "npm run test:multilogin:generate && npm run test:multilogin:run",
+    "test:automation:generate": "npx tsx scripts/generate-automation-testdata.ts",
+    "test:automation:run": "npx tsx src/main/test-automation.ts",
+    "test:automation": "npm run test:automation:generate && npm run test:automation:run",
+    "test:all": "npm run test:multilogin && npm run test:automation",
     "prepare": "husky"
   },
   "devDependencies": {
