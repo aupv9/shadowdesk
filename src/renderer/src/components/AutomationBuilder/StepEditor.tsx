@@ -58,6 +58,8 @@ import { ActionBrowser } from './ActionBrowser'
 import { ACTION_META } from './actionMetadata'
 import { ParameterValidator } from './ParameterValidator'
 import { SelectorHelper } from './SelectorHelper'
+import { DragHandle } from './DragHandle'
+import { DropZoneIndicator } from './DropZoneIndicator'
 
 
 interface StepEditorProps {
@@ -68,6 +70,13 @@ interface StepEditorProps {
   onDelete: () => void
   onDuplicate: () => void
   onMove: (direction: 'up' | 'down') => void
+  isDragging?: boolean
+  draggedOverIndex?: number | null
+  onDragStart?: (e: React.DragEvent<HTMLButtonElement>, index: number) => void
+  onDragEnd?: () => void
+  onDragOver?: (e: React.DragEvent<HTMLDivElement>, index: number) => void
+  onDragLeave?: () => void
+  onDrop?: (e: React.DragEvent<HTMLDivElement>, targetIndex: number) => void
 }
 
 function getDefaultParams(action: AutomationActionType): Record<string, any> {
@@ -136,7 +145,22 @@ function getDefaultParams(action: AutomationActionType): Record<string, any> {
   }
 }
 
-export function StepEditor({ step, index, total, onUpdate, onDelete, onDuplicate, onMove }: StepEditorProps) {
+export function StepEditor({
+  step,
+  index,
+  total,
+  onUpdate,
+  onDelete,
+  onDuplicate,
+  onMove,
+  isDragging,
+  draggedOverIndex,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop
+}: StepEditorProps) {
   const [expanded, setExpanded] = useState(false)
   const [showRetry, setShowRetry] = useState(false)
   const [showActionBrowser, setShowActionBrowser] = useState(false)
@@ -162,26 +186,55 @@ export function StepEditor({ step, index, total, onUpdate, onDelete, onDuplicate
   const hasRetry = (step.retries ?? 0) > 0
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-hidden">
-      {/* Step header */}
+    <>
+      {/* Drop zone before step */}
+      <DropZoneIndicator isActive={draggedOverIndex === index} position={index} />
+
       <div
-        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-800/80 transition-colors"
-        onClick={() => setExpanded(!expanded)}
+        className={`
+          bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-hidden
+          ${isDragging ? 'opacity-50' : ''}
+          transition-opacity duration-200
+        `}
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+          onDragOver?.(e, index)
+        }}
+        onDragLeave={onDragLeave}
+        onDrop={(e) => {
+          e.preventDefault()
+          onDrop?.(e, index)
+        }}
       >
-        <span className="text-xs font-mono text-slate-600 w-5 text-right">{index + 1}</span>
-        <Icon className={`w-4 h-4 ${meta.color} shrink-0`} />
-        <span className="text-sm font-medium text-white flex-1">
-          {step.label || meta.label}
-        </span>
-        {hasRetry && (
-          <span className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">
-            <RefreshCw className="w-2.5 h-2.5" />
-            ×{step.retries}
+        {/* Step header */}
+        <div
+          className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-800/80 transition-colors"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {onDragStart ? (
+            <DragHandle
+              index={index}
+              isDragging={isDragging ?? false}
+              onDragStart={(e) => onDragStart(e, index)}
+              onDragEnd={onDragEnd ?? (() => {})}
+            />
+          ) : (
+            <span className="text-xs font-mono text-slate-600 w-6 text-center">{index + 1}</span>
+          )}
+          <Icon className={`w-4 h-4 ${meta.color} shrink-0`} />
+          <span className="text-sm font-medium text-white flex-1">
+            {step.label || meta.label}
           </span>
-        )}
-        <span className="text-xs text-slate-500">{meta.label}</span>
-        {expanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
-      </div>
+          {hasRetry && (
+            <span className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">
+              <RefreshCw className="w-2.5 h-2.5" />
+              ×{step.retries}
+            </span>
+          )}
+          <span className="text-xs text-slate-500">{meta.label}</span>
+          {expanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+        </div>
 
       {/* Step body */}
       {expanded && (
@@ -304,7 +357,13 @@ export function StepEditor({ step, index, total, onUpdate, onDelete, onDuplicate
           </div>
         </div>
       )}
-    </div>
+      </div>
+
+      {/* Drop zone after last step */}
+      {index === total - 1 && (
+        <DropZoneIndicator isActive={draggedOverIndex === total} position={total} />
+      )}
+    </>
   )
 }
 
