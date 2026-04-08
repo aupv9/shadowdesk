@@ -15,3 +15,6 @@ profiles/
 # SQLite database
 *.db
 *.sqlite
+
+# TypeScript build info
+*.tsbuildinfo
