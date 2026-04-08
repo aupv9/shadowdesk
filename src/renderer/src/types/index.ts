@@ -44,6 +44,9 @@ export type {
   ProfileVersion,
   BehaviorConfig,
   TimingConfig,
+  // Phase 17
+  BehaviorPreset,
+  BehaviorPresetId,
   // Phase 8
   ChromiumPatch,
   ChromiumPatchStatus,
@@ -96,7 +99,20 @@ export { PLAN_LIMITS } from '../../../shared/types'
 
 // Renderer-only types
 
-export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'detection' | 'settings' | 'team' | 'account' | 'automation' | 'runs' | 'patches' | 'marketplace' | 'ai'
+export type NavSection =
+  | 'profiles'
+  | 'proxies'
+  | 'fingerprint'
+  | 'behavior'       // Phase 17 — Behavioral Config UI
+  | 'detection'
+  | 'settings'
+  | 'team'
+  | 'account'
+  | 'automation'
+  | 'runs'
+  | 'patches'
+  | 'marketplace'
+  | 'ai'
 
 export interface Toast {
   id: string

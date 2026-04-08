@@ -109,6 +109,10 @@ export interface NetworkConfig {
 }
 
 // Phase 6: Behavior simulation config
+// Phase 17: Extended with fine-grained parameters exposed in the
+// Behavioral Config UI. All advanced fields are optional so older
+// profiles continue to work unchanged — the scripts pick sensible
+// defaults derived from the legacy boolean toggles.
 export interface BehaviorConfig {
   // Mouse movement simulation: adds micro-jitter on pointer events
   mouseJitter: boolean
@@ -116,9 +120,31 @@ export interface BehaviorConfig {
   typingNoise: boolean
   // Scroll inertia: simulates natural momentum on wheel events
   scrollInertia: boolean
+
+  // ── Phase 17: Advanced mouse jitter tuning ──────────────────────────────
+  /** Gaussian sigma (px) applied to clientX/Y on pointer events. 0.1–2.0 */
+  mouseJitterSigma?: number
+  /** Intensity preset label — used by the UI to describe the current sigma */
+  mouseJitterIntensity?: 'off' | 'subtle' | 'moderate' | 'heavy'
+
+  // ── Phase 17: Typing cadence tuning ────────────────────────────────────
+  /** Target typing speed in words-per-minute. 40–180 */
+  typingWpm?: number
+  /** Percentage variance around typingWpm (e.g. 15 = ±15%). 0–50 */
+  typingVariancePct?: number
+  /** Key-hold duration jitter sigma in ms. 1–15 */
+  typingHoldSigmaMs?: number
+
+  // ── Phase 17: Scroll inertia tuning ────────────────────────────────────
+  /** Decay multiplier applied on each wheel event (0.7–0.98). */
+  scrollDecay?: number
+  /** Noise sigma in px added to each delta on scroll inertia. 0–5 */
+  scrollNoisePx?: number
 }
 
 // Phase 6: Timing attack defense config
+// Phase 17: Extended with advanced knobs — rAF jitter sigma, SAB/Atomics
+// noise toggle. Legacy fields are unchanged.
 export interface TimingConfig {
   // Reduce Date.now() precision to 100ms blocks
   dateNoisePrecision: 50 | 100 | 250
@@ -126,6 +152,24 @@ export interface TimingConfig {
   rafJitter: boolean
   // Clamp performance.now() to same precision as Date.now
   performanceClamp: boolean
+
+  // ── Phase 17 ───────────────────────────────────────────────────────────
+  /** Gaussian sigma (ms) added to rAF timestamps when rafJitter is on. 0.1–5 */
+  rafJitterSigmaMs?: number
+  /** Inject jitter into Atomics.wait() return timing (SAB-based timers) */
+  atomicsWaitNoise?: boolean
+}
+
+// ── Phase 17: Behavioral Config UI — shared presets ────────────────────────
+/** Builtin presets shown in the Behavioral Config UI */
+export type BehaviorPresetId = 'off' | 'subtle' | 'balanced' | 'heavy' | 'stealth'
+
+export interface BehaviorPreset {
+  id: BehaviorPresetId
+  name: string
+  description: string
+  behavior: BehaviorConfig
+  timing: TimingConfig
 }
 
 

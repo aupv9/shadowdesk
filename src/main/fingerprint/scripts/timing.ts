@@ -11,12 +11,21 @@ import type { TimingConfig } from '../../../shared/types'
  *  1. Quantises Date.now() to configurable precision blocks
  *  2. Adds bounded jitter to requestAnimationFrame timestamps
  *  3. Optionally clamps performance.now() to match Date.now precision
+ *  4. Optionally jitters Atomics.wait() timeouts (Phase 17 — opt-out)
  *
  * All noise is deterministic per profile (seeded) so repeated measurements
  * within the same session return consistent-enough values to not break sites
  * while still frustrating cross-site timing correlation.
+ *
+ * Phase 17 — The Behavioral Config UI lets users tune rAF jitter sigma and
+ * toggle Atomics noise. Both fields are optional on TimingConfig; defaults
+ * below match the Phase 6 hard-coded values for backwards compatibility.
  */
 export function buildTimingScript(config: TimingConfig, seed: number): string {
+  const clamp = (v: number, lo: number, hi: number) =>
+    Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo
+  const rafSigmaMs     = clamp(config.rafJitterSigmaMs ?? 1.2, 0, 10)
+  const atomicsNoiseOn = config.atomicsWaitNoise !== false   // default true
   return `
 (function() {
   'use strict';
@@ -91,15 +100,16 @@ ${config.rafJitter ? `
   // The DOMHighResTimeStamp passed to rAF callbacks is a monotonically
   // increasing value that automation tools produce with machine-perfect
   // regularity (16.666… ms exactly at 60 Hz). Real browsers have noise from
-  // GPU scheduling and compositor jitter. We add ±2 ms Gaussian noise.
+  // GPU scheduling and compositor jitter. Phase 17: sigma is configurable.
   (function() {
     var _origRAF = window.requestAnimationFrame.bind(window);
+    var RAF_SIGMA_MS = ${rafSigmaMs};
 
     window.requestAnimationFrame = function requestAnimationFrame(cb) {
       return _origRAF(function(ts) {
-        // Box-Muller for Gaussian noise, sigma=1.2ms
+        // Box-Muller for Gaussian noise
         var u = 1 - rng(), v = rng();
-        var noise = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v) * 1.2;
+        var noise = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v) * RAF_SIGMA_MS;
         cb(ts + noise);
       });
     };
@@ -118,10 +128,11 @@ ${config.rafJitter ? `
   })();
 ` : ''}
 
+${atomicsNoiseOn ? `
   // ── SharedArrayBuffer / Atomics timing attack mitigation ─────────────────
   // If SharedArrayBuffer is available, high-precision timers can be built
   // using Atomics.wait(). We don't block SAB (breaks WASM), but we add
-  // noise to Atomics.wait return timing.
+  // noise to Atomics.wait return timing. Phase 17: toggleable from UI.
   (function() {
     if (typeof Atomics === 'undefined' || typeof Atomics.wait !== 'function') return;
     var _origWait = Atomics.wait.bind(Atomics);
@@ -136,6 +147,7 @@ ${config.rafJitter ? `
       value: function() { return 'function wait() { [native code] }'; }
     });
   })();
+` : ''}
 
 })();
 `
