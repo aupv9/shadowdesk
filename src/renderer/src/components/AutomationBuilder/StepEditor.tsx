@@ -53,108 +53,9 @@ import {
   SkipForward
 } from 'lucide-react'
 import type { AutomationStep, AutomationActionType } from '../../types'
+import { ActionBrowser } from './ActionBrowser'
+import { ACTION_META } from './actionMetadata'
 
-const ACTION_META: Record<AutomationActionType, { icon: React.ElementType; label: string; color: string }> = {
-  navigate:           { icon: Globe,              label: 'Navigate',             color: 'text-blue-400' },
-  click:              { icon: MousePointer,       label: 'Click',                color: 'text-green-400' },
-  doubleClick:        { icon: MousePointerClick,  label: 'Double Click',         color: 'text-green-300' },
-  type:               { icon: Type,               label: 'Type Text',            color: 'text-purple-400' },
-  wait:               { icon: Clock,              label: 'Wait',                 color: 'text-yellow-400' },
-  waitForSelector:    { icon: Search,             label: 'Wait for Element',     color: 'text-orange-400' },
-  waitForNavigation:  { icon: Navigation,         label: 'Wait for Navigation',  color: 'text-blue-300' },
-  screenshot:         { icon: Camera,             label: 'Screenshot',           color: 'text-pink-400' },
-  extractText:        { icon: FileText,           label: 'Extract Text',         color: 'text-cyan-400' },
-  scroll:             { icon: ArrowDownToLine,    label: 'Scroll',               color: 'text-indigo-400' },
-  select:             { icon: List,               label: 'Select Option',        color: 'text-teal-400' },
-  keyPress:           { icon: Keyboard,           label: 'Key Press',            color: 'text-amber-400' },
-  evaluate:           { icon: Code,               label: 'Run Script',           color: 'text-red-400' },
-  conditional:        { icon: GitBranch,          label: 'Conditional',          color: 'text-emerald-400' },
-  loop:               { icon: Repeat,             label: 'Loop',                 color: 'text-violet-400' },
-  hover:              { icon: Hand,               label: 'Hover',                color: 'text-sky-400' },
-  rightClick:         { icon: MousePointerClick,  label: 'Right Click',          color: 'text-rose-400' },
-  setAttribute:       { icon: PenTool,            label: 'Set Attribute',        color: 'text-lime-400' },
-  httpRequest:        { icon: Send,               label: 'HTTP Request',         color: 'text-fuchsia-400' },
-  upload:             { icon: Upload,             label: 'Upload File',          color: 'text-sky-300' },
-  download:           { icon: Download,           label: 'Download File',        color: 'text-emerald-300' },
-  solveCaptcha:       { icon: ShieldCheck,        label: 'Solve Captcha',        color: 'text-yellow-300' },
-  injectCaptchaToken: { icon: KeyRound,           label: 'Inject Captcha Token', color: 'text-amber-300' },
-  useCredential:      { icon: Lock,               label: 'Use Credential',       color: 'text-emerald-400' },
-  // Tier 1 RPA additions
-  callWorkflow:       { icon: Workflow,           label: 'Call Workflow',        color: 'text-indigo-300' },
-  parallelSteps:      { icon: Layers,             label: 'Parallel Steps',       color: 'text-violet-300' },
-  jumpToStep:         { icon: CornerDownRight,    label: 'Jump to Step',         color: 'text-amber-300' },
-  interceptRequest:   { icon: ShieldCheck,        label: 'Intercept Request',    color: 'text-rose-300' },
-  clearIntercepts:    { icon: ShieldOff,          label: 'Clear Intercepts',     color: 'text-rose-200' },
-  getCookies:         { icon: Cookie,             label: 'Get Cookies',          color: 'text-amber-200' },
-  setCookies:         { icon: Cookie,             label: 'Set Cookies',          color: 'text-amber-300' },
-  deleteCookies:      { icon: Cookie,             label: 'Delete Cookies',       color: 'text-amber-400' },
-  // Tier 3 RPA — assertions
-  assert:             { icon: CheckCircle,        label: 'Assert',               color: 'text-green-300' },
-  // Tier 4 RPA — multi-tab
-  openTab:            { icon: Plus,               label: 'Open Tab',             color: 'text-blue-300' },
-  switchTab:          { icon: ArrowLeftRight,     label: 'Switch Tab',           color: 'text-blue-400' },
-  closeTab:           { icon: X,                  label: 'Close Tab',            color: 'text-blue-200' },
-  getTabs:            { icon: LayoutList,         label: 'Get Tabs',             color: 'text-sky-300' },
-  // Tier 4 RPA — proxy rotation
-  switchProxy:        { icon: Shuffle,            label: 'Switch Proxy',         color: 'text-orange-300' },
-  // Tier 4 RPA — text click
-  clickByText:        { icon: ScanText,           label: 'Click by Text',        color: 'text-teal-300' },
-  // Tier 5 RPA — storage inspection
-  getStorage:         { icon: Database,           label: 'Get Storage',          color: 'text-cyan-400' },
-  setStorage:         { icon: Database,           label: 'Set Storage',          color: 'text-cyan-500' },
-  clearStorage:       { icon: Trash2,             label: 'Clear Storage',        color: 'text-red-400' },
-  queryIndexedDB:     { icon: Database,           label: 'Query IndexedDB',      color: 'text-indigo-400' },
-  // Tier 6 RPA — data-driven automation & file handling
-  forEachRow:         { icon: Repeat,             label: 'For Each Row',         color: 'text-emerald-400' },
-  readFile:           { icon: FileText,           label: 'Read File',            color: 'text-sky-400' },
-  writeFile:          { icon: FileText,           label: 'Write File',           color: 'text-sky-500' },
-  waitForDownload:    { icon: Download,           label: 'Wait For Download',    color: 'text-amber-300' },
-  // Tier 7 RPA — error recovery & resilience
-  tryCatch:           { icon: ShieldCheck,        label: 'Try / Catch',          color: 'text-pink-400' },
-  // Tier 9 RPA — advanced element interactions
-  dragAndDrop:        { icon: GripVertical,       label: 'Drag & Drop',          color: 'text-violet-400' },
-  keyCombo:           { icon: Keyboard,           label: 'Key Combo',            color: 'text-amber-500' },
-  selectContextMenu:  { icon: List,               label: 'Context Menu',         color: 'text-rose-300' },
-  setRangeInput:      { icon: Sliders,            label: 'Set Range Input',      color: 'text-teal-400' },
-  scrollIntoView:     { icon: FocusIcon,          label: 'Scroll Into View',     color: 'text-sky-300' },
-  switchFrame:        { icon: Frame,              label: 'Switch Frame',         color: 'text-indigo-300' },
-  // Phase 18 — Data pipelines & control flow
-  extractJson:        { icon: Brackets,           label: 'Extract JSON',         color: 'text-cyan-300' },
-  forEachElement:     { icon: Repeat,             label: 'For Each Element',     color: 'text-emerald-300' },
-  whileLoop:          { icon: IterationCcw,       label: 'While Loop',           color: 'text-purple-300' },
-  waitForRequest:     { icon: Network,            label: 'Wait for Request',     color: 'text-orange-300' },
-  waitForResponse:    { icon: Network,            label: 'Wait for Response',    color: 'text-orange-400' },
-  paginate:           { icon: SkipForward,        label: 'Paginate',             color: 'text-pink-300' }
-}
-
-const ALL_ACTIONS: AutomationActionType[] = [
-  'navigate', 'click', 'doubleClick', 'type', 'wait', 'waitForSelector', 'waitForNavigation',
-  'screenshot', 'extractText', 'scroll', 'select', 'keyPress', 'evaluate',
-  'hover', 'rightClick', 'setAttribute', 'httpRequest',
-  'upload', 'download',
-  'solveCaptcha', 'injectCaptchaToken',
-  'useCredential',
-  'conditional', 'loop',
-  // Tier 1 RPA additions
-  'callWorkflow', 'parallelSteps', 'jumpToStep',
-  'interceptRequest', 'clearIntercepts',
-  'getCookies', 'setCookies', 'deleteCookies',
-  'assert',
-  // Tier 4 RPA
-  'openTab', 'switchTab', 'closeTab', 'getTabs',
-  'switchProxy',
-  'clickByText',
-  // Tier 5 RPA
-  'getStorage', 'setStorage', 'clearStorage', 'queryIndexedDB',
-  // Tier 6 RPA
-  'forEachRow', 'readFile', 'writeFile', 'waitForDownload',
-  // Tier 7 RPA
-  'tryCatch',
-  // Tier 9 RPA
-  'dragAndDrop', 'keyCombo', 'selectContextMenu', 'setRangeInput', 'scrollIntoView', 'switchFrame',
-  // Phase 18 — Data pipelines & control flow
-  'extractJson', 'forEachElement', 'whileLoop', 'waitForRequest', 'waitForResponse', 'paginate'
-]
 
 interface StepEditorProps {
   step: AutomationStep
@@ -235,10 +136,12 @@ function getDefaultParams(action: AutomationActionType): Record<string, any> {
 export function StepEditor({ step, index, total, onUpdate, onDelete, onDuplicate, onMove }: StepEditorProps) {
   const [expanded, setExpanded] = useState(false)
   const [showRetry, setShowRetry] = useState(false)
+  const [showActionBrowser, setShowActionBrowser] = useState(false)
   const meta = ACTION_META[step.action]
 
   const handleActionChange = (action: AutomationActionType) => {
     onUpdate({ action, params: getDefaultParams(action), label: ACTION_META[action].label })
+    setShowActionBrowser(false)
   }
 
   const handleParamChange = (key: string, value: any) => {
@@ -309,16 +212,28 @@ export function StepEditor({ step, index, total, onUpdate, onDelete, onDuplicate
           {/* Action type */}
           <div className="mb-3">
             <label className="text-xs text-slate-500 mb-1 block">Action</label>
-            <select
-              value={step.action}
-              onChange={(e) => handleActionChange(e.target.value as AutomationActionType)}
-              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500"
+            <button
+              onClick={() => setShowActionBrowser(true)}
+              className="w-full flex items-center gap-3 px-3 py-2 bg-slate-700 border border-slate-600 text-white text-sm rounded hover:bg-slate-600 transition-colors text-left"
             >
-              {ALL_ACTIONS.map((a) => (
-                <option key={a} value={a}>{ACTION_META[a].label}</option>
-              ))}
-            </select>
+              <Icon className={`w-4 h-4 ${meta.color} shrink-0`} />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">{meta.label}</div>
+                {meta.description && (
+                  <div className="text-xs text-slate-400 truncate">{meta.description}</div>
+                )}
+              </div>
+              <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+            </button>
           </div>
+
+          {/* Action browser modal */}
+          {showActionBrowser && (
+            <ActionBrowser
+              onSelect={handleActionChange}
+              onClose={() => setShowActionBrowser(false)}
+            />
+          )}
 
           {/* Action-specific params */}
           <ParamEditor action={step.action} params={step.params} onChange={handleParamChange} />
