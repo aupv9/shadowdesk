@@ -350,6 +350,87 @@ export class AutomationEngine {
     return AutomationEngine.instance
   }
 
+  /**
+   * Phase 18.1: Pre-flight validation of regex patterns in workflow steps.
+   * Catches invalid regex early instead of at runtime.
+   */
+  private validateWorkflowRegex(steps: AutomationStep[]): void {
+    for (const step of steps) {
+      // Check for regex in various action types
+      if (step.action === 'whileLoop' && step.params?.pattern) {
+        try {
+          new RegExp(step.params.pattern as string)
+        } catch (e: any) {
+          throw new Error(
+            `Invalid regex in step "${step.label}" (whileLoop pattern): ${e.message}`
+          )
+        }
+      }
+
+      if (step.action === 'waitForRequest' && step.params?.urlPattern && step.params?.regex === true) {
+        try {
+          new RegExp(step.params.urlPattern as string)
+        } catch (e: any) {
+          throw new Error(
+            `Invalid regex in step "${step.label}" (waitForRequest urlPattern): ${e.message}`
+          )
+        }
+      }
+
+      if (step.action === 'waitForResponse' && step.params?.urlPattern && step.params?.regex === true) {
+        try {
+          new RegExp(step.params.urlPattern as string)
+        } catch (e: any) {
+          throw new Error(
+            `Invalid regex in step "${step.label}" (waitForResponse urlPattern): ${e.message}`
+          )
+        }
+      }
+
+      if (step.action === 'waitForDownload' && step.params?.pattern) {
+        try {
+          new RegExp(step.params.pattern as string)
+        } catch (e: any) {
+          throw new Error(
+            `Invalid regex in step "${step.label}" (waitForDownload pattern): ${e.message}`
+          )
+        }
+      }
+
+      // Recursively validate nested steps
+      if (step.action === 'conditional' && step.params?.thenSteps) {
+        this.validateWorkflowRegex(step.params.thenSteps)
+      }
+      if (step.action === 'conditional' && step.params?.elseSteps) {
+        this.validateWorkflowRegex(step.params.elseSteps)
+      }
+      if (step.action === 'loop' && step.params?.steps) {
+        this.validateWorkflowRegex(step.params.steps)
+      }
+      if (step.action === 'whileLoop' && step.params?.steps) {
+        this.validateWorkflowRegex(step.params.steps)
+      }
+      if (step.action === 'forEachRow' && step.params?.steps) {
+        this.validateWorkflowRegex(step.params.steps)
+      }
+      if (step.action === 'forEachElement' && step.params?.steps) {
+        this.validateWorkflowRegex(step.params.steps)
+      }
+      if (step.action === 'tryCatch' && step.params?.tryBlock) {
+        this.validateWorkflowRegex(step.params.tryBlock)
+      }
+      if (step.action === 'tryCatch' && step.params?.catchBlock) {
+        this.validateWorkflowRegex(step.params.catchBlock)
+      }
+      if (step.action === 'tryCatch' && step.params?.finallyBlock) {
+        this.validateWorkflowRegex(step.params.finallyBlock)
+      }
+      if (step.action === 'parallelSteps' && step.params?.steps) {
+        this.validateWorkflowRegex(step.params.steps)
+      }
+    }
+  }
+
   async executeWorkflow(
     workflowId: string,
     profileId: string,
@@ -374,6 +455,13 @@ export class AutomationEngine {
       ...workflowRow,
       steps: JSON.parse(workflowRow.steps),
       variables: workflowRow.variables ? JSON.parse(workflowRow.variables) : undefined
+    }
+
+    // Phase 18.1: Pre-flight validation of regex patterns
+    try {
+      this.validateWorkflowRegex(workflow.steps)
+    } catch (e: any) {
+      throw new Error(`Workflow validation failed: ${e.message}`)
     }
 
     // Resolve profile name for built-in {profileName} variable
