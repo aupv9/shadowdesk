@@ -77,6 +77,8 @@ interface StepEditorProps {
   onDragOver?: (e: React.DragEvent<HTMLDivElement>, index: number) => void
   onDragLeave?: () => void
   onDrop?: (e: React.DragEvent<HTMLDivElement>, targetIndex: number) => void
+  /** Action type of the preceding step — used for smart suggestions in ActionBrowser */
+  previousActionType?: AutomationActionType
 }
 
 function getDefaultParams(action: AutomationActionType): Record<string, any> {
@@ -159,7 +161,8 @@ export function StepEditor({
   onDragEnd,
   onDragOver,
   onDragLeave,
-  onDrop
+  onDrop,
+  previousActionType
 }: StepEditorProps) {
   const [expanded, setExpanded] = useState(false)
   const [showRetry, setShowRetry] = useState(false)
@@ -295,6 +298,7 @@ export function StepEditor({
             <ActionBrowser
               onSelect={handleActionChange}
               onClose={() => setShowActionBrowser(false)}
+              previousActionType={previousActionType}
             />
           )}
 
