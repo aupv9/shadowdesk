@@ -14,6 +14,7 @@ import type {
 } from '../shared/types'
 import type { Page, ElementHandle } from 'puppeteer-core'
 import type { WebContents } from 'electron'
+import { app } from 'electron'
 import http from 'http'
 import https from 'https'
 import { createWriteStream } from 'fs'
@@ -80,6 +81,61 @@ function parseCsv(text: string, delimiter = ','): Record<string, string>[] {
       header.forEach((h, idx) => { obj[h] = r[idx] ?? '' })
       return obj
     })
+}
+
+/**
+ * Phase 18.1 — File path validation for security.
+ *
+ * Prevents directory traversal attacks (LFI) by validating that file paths
+ * are contained within the app's userData directory. Rejects paths that:
+ *   - Use absolute paths outside userData
+ *   - Use ../../../ traversal attacks
+ *   - Point to sensitive system files
+ *
+ * Returns the validated absolute path if safe, otherwise throws.
+ */
+function validateFilePath(filePath: string): string {
+  if (!filePath || typeof filePath !== 'string') {
+    throw new Error('filePath must be a non-empty string')
+  }
+
+  const userData = app.getPath('userData')
+
+  // Handle absolute paths
+  if (isAbsolute(filePath)) {
+    const normalized = pathResolve(filePath)
+    const relative = normalized.split(userData).pop() || ''
+
+    // Check if path escapes userData
+    if (!normalized.startsWith(userData)) {
+      throw new Error(
+        `File access denied: absolute path outside userData directory. ` +
+        `Restricted to: ${userData}`
+      )
+    }
+    return normalized
+  }
+
+  // Handle relative paths — resolve relative to userData
+  const normalized = pathResolve(userData, filePath)
+
+  // Ensure it's still within userData (prevent ../)
+  try {
+    const relative = pathResolve(normalized).substring(userData.length + 1)
+    if (relative.startsWith('..')) {
+      throw new Error(
+        `File access denied: path escape attempt (../) detected. ` +
+        `Use relative paths within the user data directory.`
+      )
+    }
+  } catch {
+    throw new Error(
+      `File access denied: invalid path. ` +
+      `Use relative paths within the user data directory.`
+    )
+  }
+
+  return normalized
 }
 
 /** Replace {key} placeholders in step params with variable values.
@@ -1552,7 +1608,7 @@ export class AutomationEngine {
         if (Array.isArray(params.rows)) {
           rows = params.rows
         } else if (params.filePath) {
-          const filePath: string = params.filePath
+          const filePath: string = validateFilePath(params.filePath)
           let raw: string
           try {
             raw = await fsReadFile(filePath, 'utf-8')
@@ -1627,9 +1683,11 @@ export class AutomationEngine {
         // Read a text file into a workflow variable. Defaults to UTF-8.
         // Optional `parse: 'json'` parses the contents and stores the
         // serialized JSON string (consumers can re-parse if needed).
+        // Paths are restricted to userData directory for security.
         if (!params.filePath) throw new Error('readFile: filePath required')
+        const filePath = validateFilePath(params.filePath)
         const enc: BufferEncoding = (params.encoding ?? 'utf-8') as BufferEncoding
-        const text = await fsReadFile(params.filePath, enc)
+        const text = await fsReadFile(filePath, enc)
         let value: string = String(text)
         if (params.parse === 'json') {
           try {
@@ -1649,20 +1707,19 @@ export class AutomationEngine {
       case 'writeFile': {
         // Write `params.content` to disk. Supports `append: true` and
         // automatic parent-directory creation. Returns bytes written.
+        // Paths are restricted to userData directory for security.
         if (!params.filePath) throw new Error('writeFile: filePath required')
+        const filePath = validateFilePath(params.filePath)
         const content: string = params.content ?? ''
         const enc: BufferEncoding = (params.encoding ?? 'utf-8') as BufferEncoding
-        const target = isAbsolute(params.filePath)
-          ? params.filePath
-          : pathResolve(process.cwd(), params.filePath)
-        await mkdir(dirname(target), { recursive: true })
+        await mkdir(dirname(filePath), { recursive: true })
         if (params.append) {
-          await fsAppendFile(target, content, enc)
+          await fsAppendFile(filePath, content, enc)
         } else {
-          await fsWriteFile(target, content, enc)
+          await fsWriteFile(filePath, content, enc)
         }
         return {
-          filePath: target,
+          filePath: filePath,
           bytes: Buffer.byteLength(content, enc),
           mode: params.append ? 'append' : 'write'
         }
