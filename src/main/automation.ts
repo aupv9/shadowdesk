@@ -1872,6 +1872,29 @@ export class AutomationEngine {
         } else {
           throw new Error('useCredential requires either id or label')
         }
+
+        // Phase 18.1: Audit log credential access for compliance
+        const db = Database.getInstance()
+        try {
+          db.insertAuditLog({
+            user_id: 'system',  // TODO: Get from IPC context
+            user_name: 'automation',
+            action: 'credential_access',
+            target_id: cred.id,
+            target_name: cred.label,
+            timestamp: new Date().toISOString(),
+            ip_address: 'localhost',
+            metadata: {
+              workflow_id: profileId || 'unknown',
+              step_id: step.id,
+              action_type: 'useCredential'
+            }
+          })
+        } catch (auditErr) {
+          // Log audit failure but don't fail the workflow
+          console.error('[useCredential] Failed to record audit log:', auditErr)
+        }
+
         const prefix: string = params.prefix || 'cred'
         variables[`${prefix}.username`] = cred.username
         variables[`${prefix}.password`] = cred.password
