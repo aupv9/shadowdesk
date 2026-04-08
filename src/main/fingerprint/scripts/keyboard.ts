@@ -47,6 +47,21 @@ export function buildKeyboardScript(language: string): string {
     Object.setPrototypeOf(map, Map.prototype);
     return Promise.resolve(map);
   };
+
+  // P0 FIX: Patch KeyboardEvent.key to return values consistent with layout
+  // Prevents bot-detection via keyboard event inspection
+  const layoutData = ${entries};
+  const origDescriptor = Object.getOwnPropertyDescriptor(KeyboardEvent.prototype, 'key');
+
+  Object.defineProperty(KeyboardEvent.prototype, 'key', {
+    get: function() {
+      const code = this.code;
+      const key = layoutData[code];
+      // Return mapped key or original if not in layout
+      return key !== undefined ? key : origDescriptor?.get?.call(this) ?? this.key;
+    },
+    configurable: true
+  });
 })();
 `
 }

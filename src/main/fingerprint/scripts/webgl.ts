@@ -40,14 +40,19 @@ export function buildWebGlScript(config: WebGlConfig): string {
       return ext;
     };
 
-    // Add micro-noise to readPixels to prevent WebGL fingerprinting
+    // Add noise to readPixels to prevent WebGL fingerprinting
     const origReadPixels = ctx.readPixels.bind(ctx);
     ctx.readPixels = function(x, y, width, height, format, type, pixels) {
       origReadPixels(x, y, width, height, format, type, pixels);
       if (pixels instanceof Uint8Array || pixels instanceof Uint8ClampedArray) {
         for (let i = 0; i < pixels.length; i += 4) {
-          const noise = Math.floor(rng() * 3) - 1;
-          pixels[i]   = Math.max(0, Math.min(255, pixels[i]   + noise));
+          // P0 FIX: Increase noise entropy from ±1 to ±25 per channel
+          // Apply to all 4 channels (RGBA) for full coverage
+          const noise = Math.floor(rng() * 51) - 25; // -25 to +25
+          pixels[i]     = Math.max(0, Math.min(255, pixels[i]     + noise));
+          pixels[i + 1] = Math.max(0, Math.min(255, pixels[i + 1] + noise));
+          pixels[i + 2] = Math.max(0, Math.min(255, pixels[i + 2] + noise));
+          pixels[i + 3] = Math.max(0, Math.min(255, pixels[i + 3] + noise));
         }
       }
     };
