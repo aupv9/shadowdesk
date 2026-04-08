@@ -1,0 +1,443 @@
+[
+  {
+    "id": "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb",
+    "name": "WIN10 CHROME120 - Account 1",
+    "group_id": "1d7f1a72-619f-4b90-988c-4f984a099331",
+    "fingerprint": {
+      "preset": "win10-chrome120",
+      "os": {
+        "platform": "Win32",
+        "version": "10.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "platform": "Win32",
+        "vendor": "Google Inc.",
+        "version": "120",
+        "languages": [
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 1920,
+        "height": 1080,
+        "availWidth": 1920,
+        "availHeight": 1040,
+        "colorDepth": 24,
+        "pixelRatio": 1
+      },
+      "hardware": {
+        "deviceMemory": 8,
+        "hardwareConcurrency": 8,
+        "maxTouchPoints": 0
+      },
+      "locale": {
+        "language": "en-US",
+        "languages": [
+          "en-US",
+          "en"
+        ],
+        "timezone": "America/New_York"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": 0
+      },
+      "webgl": {
+        "vendor": "Google Inc. (NVIDIA)",
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "noiseSeed": 0
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": 0
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Arial",
+          "Arial Black",
+          "Calibri",
+          "Cambria",
+          "Comic Sans MS",
+          "Consolas",
+          "Courier New",
+          "Georgia",
+          "Impact",
+          "Segoe UI",
+          "Tahoma",
+          "Times New Roman",
+          "Trebuchet MS",
+          "Verdana"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 1,
+        "videoInputs": 1
+      },
+      "plugins": {
+        "mode": "realistic"
+      },
+      "speech": {
+        "mode": "filter"
+      }
+    },
+    "proxy_id": "88456660-80de-400d-b846-8a8e9fea4d5b",
+    "notes": "Test account #1 - US-based Gmail account\nProxy: USA - New York\nCreated for multi-login testing",
+    "status": "active",
+    "created_at": "2026-04-08T07:36:42.221Z"
+  },
+  {
+    "id": "b119a771-c805-4677-871d-5c8696529927",
+    "name": "WIN11 CHROME121 - Account 2",
+    "group_id": "c76608cc-e288-478f-87b4-c602207b0e27",
+    "fingerprint": {
+      "preset": "win11-chrome121",
+      "os": {
+        "platform": "Win32",
+        "version": "10.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "platform": "Win32",
+        "vendor": "Google Inc.",
+        "version": "121",
+        "languages": [
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 2560,
+        "height": 1440,
+        "availWidth": 2560,
+        "availHeight": 1400,
+        "colorDepth": 24,
+        "pixelRatio": 1
+      },
+      "hardware": {
+        "deviceMemory": 16,
+        "hardwareConcurrency": 12,
+        "maxTouchPoints": 0
+      },
+      "locale": {
+        "language": "en-US",
+        "languages": [
+          "en-US",
+          "en"
+        ],
+        "timezone": "America/Chicago"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": 0
+      },
+      "webgl": {
+        "vendor": "Google Inc. (AMD)",
+        "renderer": "ANGLE (AMD, AMD Radeon RX 6700 XT Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "noiseSeed": 0
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": 0
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Arial",
+          "Arial Black",
+          "Calibri",
+          "Cambria",
+          "Comic Sans MS",
+          "Consolas",
+          "Courier New",
+          "Georgia",
+          "Impact",
+          "Segoe UI",
+          "Tahoma",
+          "Times New Roman",
+          "Trebuchet MS",
+          "Verdana"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 2,
+        "videoInputs": 1
+      },
+      "plugins": {
+        "mode": "realistic"
+      },
+      "speech": {
+        "mode": "filter"
+      }
+    },
+    "proxy_id": "30d91fd1-1db5-4a1c-be60-f236e54d32b9",
+    "notes": "Test account #2 - UK-based Outlook account\nProxy: UK - London\nCreated for multi-login testing",
+    "status": "active",
+    "created_at": "2026-04-08T07:36:42.221Z"
+  },
+  {
+    "id": "3f995308-9f90-431a-a728-d1e1e9536572",
+    "name": "MAC SONOMA CHROME121 - Account 3",
+    "group_id": "8f716463-16ac-4770-8f96-95dcdcfff1e7",
+    "fingerprint": {
+      "preset": "mac-sonoma-chrome121",
+      "os": {
+        "platform": "MacIntel",
+        "version": "14.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "platform": "MacIntel",
+        "vendor": "Google Inc.",
+        "version": "121",
+        "languages": [
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 1440,
+        "height": 900,
+        "availWidth": 1440,
+        "availHeight": 855,
+        "colorDepth": 24,
+        "pixelRatio": 2
+      },
+      "hardware": {
+        "deviceMemory": 8,
+        "hardwareConcurrency": 8,
+        "maxTouchPoints": 0
+      },
+      "locale": {
+        "language": "en-US",
+        "languages": [
+          "en-US",
+          "en"
+        ],
+        "timezone": "America/Los_Angeles"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": 0
+      },
+      "webgl": {
+        "vendor": "Apple",
+        "renderer": "Apple M1",
+        "noiseSeed": 0
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": 0
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Arial",
+          "Helvetica",
+          "Times New Roman",
+          "Courier",
+          "Georgia"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 2,
+        "videoInputs": 1
+      },
+      "plugins": {
+        "mode": "realistic"
+      },
+      "speech": {
+        "mode": "filter"
+      }
+    },
+    "proxy_id": "30de710d-5f7c-4ed3-b6ef-06b35943142e",
+    "notes": "Test account #3 - Vietnam-based Gmail account\nProxy: Vietnam - Ho Chi Minh\nCreated for multi-login testing",
+    "status": "active",
+    "created_at": "2026-04-08T07:36:42.221Z"
+  },
+  {
+    "id": "6b998489-7761-4f10-842f-97e71b1c6c09",
+    "name": "LINUX UBUNTU CHROME120 - Account 4",
+    "group_id": "1d7f1a72-619f-4b90-988c-4f984a099331",
+    "fingerprint": {
+      "preset": "linux-ubuntu-chrome120",
+      "os": {
+        "platform": "Linux x86_64",
+        "version": "5.15.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "platform": "Linux x86_64",
+        "vendor": "Google Inc.",
+        "version": "120",
+        "languages": [
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 1920,
+        "height": 1080,
+        "availWidth": 1920,
+        "availHeight": 1050,
+        "colorDepth": 24,
+        "pixelRatio": 1
+      },
+      "hardware": {
+        "deviceMemory": 16,
+        "hardwareConcurrency": 8,
+        "maxTouchPoints": 0
+      },
+      "locale": {
+        "language": "en-US",
+        "languages": [
+          "en-US",
+          "en"
+        ],
+        "timezone": "UTC"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": 0
+      },
+      "webgl": {
+        "vendor": "Google Inc. (Intel)",
+        "renderer": "ANGLE (Intel, Intel UHD Graphics 630 OpenGL via Chromium, OpenGL 4.6)",
+        "noiseSeed": 0
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": 0
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "DejaVu Sans",
+          "DejaVu Serif",
+          "Liberation Sans",
+          "Courier New",
+          "Georgia"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 2,
+        "videoInputs": 1
+      },
+      "plugins": {
+        "mode": "realistic"
+      },
+      "speech": {
+        "mode": "filter"
+      }
+    },
+    "proxy_id": "df7ae525-7373-4fc4-a33c-e86aaf208c5e",
+    "notes": "Test account #4 - Thailand-based account\nProxy: Thailand - Bangkok\nCreated for multi-login testing",
+    "status": "active",
+    "created_at": "2026-04-08T07:36:42.221Z"
+  },
+  {
+    "id": "f13b6d83-4c79-427c-b3a7-34c951688982",
+    "name": "ANDROID SAMSUNG CHROME120 - Account 5",
+    "group_id": "c76608cc-e288-478f-87b4-c602207b0e27",
+    "fingerprint": {
+      "preset": "android-samsung-chrome120",
+      "os": {
+        "platform": "Linux armv8l",
+        "version": "13"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.193 Mobile Safari/537.36",
+        "platform": "Linux armv8l",
+        "vendor": "Google Inc.",
+        "version": "120",
+        "languages": [
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 1080,
+        "height": 2400,
+        "availWidth": 1080,
+        "availHeight": 2352,
+        "colorDepth": 24,
+        "pixelRatio": 2.75
+      },
+      "hardware": {
+        "deviceMemory": 8,
+        "hardwareConcurrency": 8,
+        "maxTouchPoints": 10
+      },
+      "locale": {
+        "language": "en-US",
+        "languages": [
+          "en-US",
+          "en"
+        ],
+        "timezone": "Asia/Seoul"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": 0
+      },
+      "webgl": {
+        "vendor": "Google Inc. (Qualcomm)",
+        "renderer": "ANGLE (Qualcomm, Adreno (TM) 642, OpenGL ES via Chromium, OpenGL ES 3.1)",
+        "noiseSeed": 0
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": 0
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Roboto",
+          "Droid Sans",
+          "Courier New"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 1,
+        "videoInputs": 2
+      },
+      "plugins": {
+        "mode": "realistic"
+      },
+      "speech": {
+        "mode": "filter"
+      }
+    },
+    "proxy_id": "a25768d9-a6bb-4168-b64e-39774b2d1cca",
+    "notes": "Test account #5 - Indonesia-based account\nProxy: Indonesia - Jakarta\nCreated for multi-login testing",
+    "status": "active",
+    "created_at": "2026-04-08T07:36:42.221Z"
+  }
+]
