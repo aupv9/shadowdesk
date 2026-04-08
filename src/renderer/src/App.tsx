@@ -85,7 +85,7 @@ export default function App() {
           {section === 'detection'   && <DetectionDashboard onNavigate={setSection} />}
         </ErrorBoundary>
         <ErrorBoundary section="Automation">
-          {section === 'automation'  && <AutomationBuilder />}
+          {section === 'automation'  && <AutomationBuilder onNavigate={setSection} />}
         </ErrorBoundary>
         <ErrorBoundary section="Run Dashboard">
           {section === 'runs'        && <RunDashboard />}

@@ -1,11 +1,19 @@
 import React, { useState } from 'react'
-import { X, Bot } from 'lucide-react'
+import { X, Wrench } from 'lucide-react'
 
 interface WorkflowCreateModalProps {
   onClose: () => void
   onCreate: (name: string, description: string) => Promise<void>
 }
 
+/**
+ * "Build from scratch" workflow creation modal.
+ *
+ * Phase 1 UX: This is the final step of the `scratch` path in the Guided
+ * Entry Point (WorkflowCreationFlow). It creates an empty workflow with
+ * just a name and description, which the user then populates manually in
+ * the Step Editor.
+ */
 export function WorkflowCreateModal({ onClose, onCreate }: WorkflowCreateModalProps) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -23,12 +31,23 @@ export function WorkflowCreateModal({ onClose, onCreate }: WorkflowCreateModalPr
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-slate-800 rounded-xl shadow-xl border border-slate-700 w-full max-w-md">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onClose}
+    >
+      <div
+        className="bg-slate-800 rounded-xl shadow-xl border border-slate-700 w-full max-w-md"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
           <div className="flex items-center gap-2">
-            <Bot className="w-5 h-5 text-ghost-400" />
-            <h2 className="text-lg font-semibold text-white">New Workflow</h2>
+            <Wrench className="w-5 h-5 text-amber-300" />
+            <div>
+              <h2 className="text-lg font-semibold text-white">Build from scratch</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Start with an empty workflow and add steps manually
+              </p>
+            </div>
           </div>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded-lg">
             <X className="w-5 h-5" />
@@ -37,7 +56,9 @@ export function WorkflowCreateModal({ onClose, onCreate }: WorkflowCreateModalPr
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Name</label>
+            <label className="block text-sm text-slate-400 mb-1">
+              Workflow name <span className="text-rose-400">*</span>
+            </label>
             <input
               type="text"
               value={name}
@@ -46,6 +67,9 @@ export function WorkflowCreateModal({ onClose, onCreate }: WorkflowCreateModalPr
               autoFocus
               className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ghost-500"
             />
+            <p className="text-[11px] text-slate-500 mt-1">
+              Give it a clear name so you can find it later
+            </p>
           </div>
           <div>
             <label className="block text-sm text-slate-400 mb-1">Description (optional)</label>
@@ -71,7 +95,7 @@ export function WorkflowCreateModal({ onClose, onCreate }: WorkflowCreateModalPr
               disabled={!name.trim() || loading}
               className="px-4 py-2 bg-ghost-600 hover:bg-ghost-700 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors"
             >
-              {loading ? 'Creating...' : 'Create Workflow'}
+              {loading ? 'Creating...' : 'Create empty workflow'}
             </button>
           </div>
         </form>

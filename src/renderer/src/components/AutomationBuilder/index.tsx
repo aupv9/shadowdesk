@@ -21,15 +21,21 @@ import {
 } from 'lucide-react'
 import { useAutomationStore } from '../../stores/automationStore'
 import { useProfileStore } from '../../stores/profileStore'
+import { useToastStore } from '../../stores/toastStore'
 import { StepEditor } from './StepEditor'
 import { WorkflowCreateModal } from './WorkflowCreateModal'
+import { WorkflowCreationFlow, type WorkflowCreationMethod } from './WorkflowCreationFlow'
 import { TemplatePickerModal } from './TemplatePickerModal'
 import { SchedulesModal } from './SchedulesModal'
 import { VariablesEditor } from './VariablesEditor'
 import { RecordingReview } from './RecordingReview'
-import type { AutomationStep, AutomationStepResult } from '../../types'
+import type { AutomationStep, AutomationStepResult, NavSection } from '../../types'
 
-export function AutomationBuilder() {
+interface AutomationBuilderProps {
+  onNavigate?: (section: NavSection) => void
+}
+
+export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
   const {
     workflows, selectedWorkflow, runResult, parallelResults, runHistory,
     loading, running, error,
@@ -38,6 +44,8 @@ export function AutomationBuilder() {
   } = useAutomationStore()
 
   const { profiles, activeSessions, fetchActiveSessions } = useProfileStore()
+  const pushToast = useToastStore((s) => s.push)
+  const [showCreationFlow, setShowCreationFlow] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [showSchedules, setShowSchedules] = useState(false)
@@ -265,6 +273,67 @@ export function AutomationBuilder() {
     setShowTemplates(false)
   }
 
+  // Phase 1 UX — Route the user from the Guided Entry Point to the right
+  // creation path. Each method opens the appropriate existing modal or
+  // triggers the matching flow (recording, AI, etc.).
+  const handleCreationMethod = (method: WorkflowCreationMethod) => {
+    setShowCreationFlow(false)
+    switch (method) {
+      case 'record': {
+        // Recording needs a launched profile. If the user doesn't have one
+        // ready, guide them clearly instead of failing silently.
+        if (!selectedProfileId) {
+          pushToast(
+            'Select a profile on the right, then click "Start Recording" to capture your steps.',
+            'info',
+            6000
+          )
+          return
+        }
+        if (!activeSessions.includes(selectedProfileId)) {
+          pushToast(
+            'Launch the selected profile first, then click "Start Recording".',
+            'info',
+            6000
+          )
+          return
+        }
+        // Profile is ready — kick off the recorder immediately.
+        void handleStartRecording()
+        pushToast(
+          'Recording started. Do the task in the browser, then click "Stop Recording".',
+          'success',
+          5000
+        )
+        return
+      }
+      case 'template':
+        setShowTemplates(true)
+        return
+      case 'ai':
+        if (onNavigate) {
+          onNavigate('ai')
+          pushToast(
+            'Describe what you want to automate in the AI Assistant, then import the generated steps.',
+            'info',
+            6000
+          )
+        } else {
+          // Fallback if navigation isn't wired — point the user in the
+          // right direction.
+          pushToast(
+            'Open the AI Assistant from the sidebar to generate a workflow from a plain-English description.',
+            'info',
+            6000
+          )
+        }
+        return
+      case 'scratch':
+        setShowCreate(true)
+        return
+    }
+  }
+
   // ── Export workflow as JSON ──────────────────────────────────────────────────
   const handleExport = () => {
     if (!selectedWorkflow) return
@@ -341,13 +410,15 @@ export function AutomationBuilder() {
           <button
             onClick={() => setShowTemplates(true)}
             className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors"
+            title="Browse pre-built workflow templates"
           >
             <Layers className="w-4 h-4" />
             Templates
           </button>
           <button
-            onClick={() => setShowCreate(true)}
+            onClick={() => setShowCreationFlow(true)}
             className="flex items-center gap-2 px-3 py-2 bg-ghost-600 hover:bg-ghost-700 text-white text-sm font-medium rounded-lg transition-colors"
+            title="Create a new workflow — choose how you want to build it"
           >
             <Plus className="w-4 h-4" />
             New Workflow
@@ -746,7 +817,14 @@ export function AutomationBuilder() {
                 Build automation workflows to control browser profiles. Add steps like navigate, click,
                 type, screenshot, and more — then run them on any active profile.
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                <button
+                  onClick={() => setShowCreationFlow(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-ghost-600 hover:bg-ghost-700 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create Workflow
+                </button>
                 <button
                   onClick={() => setShowTemplates(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors"
@@ -767,7 +845,17 @@ export function AutomationBuilder() {
         </div>
       </div>
 
-      {/* Create modal */}
+      {/* Phase 1 UX — Guided Entry Point: 4-method workflow creation picker */}
+      {showCreationFlow && (
+        <WorkflowCreationFlow
+          onClose={() => setShowCreationFlow(false)}
+          onSelectMethod={handleCreationMethod}
+          isFirstTime={workflows.length === 0}
+        />
+      )}
+
+      {/* "Build from scratch" — the original blank-workflow modal (now only
+          reached from the guided entry point) */}
       {showCreate && (
         <WorkflowCreateModal
           onClose={() => setShowCreate(false)}
