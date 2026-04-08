@@ -56,6 +56,16 @@ import {
   analyzeDetection, healSelector,
   getBehaviorArchetypes, getBehaviorArchetype
 } from '../ai-assistant'
+// Phase 21 — Behavior Correlation Detector
+import {
+  runCorrelationScan,
+  listCorrelationReports,
+  getCorrelationReport,
+  deleteCorrelationReport,
+  recordBehaviorSample,
+  clearBehaviorSamplesForProfile,
+} from '../behavior-correlation-service'
+import type { BehaviorCorrelationOptions, BehaviorSample } from '../../shared/types'
 import { ScriptAnalyzer } from '../script-analyzer'
 import { RecordingRefiner } from '../recording-refiner'
 import { getProxyProviderManager } from '../proxy-providers/provider-manager'
@@ -1845,6 +1855,40 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ai:behaviorArchetypes', () => getBehaviorArchetypes())
 
   ipcMain.handle('ai:behaviorArchetype', (_e, id: string) => getBehaviorArchetype(id))
+
+  // ── Phase 21 — Behavior Correlation Detector ──────────────────────────────
+
+  ipcMain.handle('correlation:scan', (_e, options?: BehaviorCorrelationOptions) =>
+    runCorrelationScan(options ?? {})
+  )
+
+  ipcMain.handle('correlation:history', (_e, limit?: number) =>
+    listCorrelationReports(limit ?? 25)
+  )
+
+  ipcMain.handle('correlation:get', (_e, id: string) => {
+    const report = getCorrelationReport(id)
+    if (!report) throw new Error(`Correlation report ${id} not found`)
+    return report
+  })
+
+  ipcMain.handle('correlation:delete', (_e, id: string) => {
+    deleteCorrelationReport(id)
+    return { success: true }
+  })
+
+  ipcMain.handle(
+    'correlation:recordSample',
+    (_e, profileId: string, sample: BehaviorSample, sessionId?: string) => {
+      recordBehaviorSample(profileId, sample, sessionId)
+      return { success: true }
+    }
+  )
+
+  ipcMain.handle('correlation:clearSamples', (_e, profileId: string) => {
+    clearBehaviorSamplesForProfile(profileId)
+    return { success: true }
+  })
 
   // ── Phase 17 — Script-to-Workflow (Recording Analysis & Refinement) ────────
 
