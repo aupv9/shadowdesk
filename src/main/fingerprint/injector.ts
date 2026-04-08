@@ -25,6 +25,8 @@ import { buildKeyboardScript } from './scripts/keyboard'
 import { buildWorkerFingerprintScript } from './scripts/worker'
 import { buildNativeToStringScript } from './scripts/native-tostring'
 import { buildIframePropagationScript } from './scripts/iframe'
+// P0 FIX: SharedArrayBuffer hiding
+import { buildSharedArrayBufferScript } from './scripts/sharedarraybuffer'
 import { CdpEvasion } from './cdp-evasion'
 
 export class FingerprintInjector {
@@ -35,6 +37,8 @@ export class FingerprintInjector {
       // Phase 9.2 — hardened toString MUST be installed first so subsequent
       // patches inherit `[native code]` reporting.
       buildNativeToStringScript(),
+      // P0 FIX: Hide SharedArrayBuffer early (before any page JS)
+      buildSharedArrayBufferScript(),
       // Phase 9.1 — Worker / SharedWorker constructor wrapping
       buildWorkerFingerprintScript(fp.browser, fp.hardware, fp.locale, fp.os),
       // Phase 9.3 — iframe context propagation (about:blank / srcdoc)

@@ -37,7 +37,9 @@ export function buildCanvasScript(config: CanvasConfig): string {
   function addNoise(imageData) {
     const data = imageData.data;
     for (let i = 0; i < data.length; i += 4) {
-      const noise = Math.floor(rng() * 3) - 1; // -1, 0, or 1
+      // P0 FIX: Increase noise entropy from ±1 to ±25 per channel
+      // Previous ±1 was easily detected via statistical analysis
+      const noise = Math.floor(rng() * 51) - 25; // -25 to +25
       data[i]     = Math.max(0, Math.min(255, data[i]     + noise));
       data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
       data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
