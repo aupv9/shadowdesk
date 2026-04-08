@@ -13,6 +13,7 @@ import { TeamManager } from './components/TeamManager'
 import { PatchManager } from './components/PatchManager'
 import { Marketplace } from './components/Marketplace'
 import { AIAssistant } from './components/AIAssistant'
+import { SEAPlatforms } from './components/SEAPlatforms'
 import { ErrorBoundary } from './components/UI/ErrorBoundary'
 import { ToastContainer } from './components/UI/Toast'
 import { ConfirmDialog } from './components/UI/ConfirmDialog'
@@ -106,6 +107,9 @@ export default function App() {
         </ErrorBoundary>
         <ErrorBoundary section="AI Assistant">
           {section === 'ai'          && <AIAssistant onNavigate={setSection} />}
+        </ErrorBoundary>
+        <ErrorBoundary section="SEA Platforms">
+          {section === 'sea-platforms' && <SEAPlatforms onNavigate={setSection} />}
         </ErrorBoundary>
       </main>
       <ToastContainer />

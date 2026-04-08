@@ -11,6 +11,7 @@ import { ApiServer } from '../api-server'
 import { resolveFingerprint, FINGERPRINT_PRESETS } from '../fingerprint/presets'
 import { getBehaviorPresets } from '../fingerprint/behavior-presets'
 import { getTemplates, getTemplate } from '../workflow-templates'
+import { getSeaPlatforms, getSeaPlatform, getSeaPlatformTemplates, getSeaRegions } from '../sea-platforms'
 import { getSettings, updateSettings } from '../settings'
 import { downloadUpdate, installUpdate } from '../auto-updater'
 import {
@@ -1624,6 +1625,25 @@ export function registerIpcHandlers(): void {
     db.createWorkflow({ id, name: name ?? tpl.name, description: tpl.description, steps })
     const row = db.getWorkflow(id)
     return { ...row, steps: JSON.parse(row.steps) }
+  })
+
+  // ── Phase 17 — SEA Platform Catalog ────────────────────────────────
+  ipcMain.handle('seaPlatforms:list', () => {
+    return getSeaPlatforms()
+  })
+
+  ipcMain.handle('seaPlatforms:get', (_event, id: string) => {
+    const p = getSeaPlatform(id)
+    if (!p) throw new Error(`SEA platform ${id} not found`)
+    return p
+  })
+
+  ipcMain.handle('seaPlatforms:templates', (_event, id: string) => {
+    return getSeaPlatformTemplates(id)
+  })
+
+  ipcMain.handle('seaPlatforms:regions', () => {
+    return getSeaRegions()
   })
 
   // ── API Server ──────────────────────────────────────────────────────

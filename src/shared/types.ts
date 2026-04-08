@@ -773,8 +773,60 @@ export interface WorkflowTemplate {
   id: string
   name: string
   description: string
-  category: 'scraping' | 'testing' | 'social' | 'ecommerce' | 'general'
+  category:
+    | 'scraping'
+    | 'testing'
+    | 'social'
+    | 'ecommerce'
+    | 'general'
+    // Phase 17 — SEA Platform Templates
+    | 'sea-ecommerce'
+    | 'sea-payments'
+    | 'sea-social'
   steps: AutomationStep[]
+  /** Phase 17 — SEA platform id (e.g. 'shopee', 'lazada', 'tiktok-shop', 'vnpay', 'tiki') */
+  platform?: string
+  /** Phase 17 — ISO country code scope (e.g. 'VN', 'TH', 'ID', 'MY', 'PH', 'SG') */
+  region?: string
+  /** Phase 17 — free-form tags for search / filtering */
+  tags?: string[]
+}
+
+// ─── Phase 17 — SEA Platform Catalog ────────────────────────────────────────
+
+export type SeaPlatformKind = 'ecommerce' | 'payment' | 'social' | 'ride-hail' | 'delivery'
+
+export interface SeaPlatform {
+  /** Stable id, e.g. 'shopee', 'lazada', 'tiktok-shop', 'vnpay', 'tiki' */
+  id: string
+  /** Display name */
+  name: string
+  /** Short description shown in the catalog card */
+  description: string
+  /** High-level category */
+  kind: SeaPlatformKind
+  /** Countries this platform is primarily used in (ISO-3166-1 alpha-2) */
+  regions: string[]
+  /** Primary currencies (ISO-4217), used for labelling only */
+  currencies: string[]
+  /** Default base URL for the main region (used by templates) */
+  baseUrl: string
+  /** Per-region base URL overrides (optional) */
+  regionUrls?: Record<string, string>
+  /** Recommended fingerprint preset keys */
+  recommendedPresets: string[]
+  /** Recommended behaviour archetypes (from AI archetype library) */
+  recommendedArchetypes: string[]
+  /** Common DOM selectors used by this platform's templates */
+  selectors: Record<string, string>
+  /** Known anti-bot / detection quirks to watch for */
+  notes: string[]
+  /** Lucide icon name used in the UI */
+  icon: string
+  /** Tailwind text color class for the UI card accent */
+  accent: string
+  /** Phase 17 — workflow template ids that target this platform */
+  templateIds: string[]
 }
 
 // ─── Profile Version Types (Phase 6) ─────────────────────────────────────────

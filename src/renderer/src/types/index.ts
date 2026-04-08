@@ -81,6 +81,9 @@ export type {
   AiWorkflowResult,
   AiSelectorHealResult,
   BehaviorArchetype,
+  // Phase 17 — SEA Platform Templates
+  SeaPlatform,
+  SeaPlatformKind,
   // Phase 20 — Proxy Provider Marketplace ("Phase 17 — Proxy API Integration")
   ProxyProviderType,
   ProxyPoolType,
@@ -113,6 +116,7 @@ export type NavSection =
   | 'patches'
   | 'marketplace'
   | 'ai'
+  | 'sea-platforms'  // Phase 17 — SEA Platform Templates
 
 export interface Toast {
   id: string

@@ -151,6 +151,46 @@ const BEHAVIOR_ARCHETYPES: BehaviorArchetype[] = [
     idleDrift: true,
     icon: 'BookOpen',
     tags: ['academic', 'reader', 'multi-tab']
+  },
+  // ── Phase 17 — SEA Regional Archetypes ─────────────────────────────────
+  {
+    id: 'sea-mobile-shopper',
+    name: 'SEA Mobile Shopper',
+    description:
+      'Vietnam / Thailand / Indonesia smartphone shopper. Rapid vertical scroll, hesitant tap-to-buy, flash-sale-aware.',
+    typingWpm: [28, 48],
+    mouseSpeed: 1.0,
+    scrollStep: 320,
+    actionPause: [700, 2200],
+    idleDrift: true,
+    icon: 'ShoppingBag',
+    tags: ['sea', 'mobile', 'shopper', 'shopee', 'lazada']
+  },
+  {
+    id: 'sea-live-commerce-viewer',
+    name: 'SEA Live Commerce Viewer',
+    description:
+      'TikTok / Shopee Live viewer profile — long dwell, occasional comment burst, rare taps.',
+    typingWpm: [35, 60],
+    mouseSpeed: 0.8,
+    scrollStep: 100,
+    actionPause: [3000, 12000],
+    idleDrift: true,
+    icon: 'Video',
+    tags: ['sea', 'live', 'tiktok', 'dwell', 'social']
+  },
+  {
+    id: 'sea-bank-customer',
+    name: 'SEA Bank Customer',
+    description:
+      'Cautious VNPay / bank portal user. Slow, careful typing — reads every field before moving on.',
+    typingWpm: [25, 40],
+    mouseSpeed: 0.6,
+    scrollStep: 90,
+    actionPause: [2500, 6500],
+    idleDrift: true,
+    icon: 'Landmark',
+    tags: ['sea', 'payment', 'vnpay', 'banking', 'cautious']
   }
 ]
 
