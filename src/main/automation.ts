@@ -2680,6 +2680,10 @@ export class AutomationEngine {
       case 'forEachElement': {
         // Iterate over every DOM element matching `params.selector`.
         //
+        // IMPORTANT: Use {el.selector} in inner steps to reliably reference the
+        // current element, even if the DOM mutates. Example:
+        //   step 'click' { selector: '{el.selector}' }
+        //
         // Inside the inner steps the current element is exposed via variables:
         //   {el.index}     — 0-based position
         //   {el.total}     — total matched count (before limit/skip)
@@ -2693,9 +2697,12 @@ export class AutomationEngine {
         //                    the DOM mutates during iteration
         //
         // Supports: prefix, limit, skip, reverse, failFast (default true).
+        // Hard-capped at MAX_ELEMENTS=1,000 to prevent memory exhaustion.
         // Tagging is per-run-unique so concurrent forEachElement loops do
         // not collide on the same attribute.
         if (!params.selector) throw new Error('forEachElement: selector required')
+
+        const MAX_ELEMENTS = 1_000
         const innerSteps: AutomationStep[] = params.steps ?? []
         const prefix: string = (params.prefix ?? 'el').replace(/\.$/, '')
         const limit: number = Number(params.limit ?? 0)
@@ -2707,7 +2714,7 @@ export class AutomationEngine {
         // the same workflow in parallel) don't stomp on each other.
         const tagAttr = `data-sd-fee-${Date.now().toString(36).slice(-6)}-${Math.random().toString(36).slice(2, 6)}`
 
-        const total: number = await page.$$eval(
+        let total: number = await page.$$eval(
           params.selector,
           (els: Element[], attr: string) => {
             els.forEach((el, i) => el.setAttribute(attr, String(i)))
@@ -2715,6 +2722,14 @@ export class AutomationEngine {
           },
           tagAttr
         )
+
+        // Hard cap to prevent memory exhaustion and performance issues
+        if (total > MAX_ELEMENTS) {
+          throw new Error(
+            `forEachElement: ${total} elements exceed max ${MAX_ELEMENTS}. ` +
+            `Use 'limit' param or adjust selector to be more specific.`
+          )
+        }
 
         if (total === 0) {
           return { selector: params.selector, total: 0, iterations: 0, completed: 0, failed: 0 }
@@ -2745,9 +2760,13 @@ export class AutomationEngine {
             ).catch(() => null)
 
             if (!meta) {
-              // Element vanished (e.g. list refreshed). Skip gracefully.
-              errors.push({ index: idx, error: 'Element disappeared between iterations' })
-              if (failFast) break
+              // Element vanished (e.g. list refreshed, DOM mutation).
+              // Log and skip unless failFast is true.
+              const msg = `Element at index ${idx} disappeared (DOM mutation)`
+              errors.push({ index: idx, error: msg })
+              if (failFast) {
+                throw new Error(msg)
+              }
               continue
             }
 
