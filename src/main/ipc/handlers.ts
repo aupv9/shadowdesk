@@ -215,6 +215,11 @@ export function registerIpcHandlers(): void {
     return db.getAllProfiles()
   })
 
+  // Phase 2.1: Paginated profile listing
+  ipcMain.handle('profiles:list-paginated', (_event, limit: number, offset: number, filters?: any) => {
+    return db.getProfilesPaginated(limit, offset, filters)
+  })
+
   ipcMain.handle('profiles:create', (_event, input: CreateProfileInput) => {
     const id = uuidv4()
     const fingerprint = resolveFingerprint(input.preset, id)
@@ -315,6 +320,52 @@ export function registerIpcHandlers(): void {
     const { rm } = await import('fs/promises')
     const profileDataPath = join(app.getPath('userData'), 'profiles', id)
     await rm(profileDataPath, { recursive: true, force: true }).catch(() => {})
+  })
+
+  // Phase 2.2: Bulk operations
+  ipcMain.handle('profiles:bulk-delete', async (_event, profileIds: string[]) => {
+    if (!Array.isArray(profileIds) || profileIds.length === 0 || profileIds.length > 1000) {
+      throw new Error(`Bulk delete requires 1-1000 profile IDs, got ${profileIds.length}`)
+    }
+
+    // Close all profiles first
+    for (const id of profileIds) {
+      await bm.closeProfile(id).catch(() => {})
+    }
+
+    // Mark as archived in database
+    const count = db.bulkDeleteProfiles(profileIds)
+    markPendingChange()
+
+    // Enqueue async cleanup of directories
+    const { CleanupWorker } = await import('./cleanup-worker')
+    const cleanupWorker = CleanupWorker.getInstance()
+    for (const id of profileIds) {
+      const profileDataPath = join(app.getPath('userData'), 'profiles', id)
+      cleanupWorker.enqueue(id, [profileDataPath])
+    }
+
+    return { deleted: count }
+  })
+
+  ipcMain.handle('profiles:bulk-proxy', (_event, profileIds: string[], proxyId: string | null) => {
+    if (!Array.isArray(profileIds) || profileIds.length === 0 || profileIds.length > 1000) {
+      throw new Error(`Bulk update requires 1-1000 profile IDs, got ${profileIds.length}`)
+    }
+
+    const count = db.bulkUpdateProxyId(profileIds, proxyId)
+    markPendingChange()
+    return { updated: count }
+  })
+
+  ipcMain.handle('profiles:bulk-group', (_event, profileIds: string[], groupId: string | null) => {
+    if (!Array.isArray(profileIds) || profileIds.length === 0 || profileIds.length > 1000) {
+      throw new Error(`Bulk update requires 1-1000 profile IDs, got ${profileIds.length}`)
+    }
+
+    const count = db.bulkUpdateGroupId(profileIds, groupId)
+    markPendingChange()
+    return { updated: count }
   })
 
   ipcMain.handle('profiles:launch', async (_event, id: string) => {
@@ -1738,5 +1789,27 @@ export function registerIpcHandlers(): void {
     })
     db.updateRecordingSession(sessionId, { status: 'saved' })
     return db.getWorkflow(workflowId)
+  })
+
+  // ── Phase 2.3: Cleanup Worker ──────────────────────────────────────────────
+
+  ipcMain.handle('cleanup:status', () => {
+    const { CleanupWorker } = require('./cleanup-worker')
+    const cleanupWorker = CleanupWorker.getInstance()
+    return cleanupWorker.getStatus()
+  })
+
+  ipcMain.handle('cleanup:retryFailed', () => {
+    const { CleanupWorker } = require('./cleanup-worker')
+    const cleanupWorker = CleanupWorker.getInstance()
+    cleanupWorker.retryFailedCleanups()
+    return { success: true }
+  })
+
+  ipcMain.handle('cleanup:clearFailed', () => {
+    const { CleanupWorker } = require('./cleanup-worker')
+    const cleanupWorker = CleanupWorker.getInstance()
+    cleanupWorker.clearFailedCleanups()
+    return { success: true }
   })
 }
