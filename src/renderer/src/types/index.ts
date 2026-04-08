@@ -90,4 +90,9 @@ export interface Toast {
   id: string
   type: 'success' | 'error' | 'info'
   message: string
+  // Phase 4.3: Optional action button (e.g. Undo)
+  action?: {
+    label: string
+    onClick: () => void
+  }
 }

@@ -35,7 +35,9 @@ interface ProfileState {
   cloneProfile:       (id: string)                    => Promise<void>
   deleteProfile:      (id: string)                    => Promise<void>
   // Phase 3: bulk operations
-  bulkDeleteProfiles: (ids: string[])                 => Promise<{ deleted: number }>
+  bulkDeleteProfiles: (ids: string[])                 => Promise<{ deleted: number; undoWindowMs?: number }>
+  // Phase 4.3: undo bulk-delete
+  bulkRestoreProfiles: (ids: string[])                => Promise<{ restored: number; cancelledCleanups: number }>
   bulkAssignProxy:    (ids: string[], proxyId: string | null) => Promise<{ updated: number }>
   bulkAssignGroup:    (ids: string[], groupId: string | null) => Promise<{ updated: number }>
   launchProfile:      (id: string)                    => Promise<void>
@@ -168,6 +170,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   },
 
   // Phase 3: Bulk delete via new backend API (uses async cleanup worker)
+  // Phase 4.3: Returns undoWindowMs so UI can show an undo toast
   bulkDeleteProfiles: async (ids: string[]) => {
     if (ids.length === 0) return { deleted: 0 }
     // Optimistic UI update
@@ -175,10 +178,24 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     set((s) => ({ profiles: s.profiles.filter((p) => !ids.includes(p.id)) }))
     try {
       const result = await window.api.profiles.bulkDelete(ids)
-      return result as { deleted: number }
+      return result as { deleted: number; undoWindowMs?: number }
     } catch (e: any) {
       // Rollback on failure
       set({ profiles: prev, error: e.message })
+      throw e
+    }
+  },
+
+  // Phase 4.3: Restore archived profiles (undo bulk-delete)
+  bulkRestoreProfiles: async (ids: string[]) => {
+    if (ids.length === 0) return { restored: 0, cancelledCleanups: 0 }
+    try {
+      const result = await window.api.profiles.bulkRestore(ids)
+      // Refresh the full list to get the restored profiles back
+      await get().fetchProfiles()
+      return result as { restored: number; cancelledCleanups: number }
+    } catch (e: any) {
+      set({ error: e.message })
       throw e
     }
   },

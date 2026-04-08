@@ -28,6 +28,15 @@ import {
 import type { CreateProfileInput, CreateProxyInput, TeamRole, CreateWorkflowInput, UpdateWorkflowInput, ApiServerConfig } from '../../shared/types'
 import { parseNetscapeCookies, toNetscapeFormat } from '../utils/cookies'
 import { DetectionTestRunner } from '../detection-test'
+// Phase 4.2: Input validation + structured error handling
+import {
+  validateCreateProfileInput,
+  validateUpdateProfileInput,
+  validateCookiesJson,
+  validatePreset,
+  validateBulkIds,
+} from '../validators/profile-validator'
+import { ValidationError, NotFoundError } from '../error-handler'
 import { ChromiumPatchManager } from '../fingerprint/chromium-patches'
 import { WorkflowScheduler, buildScheduleRow } from '../scheduler'
 import { driftFingerprint } from '../fingerprint-drift'
@@ -221,6 +230,12 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('profiles:create', (_event, input: CreateProfileInput) => {
+    // Phase 4.2: Validate input before DB write
+    const validationError = validateCreateProfileInput(input)
+    if (validationError) {
+      throw new ValidationError(validationError.message, { field: validationError.field })
+    }
+
     const id = uuidv4()
     const fingerprint = resolveFingerprint(input.preset, id)
     const userDataPath = join(app.getPath('userData'), 'profiles', id)
@@ -239,6 +254,17 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('profiles:update', (_event, id: string, data: Record<string, any>) => {
+    // Phase 4.2: Validate update payload (whitelist + field-level checks)
+    const validationError = validateUpdateProfileInput(data)
+    if (validationError) {
+      throw new ValidationError(validationError.message, { field: validationError.field })
+    }
+
+    const existing = db.getProfile(id)
+    if (!existing) {
+      throw new NotFoundError(`Profile ${id} not found`)
+    }
+
     db.updateProfile(id, data)
     markPendingChange()
     return db.getProfile(id)
@@ -246,7 +272,7 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('profiles:clone', async (_event, id: string) => {
     const source = db.getProfile(id) as any
-    if (!source) throw new Error(`Profile ${id} not found`)
+    if (!source) throw new NotFoundError(`Profile ${id} not found`)
 
     const newId = uuidv4()
     const sourceFp = typeof source.fingerprint === 'string'
@@ -322,10 +348,11 @@ export function registerIpcHandlers(): void {
     await rm(profileDataPath, { recursive: true, force: true }).catch(() => {})
   })
 
-  // Phase 2.2: Bulk operations
+  // Phase 2.2: Bulk operations (Phase 4.2: Validated via validator module)
   ipcMain.handle('profiles:bulk-delete', async (_event, profileIds: string[]) => {
-    if (!Array.isArray(profileIds) || profileIds.length === 0 || profileIds.length > 1000) {
-      throw new Error(`Bulk delete requires 1-1000 profile IDs, got ${profileIds.length}`)
+    const validationError = validateBulkIds(profileIds)
+    if (validationError) {
+      throw new ValidationError(validationError.message, { field: validationError.field })
     }
 
     // Close all profiles first
@@ -337,20 +364,24 @@ export function registerIpcHandlers(): void {
     const count = db.bulkDeleteProfiles(profileIds)
     markPendingChange()
 
-    // Enqueue async cleanup of directories
+    // Phase 4.3: Enqueue cleanup with 10s delay (undo window)
+    // Users can cancel the delete within this window via profiles:bulk-restore.
+    // Once the delay elapses, the cleanup worker removes the directories.
+    const UNDO_WINDOW_MS = 10_000
     const { CleanupWorker } = await import('../cleanup-worker')
     const cleanupWorker = CleanupWorker.getInstance()
     for (const id of profileIds) {
       const profileDataPath = join(app.getPath('userData'), 'profiles', id)
-      cleanupWorker.enqueue(id, [profileDataPath])
+      cleanupWorker.enqueue(id, [profileDataPath], UNDO_WINDOW_MS)
     }
 
-    return { deleted: count }
+    return { deleted: count, undoWindowMs: UNDO_WINDOW_MS }
   })
 
   ipcMain.handle('profiles:bulk-proxy', (_event, profileIds: string[], proxyId: string | null) => {
-    if (!Array.isArray(profileIds) || profileIds.length === 0 || profileIds.length > 1000) {
-      throw new Error(`Bulk update requires 1-1000 profile IDs, got ${profileIds.length}`)
+    const validationError = validateBulkIds(profileIds)
+    if (validationError) {
+      throw new ValidationError(validationError.message, { field: validationError.field })
     }
 
     const count = db.bulkUpdateProxyId(profileIds, proxyId)
@@ -359,13 +390,33 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('profiles:bulk-group', (_event, profileIds: string[], groupId: string | null) => {
-    if (!Array.isArray(profileIds) || profileIds.length === 0 || profileIds.length > 1000) {
-      throw new Error(`Bulk update requires 1-1000 profile IDs, got ${profileIds.length}`)
+    const validationError = validateBulkIds(profileIds)
+    if (validationError) {
+      throw new ValidationError(validationError.message, { field: validationError.field })
     }
 
     const count = db.bulkUpdateGroupId(profileIds, groupId)
     markPendingChange()
     return { updated: count }
+  })
+
+  // Phase 4.3: Restore archived profiles (undo support for bulk-delete)
+  ipcMain.handle('profiles:bulk-restore', async (_event, profileIds: string[]) => {
+    const validationError = validateBulkIds(profileIds)
+    if (validationError) {
+      throw new ValidationError(validationError.message, { field: validationError.field })
+    }
+
+    // Cancel any pending cleanup tasks to preserve profile data directories
+    const { CleanupWorker } = await import('../cleanup-worker')
+    const cleanupWorker = CleanupWorker.getInstance()
+    const cancelled = cleanupWorker.cancelBulk(profileIds)
+
+    // Flip status from archived back to active
+    const restored = db.bulkRestoreProfiles(profileIds)
+    markPendingChange()
+
+    return { restored, cancelledCleanups: cancelled }
   })
 
   ipcMain.handle('profiles:launch', async (_event, id: string) => {

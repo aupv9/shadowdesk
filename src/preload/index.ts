@@ -11,6 +11,7 @@ const api = {
     delete:             (id: string)                          => ipcRenderer.invoke('profiles:delete', id),
     // Phase 2.2: Bulk operations
     bulkDelete:         (profileIds: string[])                => ipcRenderer.invoke('profiles:bulk-delete', profileIds),
+    bulkRestore:        (profileIds: string[])                => ipcRenderer.invoke('profiles:bulk-restore', profileIds),
     bulkAssignProxy:    (profileIds: string[], proxyId: string | null) => ipcRenderer.invoke('profiles:bulk-proxy', profileIds, proxyId),
     bulkAssignGroup:    (profileIds: string[], groupId: string | null) => ipcRenderer.invoke('profiles:bulk-group', profileIds, groupId),
     launch:             (id: string)                          => ipcRenderer.invoke('profiles:launch', id),

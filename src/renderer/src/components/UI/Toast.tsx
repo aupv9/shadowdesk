@@ -21,6 +21,18 @@ function ToastItem({ toast }: { toast: Toast }) {
     <div className={`flex items-start gap-3 px-4 py-3 rounded-lg border shadow-xl ${BG[toast.type]} animate-in slide-in-from-right-5 duration-200`}>
       {ICONS[toast.type]}
       <span className="text-sm text-slate-200 flex-1">{toast.message}</span>
+      {/* Phase 4.3: Optional action button (e.g. Undo) */}
+      {toast.action && (
+        <button
+          onClick={() => {
+            toast.action?.onClick()
+            dismiss(toast.id)
+          }}
+          className="text-xs font-medium text-ghost-400 hover:text-ghost-300 transition-colors px-2 py-0.5 rounded border border-ghost-500/40 hover:border-ghost-400"
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button onClick={() => dismiss(toast.id)} className="text-slate-500 hover:text-slate-300 transition-colors ml-1">
         <X className="w-3.5 h-3.5" />
       </button>

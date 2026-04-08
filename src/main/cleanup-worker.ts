@@ -17,6 +17,9 @@ export interface CleanupTask {
   paths: string[] // Absolute paths to delete
   retries: number
   lastAttempt: Date | null
+  // Phase 4.3: Delayed cleanup — task won't execute before this timestamp.
+  // Used to give users an undo window for bulk-delete operations.
+  availableAt: number
 }
 
 export interface CleanupStatus {
@@ -55,8 +58,11 @@ export class CleanupWorker {
 
   /**
    * Enqueue cleanup task for a profile
+   * @param profileId - Profile ID to clean up
+   * @param paths - Absolute paths to delete
+   * @param delayMs - Optional: minimum delay before execution (Phase 4.3: undo window)
    */
-  enqueue(profileId: string, paths: string[]): void {
+  enqueue(profileId: string, paths: string[], delayMs: number = 0): void {
     if (!profileId || paths.length === 0) {
       console.warn('[CleanupWorker] Skipped invalid cleanup task')
       return
@@ -73,9 +79,49 @@ export class CleanupWorker {
       paths,
       retries: 0,
       lastAttempt: null,
+      availableAt: Date.now() + delayMs,
     })
 
-    console.log(`[CleanupWorker] Enqueued cleanup for profile ${profileId} (${paths.length} paths)`)
+    const delayNote = delayMs > 0 ? ` (delayed ${delayMs}ms for undo window)` : ''
+    console.log(
+      `[CleanupWorker] Enqueued cleanup for profile ${profileId} (${paths.length} paths)${delayNote}`,
+    )
+  }
+
+  /**
+   * Phase 4.3: Cancel a pending cleanup task (undo support).
+   * Only cancels tasks that haven't started processing yet.
+   * @param profileId - Profile ID to cancel cleanup for
+   * @returns true if cancelled, false if already processing or not found
+   */
+  cancel(profileId: string): boolean {
+    const index = this.queue.findIndex((t) => t.profileId === profileId)
+    if (index !== -1) {
+      this.queue.splice(index, 1)
+      console.log(`[CleanupWorker] Cancelled cleanup for profile ${profileId}`)
+      return true
+    }
+
+    // Check failed map too — allow clearing failed records
+    if (this.failed.has(profileId)) {
+      this.failed.delete(profileId)
+      console.log(`[CleanupWorker] Cleared failed cleanup record for ${profileId}`)
+      return true
+    }
+
+    return false
+  }
+
+  /**
+   * Phase 4.3: Cancel multiple pending cleanups (bulk undo support).
+   * @returns Number of tasks cancelled
+   */
+  cancelBulk(profileIds: string[]): number {
+    let cancelled = 0
+    for (const id of profileIds) {
+      if (this.cancel(id)) cancelled++
+    }
+    return cancelled
   }
 
   /**
@@ -122,16 +168,21 @@ export class CleanupWorker {
   }
 
   /**
-   * Process queue: dequeue up to MAX_CONCURRENT tasks and execute
+   * Process queue: dequeue up to MAX_CONCURRENT tasks and execute.
+   * Phase 4.3: Skips tasks whose availableAt is in the future (delayed cleanup).
    */
   private async processQueue(): Promise<void> {
     if (!this.isRunning) return
 
-    // Don't exceed max concurrent
-    while (this.processing.size < MAX_CONCURRENT && this.queue.length > 0) {
-      const task = this.queue.shift()
-      if (!task) break
+    const now = Date.now()
 
+    // Don't exceed max concurrent
+    while (this.processing.size < MAX_CONCURRENT) {
+      // Find first task that's ready to execute
+      const readyIndex = this.queue.findIndex((t) => t.availableAt <= now)
+      if (readyIndex === -1) break
+
+      const [task] = this.queue.splice(readyIndex, 1)
       this.processing.add(task.profileId)
       this.executeCleanup(task).catch((error) => {
         console.error(`[CleanupWorker] Uncaught error for ${task.profileId}:`, error)
@@ -159,9 +210,9 @@ export class CleanupWorker {
           error,
         )
 
-        setTimeout(() => {
-          this.queue.push(task)
-        }, delayMs)
+        // Update availableAt so processQueue respects the retry delay
+        task.availableAt = Date.now() + delayMs
+        this.queue.push(task)
       } else {
         // Mark as failed
         this.failed.set(task.profileId, task)
@@ -208,11 +259,12 @@ export class CleanupWorker {
     console.log(`[CleanupWorker] Retrying ${failed.length} failed cleanups`)
 
     for (const task of failed) {
-      // Reset retry counter to allow retries again
+      // Reset retry counter and availableAt to allow immediate retries
       const retriedTask: CleanupTask = {
         ...task,
         retries: 0,
         lastAttempt: null,
+        availableAt: Date.now(),
       }
       this.queue.push(retriedTask)
       this.failed.delete(task.profileId)

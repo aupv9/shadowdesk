@@ -33,9 +33,11 @@ export function ProfileManager() {
     fetchProfiles, fetchActiveSessions, fetchProfilesPaginated,
     setPaginationEnabled, setPaginationLimit, goToPage,
     launchProfile, closeProfile, deleteProfile, cloneProfile,
-    bulkDeleteProfiles, bulkAssignProxy, bulkAssignGroup,
+    bulkDeleteProfiles, bulkRestoreProfiles, bulkAssignProxy, bulkAssignGroup,
     exportProfile, importProfile, setSyncExcluded
   } = useProfileStore()
+  // Phase 4.3: undo toast support
+  const pushToastWithAction = useToastStore((s) => s.pushWithAction)
   const { fetchProxies } = useProxyStore()
   const { groups, fetchGroups, createGroup, deleteGroup } = useGroupStore()
   const { checkProfileLimit, fetchUsage } = useLicenseStore()
@@ -168,7 +170,7 @@ export function ProfileManager() {
   const handleBulkDelete = async () => {
     const ok = await confirm({
       title: `Delete ${selected.size} Profile${selected.size !== 1 ? 's' : ''}`,
-      message: `This will permanently delete ${selected.size} profile${selected.size !== 1 ? 's' : ''}. Cleanup happens in the background. This cannot be undone.`,
+      message: `This will delete ${selected.size} profile${selected.size !== 1 ? 's' : ''}. You'll have a short undo window before cleanup runs.`,
       confirmLabel: `Delete ${selected.size}`,
       destructive: true,
     })
@@ -177,9 +179,33 @@ export function ProfileManager() {
       // Phase 3: Use new bulk delete API (async cleanup worker)
       const ids = Array.from(selected)
       const result = await bulkDeleteProfiles(ids)
-      pushToast(`Deleted ${result.deleted} profile${result.deleted !== 1 ? 's' : ''}. Cleanup running in background.`, 'success')
+      const count = result.deleted
+      const undoMs = result.undoWindowMs ?? 10_000
       setSelected(new Set())
       setSelectionMode(false)
+
+      // Phase 4.3: Show undoable toast — clicking Undo restores the profiles
+      // and cancels the pending cleanup tasks. Toast auto-dismisses when the
+      // undo window closes.
+      pushToastWithAction(
+        `Deleted ${count} profile${count !== 1 ? 's' : ''}`,
+        {
+          label: 'Undo',
+          onClick: async () => {
+            try {
+              const r = await bulkRestoreProfiles(ids)
+              pushToast(
+                `Restored ${r.restored} profile${r.restored !== 1 ? 's' : ''}`,
+                'success',
+              )
+            } catch (err: any) {
+              pushToast(err.message ?? 'Undo failed', 'error')
+            }
+          },
+        },
+        'success',
+        undoMs,
+      )
     } catch (e: any) {
       pushToast(e.message ?? 'Bulk delete failed', 'error')
     }
