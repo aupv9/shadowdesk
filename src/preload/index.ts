@@ -183,6 +183,11 @@ const api = {
     stopAll:   (workflowId: string)                                   => ipcRenderer.invoke('workflows:stopAll', workflowId),
     isRunning: (workflowId: string, profileId: string)                => ipcRenderer.invoke('workflows:isRunning', workflowId, profileId),
     runs:      (workflowId: string)                                   => ipcRenderer.invoke('workflows:runs', workflowId),
+    // Phase 18 — Export run history as CSV or JSON
+    exportRuns: (
+      workflowId: string | null | undefined,
+      options: { format: 'csv' | 'json'; perStep?: boolean; limit?: number; status?: 'completed' | 'failed' | 'stopped'; includeVariables?: boolean }
+    ) => ipcRenderer.invoke('workflows:runs:export', workflowId, options),
     // Tier 3 — Workflow versioning
     versions: {
       list:    (workflowId: string)                      => ipcRenderer.invoke('workflows:versions', workflowId),

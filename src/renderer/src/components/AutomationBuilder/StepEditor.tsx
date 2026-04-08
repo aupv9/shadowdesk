@@ -46,7 +46,11 @@ import {
   GripVertical,
   Frame,
   Sliders,
-  FocusIcon
+  FocusIcon,
+  Brackets,
+  IterationCcw,
+  Network,
+  SkipForward
 } from 'lucide-react'
 import type { AutomationStep, AutomationActionType } from '../../types'
 
@@ -113,7 +117,14 @@ const ACTION_META: Record<AutomationActionType, { icon: React.ElementType; label
   selectContextMenu:  { icon: List,               label: 'Context Menu',         color: 'text-rose-300' },
   setRangeInput:      { icon: Sliders,            label: 'Set Range Input',      color: 'text-teal-400' },
   scrollIntoView:     { icon: FocusIcon,          label: 'Scroll Into View',     color: 'text-sky-300' },
-  switchFrame:        { icon: Frame,              label: 'Switch Frame',         color: 'text-indigo-300' }
+  switchFrame:        { icon: Frame,              label: 'Switch Frame',         color: 'text-indigo-300' },
+  // Phase 18 — Data pipelines & control flow
+  extractJson:        { icon: Brackets,           label: 'Extract JSON',         color: 'text-cyan-300' },
+  forEachElement:     { icon: Repeat,             label: 'For Each Element',     color: 'text-emerald-300' },
+  whileLoop:          { icon: IterationCcw,       label: 'While Loop',           color: 'text-purple-300' },
+  waitForRequest:     { icon: Network,            label: 'Wait for Request',     color: 'text-orange-300' },
+  waitForResponse:    { icon: Network,            label: 'Wait for Response',    color: 'text-orange-400' },
+  paginate:           { icon: SkipForward,        label: 'Paginate',             color: 'text-pink-300' }
 }
 
 const ALL_ACTIONS: AutomationActionType[] = [
