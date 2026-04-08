@@ -4,6 +4,12 @@ import { BrowserManager } from './browser-manager'
 import { Database } from './database'
 import { resolveFingerprint } from './fingerprint/presets'
 import { analyzeBehaiorDrift, createBehaviorConsistencyVector } from './fingerprint/behavior-drift'
+import {
+  testFirefoxSpecificVectors,
+  testSafariSpecificVectors,
+  testEdgeSpecificVectors,
+  testBrowserConsistency
+} from './fingerprint/browser-vectors'
 import type { DetectionTestResult, DetectionVectorResult } from '../shared/types'
 
 /**
@@ -160,6 +166,18 @@ export class DetectionTestRunner {
       allResults.length // session count
     )
     vectors.push(createBehaviorConsistencyVector(behaviorDriftReport))
+
+    // P3: Browser-specific vectors (Firefox, Safari, Edge, Brave)
+    vectors.push(await testBrowserConsistency(page, fingerprint))
+
+    // P3: Browser-specific detailed checks
+    const firefoxVectors = await testFirefoxSpecificVectors(page, fingerprint)
+    const safariVectors = await testSafariSpecificVectors(page, fingerprint)
+    const edgeVectors = await testEdgeSpecificVectors(page, fingerprint)
+
+    vectors.push(...firefoxVectors)
+    vectors.push(...safariVectors)
+    vectors.push(...edgeVectors)
 
     return vectors
   }
