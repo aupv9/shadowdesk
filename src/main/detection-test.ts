@@ -3,6 +3,7 @@ import type { Page } from 'puppeteer-core'
 import { BrowserManager } from './browser-manager'
 import { Database } from './database'
 import { resolveFingerprint } from './fingerprint/presets'
+import { analyzeBehaiorDrift, createBehaviorConsistencyVector } from './fingerprint/behavior-drift'
 import type { DetectionTestResult, DetectionVectorResult } from '../shared/types'
 
 /**
@@ -86,6 +87,11 @@ export class DetectionTestRunner {
     // Navigate to about:blank to run tests in a clean context
     await page.goto('about:blank', { waitUntil: 'load' }).catch(() => {})
 
+    // P2: Get profile data for behavior drift analysis
+    const db = Database.getInstance()
+    const profile = db.getProfile(profileId) as any
+    const fingerprint = profile?.fingerprint ? (typeof profile.fingerprint === 'string' ? JSON.parse(profile.fingerprint) : profile.fingerprint) : {}
+
     const vectors: DetectionVectorResult[] = []
 
     // Run each test and collect results
@@ -144,6 +150,16 @@ export class DetectionTestRunner {
     vectors.push(await this.testUachPlatformAlignment(page))
     vectors.push(await this.testUachMobileTouchAlignment(page))
     vectors.push(await this.testAcceptLanguageAlignment(page))
+
+    // P2: Behavior drift detection test
+    const allResults = db.getDetectionTestResults(profileId)
+    const behaviorDriftReport = analyzeBehaiorDrift(
+      profileId,
+      profile?.name || 'Unknown',
+      fingerprint,
+      allResults.length // session count
+    )
+    vectors.push(createBehaviorConsistencyVector(behaviorDriftReport))
 
     return vectors
   }

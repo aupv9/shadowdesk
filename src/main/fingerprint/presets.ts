@@ -600,6 +600,302 @@ export const FINGERPRINT_PRESETS: Record<string, FingerprintConfig> = {
     plugins: { mode: 'empty' },
     speech: { mode: 'filter' },
     network: { connectionType: '4g' }
+  },
+
+  // ── P2: Safari Desktop Presets (macOS) ──────────────────────────────
+
+  'mac-ventura-safari17': {
+    preset: 'mac-ventura-safari17',
+    os: { platform: 'MacIntel', version: '13.6.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+      platform: 'MacIntel',
+      vendor: 'Apple Computer, Inc.',
+      version: '17',
+      languages: ['en-US', 'en']
+    },
+    screen: {
+      width: 1440,
+      height: 900,
+      availWidth: 1440,
+      availHeight: 862,
+      colorDepth: 30,
+      pixelRatio: 2
+    },
+    hardware: { deviceMemory: 8, hardwareConcurrency: 8, maxTouchPoints: 0 },
+    locale: { language: 'en-US', languages: ['en-US', 'en'], timezone: 'America/Los_Angeles' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Apple Inc.',
+      renderer: 'Apple GPU',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Helvetica', 'Helvetica Neue', 'Arial', 'Times New Roman',
+        'Courier New', 'Georgia', 'Verdana', 'Trebuchet MS',
+        'San Francisco', 'Apple SD Gothic Neo'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 1 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' }
+  },
+
+  'mac-sonoma-safari17': {
+    preset: 'mac-sonoma-safari17',
+    os: { platform: 'MacIntel', version: '14.2.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15',
+      platform: 'MacIntel',
+      vendor: 'Apple Computer, Inc.',
+      version: '17',
+      languages: ['en-US', 'en']
+    },
+    screen: {
+      width: 1512,
+      height: 982,
+      availWidth: 1512,
+      availHeight: 944,
+      colorDepth: 30,
+      pixelRatio: 2
+    },
+    hardware: { deviceMemory: 16, hardwareConcurrency: 10, maxTouchPoints: 0 },
+    locale: { language: 'en-US', languages: ['en-US', 'en'], timezone: 'America/Los_Angeles' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Apple Inc.',
+      renderer: 'Apple GPU',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Helvetica', 'Helvetica Neue', 'Arial', 'Times New Roman',
+        'Courier New', 'Georgia', 'Verdana', 'Trebuchet MS',
+        'San Francisco', 'Apple SD Gothic Neo', 'Menlo'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 1 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' }
+  },
+
+  'mac-monterey-safari16': {
+    preset: 'mac-monterey-safari16',
+    os: { platform: 'MacIntel', version: '12.7.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.4 Safari/605.1.15',
+      platform: 'MacIntel',
+      vendor: 'Apple Computer, Inc.',
+      version: '16',
+      languages: ['en-US', 'en']
+    },
+    screen: {
+      width: 1440,
+      height: 900,
+      availWidth: 1440,
+      availHeight: 860,
+      colorDepth: 30,
+      pixelRatio: 2
+    },
+    hardware: { deviceMemory: 8, hardwareConcurrency: 8, maxTouchPoints: 0 },
+    locale: { language: 'en-US', languages: ['en-US', 'en'], timezone: 'America/New_York' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Apple Inc.',
+      renderer: 'Apple GPU',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Helvetica', 'Helvetica Neue', 'Arial', 'Times New Roman',
+        'Courier New', 'Georgia', 'Verdana', 'Trebuchet MS', 'San Francisco'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 0 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' }
+  },
+
+  // ── P2: Firefox Desktop Presets ────────────────────────────────────
+
+  'win11-firefox124': {
+    preset: 'win11-firefox124',
+    os: { platform: 'Win32', version: '10.0.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0',
+      platform: 'Win32',
+      vendor: '',
+      version: '124',
+      languages: ['en-US', 'en']
+    },
+    screen: {
+      width: 2560,
+      height: 1440,
+      availWidth: 2560,
+      availHeight: 1400,
+      colorDepth: 24,
+      pixelRatio: 1
+    },
+    hardware: { deviceMemory: 16, hardwareConcurrency: 12, maxTouchPoints: 0 },
+    locale: { language: 'en-US', languages: ['en-US', 'en'], timezone: 'America/New_York' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Google Inc. (NVIDIA)',
+      renderer: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 Direct3D11 vs_5_0 ps_5_0, D3D11)',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Arial', 'Arial Black', 'Calibri', 'Cambria', 'Comic Sans MS',
+        'Consolas', 'Courier New', 'Georgia', 'Impact', 'Segoe UI',
+        'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 2, videoInputs: 1 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' }
+  },
+
+  'mac-sonoma-firefox124': {
+    preset: 'mac-sonoma-firefox124',
+    os: { platform: 'MacIntel', version: '14.2.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:124.0) Gecko/20100101 Firefox/124.0',
+      platform: 'MacIntel',
+      vendor: '',
+      version: '124',
+      languages: ['en-US', 'en']
+    },
+    screen: {
+      width: 1512,
+      height: 982,
+      availWidth: 1512,
+      availHeight: 944,
+      colorDepth: 30,
+      pixelRatio: 2
+    },
+    hardware: { deviceMemory: 16, hardwareConcurrency: 10, maxTouchPoints: 0 },
+    locale: { language: 'en-US', languages: ['en-US', 'en'], timezone: 'America/Los_Angeles' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Google Inc. (Apple)',
+      renderer: 'ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Unspecified Version)',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Helvetica', 'Helvetica Neue', 'Arial', 'Times New Roman',
+        'Courier New', 'Georgia', 'Verdana', 'Trebuchet MS', 'San Francisco'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 1 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' }
+  },
+
+  'linux-ubuntu-firefox124': {
+    preset: 'linux-ubuntu-firefox124',
+    os: { platform: 'Linux x86_64', version: '5.15.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0',
+      platform: 'Linux x86_64',
+      vendor: '',
+      version: '124',
+      languages: ['en-US', 'en']
+    },
+    screen: {
+      width: 1920,
+      height: 1080,
+      availWidth: 1920,
+      availHeight: 1054,
+      colorDepth: 24,
+      pixelRatio: 1
+    },
+    hardware: { deviceMemory: 8, hardwareConcurrency: 8, maxTouchPoints: 0 },
+    locale: { language: 'en-US', languages: ['en-US', 'en'], timezone: 'Europe/London' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Mesa/X.org',
+      renderer: 'Mesa Intel(R) UHD Graphics 630 (CML GT2)',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Arial', 'Courier New', 'DejaVu Sans', 'DejaVu Serif',
+        'Liberation Mono', 'Liberation Sans', 'Liberation Serif', 'Times New Roman', 'Verdana'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 0 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' }
+  },
+
+  'android-firefox124': {
+    preset: 'android-firefox124',
+    geolocation: { latitude: 13.7563, longitude: 100.5018, accuracy: 20 },
+    os: { platform: 'Linux armv8l', version: '14.0.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Android; Mobile; rv:124.0) Gecko/124.0 Firefox/124.0',
+      platform: 'Linux armv8l',
+      vendor: '',
+      version: '124',
+      languages: ['th-TH', 'en-US', 'en']
+    },
+    screen: {
+      width: 412,
+      height: 915,
+      availWidth: 412,
+      availHeight: 891,
+      colorDepth: 24,
+      pixelRatio: 2.625
+    },
+    hardware: { deviceMemory: 8, hardwareConcurrency: 8, maxTouchPoints: 5 },
+    locale: { language: 'th-TH', languages: ['th-TH', 'en-US', 'en'], timezone: 'Asia/Bangkok' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Google Inc. (ARM)',
+      renderer: 'ANGLE (ARM, Mali-G710 MC10, OpenGL ES 3.2)',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Roboto', 'Noto Sans', 'Noto Color Emoji',
+        'Droid Sans', 'Droid Serif', 'Courier New'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 2 },
+    plugins: { mode: 'empty' },
+    speech: { mode: 'filter' },
+    network: { connectionType: '4g' }
   }
 }
 
