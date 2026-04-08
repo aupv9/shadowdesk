@@ -3,6 +3,11 @@ import type { Database as SqlDatabase } from 'sql.js'
 import { join } from 'path'
 import { app } from 'electron'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
+import {
+  encryptCredential,
+  decryptCredential,
+  isEncryptedCredential,
+} from './crypto/proxy-credential-service'
 
 export class Database {
   private static instance: Database
@@ -631,20 +636,64 @@ export class Database {
 
   // ── Proxy CRUD ────────────────────────────────────────────────────────────
 
+  /**
+   * Decrypt the credential columns of a proxy row in place. Plain-text legacy
+   * rows pass through unchanged so the database can be migrated incrementally.
+   */
+  private decryptProxyRow(row: any): any {
+    if (!row) return row
+    return {
+      ...row,
+      username: row.username ? decryptCredential(row.username, row.id, 'username') : null,
+      password: row.password ? decryptCredential(row.password, row.id, 'password') : null,
+    }
+  }
+
   getAllProxies(): any[] {
-    return this.queryAll('SELECT * FROM proxies ORDER BY created_at DESC')
+    const rows = this.queryAll('SELECT * FROM proxies ORDER BY created_at DESC')
+    return rows.map((r) => this.decryptProxyRow(r))
   }
 
   getProxy(id: string): any {
-    return this.queryOne('SELECT * FROM proxies WHERE id = ?', [id])
+    const row = this.queryOne('SELECT * FROM proxies WHERE id = ?', [id])
+    return this.decryptProxyRow(row)
+  }
+
+  /**
+   * One-shot migration: encrypt any proxy credentials still stored in plain
+   * text. Called once at app startup. Safe to re-run — already-encrypted
+   * rows are skipped.
+   */
+  encryptLegacyProxyCredentials(): { migrated: number } {
+    const rows = this.queryAll('SELECT id, username, password FROM proxies') as any[]
+    let migrated = 0
+    for (const row of rows) {
+      const userPlain = row.username && !isEncryptedCredential(row.username)
+      const passPlain = row.password && !isEncryptedCredential(row.password)
+      if (!userPlain && !passPlain) continue
+
+      const newUser = userPlain
+        ? encryptCredential(row.username, row.id, 'username')
+        : row.username
+      const newPass = passPlain
+        ? encryptCredential(row.password, row.id, 'password')
+        : row.password
+
+      this.run(
+        'UPDATE proxies SET username = ?, password = ? WHERE id = ?',
+        [newUser ?? null, newPass ?? null, row.id],
+      )
+      migrated++
+    }
+    return { migrated }
   }
 
   /** Return a random healthy proxy, or any proxy if none are healthy. */
   getRandomProxy(): any {
-    return (
+    const row =
       this.queryOne('SELECT * FROM proxies WHERE is_healthy = 1 ORDER BY RANDOM() LIMIT 1') ??
       this.queryOne('SELECT * FROM proxies ORDER BY RANDOM() LIMIT 1')
-    )
+    return this.decryptProxyRow(row)
   }
 
   /** Return the next proxy in round-robin order after the given id. */
@@ -669,6 +718,11 @@ export class Database {
     password?: string
     country?: string
   }): void {
+    // Encrypt credentials at rest. Empty / undefined creds remain NULL so the
+    // "no auth required" branch in browser-manager continues to work.
+    const encUser = encryptCredential(proxy.username, proxy.id, 'username')
+    const encPass = encryptCredential(proxy.password, proxy.id, 'password')
+
     this.run(
       `INSERT INTO proxies (id, name, type, host, port, username, password, country)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -678,8 +732,8 @@ export class Database {
         proxy.type,
         proxy.host,
         proxy.port,
-        proxy.username ?? null,
-        proxy.password ?? null,
+        encUser,
+        encPass,
         proxy.country ?? null
       ]
     )

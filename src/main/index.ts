@@ -73,6 +73,17 @@ app.whenReady().then(async () => {
   const db = Database.getInstance()
   await db.initialize()
 
+  // Encrypt any pre-existing plain-text proxy credentials. Idempotent —
+  // already-encrypted rows are skipped, so this can run on every startup.
+  try {
+    const result = db.encryptLegacyProxyCredentials()
+    if (result.migrated > 0) {
+      console.log(`[startup] encrypted ${result.migrated} legacy proxy credential(s)`)
+    }
+  } catch (err) {
+    console.error('[startup] proxy credential migration failed:', err)
+  }
+
   // Register IPC handlers
   registerIpcHandlers()
 

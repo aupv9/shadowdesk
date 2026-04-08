@@ -2,7 +2,24 @@ import http from 'http'
 import { Database } from './database'
 import { BrowserManager } from './browser-manager'
 import { AutomationEngine } from './automation'
+import { validateProxyInput } from './proxy/validation'
 import type { ApiServerConfig, ApiServerStatus } from '../shared/types'
+
+/**
+ * Strip credentials from a proxy row before exposing it over the local
+ * REST API. The local server is reachable on 127.0.0.1 but any process on
+ * the machine can read it, so leaking proxy passwords here would defeat
+ * the at-rest encryption.
+ */
+function maskProxyForApi(proxy: any): any {
+  if (!proxy) return proxy
+  const { username, password, ...rest } = proxy
+  return {
+    ...rest,
+    has_auth: !!(username || password),
+    username: username ? '***' : null,
+  }
+}
 
 /**
  * Local REST API server for external automation control.
@@ -199,24 +216,30 @@ export class ApiServer {
 
     // ── Proxies ────────────────────────────────────────────────────────
     if (path === '/api/proxies' && method === 'GET') {
-      this.sendJson(res, 200, db.getAllProxies())
+      const proxies = db.getAllProxies() as any[]
+      this.sendJson(res, 200, proxies.map(maskProxyForApi))
       return
     }
 
     if (path === '/api/proxies' && method === 'POST') {
+      const verr = validateProxyInput(body)
+      if (verr) {
+        this.sendJson(res, 400, { error: `Invalid ${verr.field}: ${verr.message}` })
+        return
+      }
       const { v4: uuidv4 } = await import('uuid')
       const id = uuidv4()
       db.createProxy({ id, ...body })
-      this.sendJson(res, 201, { id, ...body })
+      const created = db.getProxy(id)
+      this.sendJson(res, 201, maskProxyForApi(created))
       return
     }
 
     const proxyMatch = path.match(/^\/api\/proxies\/([^/]+)$/)
     if (proxyMatch && method === 'GET') {
-      const proxies = db.getAllProxies() as any[]
-      const proxy = proxies.find((p) => p.id === proxyMatch[1])
+      const proxy = db.getProxy(proxyMatch[1])
       if (!proxy) { this.sendJson(res, 404, { error: 'Proxy not found' }); return }
-      this.sendJson(res, 200, proxy)
+      this.sendJson(res, 200, maskProxyForApi(proxy))
       return
     }
 

@@ -49,6 +49,26 @@ import { ScriptAnalyzer } from '../script-analyzer'
 import { RecordingRefiner } from '../recording-refiner'
 import type { CreateNodeInput, CreateWebhookInput, TelegramConfig, MarketplaceCategory, WebhookConfig } from '../../shared/types'
 import type { AutomationStep, DetectionVectorResult, RefineOptions } from '../../shared/types'
+import { validateProxyInput, tcpHandshake, detectIpLeak } from '../proxy/validation'
+
+/**
+ * Strip proxy credentials before sending the proxy list to the renderer.
+ *
+ * The renderer never displays passwords (it only shows an "auth" indicator
+ * when credentials are present), so we replace them with a boolean flag and
+ * masked username. This closes the IPC-side credential leak that existed
+ * even after the database started encrypting at rest.
+ */
+function sanitizeProxyForRenderer(proxy: any): any {
+  if (!proxy) return proxy
+  const { username, password, ...rest } = proxy
+  return {
+    ...rest,
+    has_auth: !!(username || password),
+    username: username ? '***' : null,
+    // password is intentionally omitted
+  }
+}
 
 // ── Phase 18: Run history export helpers ──────────────────────────────────
 
@@ -749,22 +769,48 @@ export function registerIpcHandlers(): void {
   // ── Proxies ───────────────────────────────────────────────────────────────
 
   ipcMain.handle('proxies:list', () => {
-    return db.getAllProxies()
+    // Decrypted on read, then credentials stripped before crossing the IPC
+    // boundary so the renderer never sees plaintext passwords.
+    const proxies = db.getAllProxies() as any[]
+    return proxies.map(sanitizeProxyForRenderer)
   })
 
-  ipcMain.handle('proxies:create', (_event, input: CreateProxyInput) => {
+  ipcMain.handle('proxies:create', async (_event, input: CreateProxyInput) => {
+    // 1. Structural validation — fail fast on malformed input.
+    const err = validateProxyInput(input)
+    if (err) throw new Error(`Invalid proxy ${err.field}: ${err.message}`)
+
+    // 2. Reachability check — TCP handshake to host:port. Lightweight (no
+    //    browser launch). If unreachable we still create the row so the user
+    //    can edit/retry later, but we mark it unhealthy upfront.
+    const reach = await tcpHandshake(input.host, input.port)
+
     const id = uuidv4()
     db.createProxy({ id, ...input })
-    return { id, ...input }
+
+    if (reach.ok) {
+      db.updateProxyHealth(id, reach.latency_ms, true)
+    } else {
+      db.updateProxyHealth(id, reach.latency_ms, false)
+    }
+
+    const created = db.getProxy(id)
+    return {
+      ...sanitizeProxyForRenderer(created),
+      reachable: reach.ok,
+      reach_error: reach.ok ? null : reach.error,
+    }
   })
 
   ipcMain.handle('proxies:delete', (_event, id: string) => {
     db.deleteProxy(id)
   })
 
-  ipcMain.handle('proxies:importBulk', (_event, lines: string[]) => {
+  ipcMain.handle('proxies:importBulk', async (_event, lines: string[]) => {
     let imported = 0
     let failed = 0
+    const errors: Array<{ line: string; reason: string }> = []
+
     for (const raw of lines) {
       const line = raw.trim()
       if (!line || line.startsWith('#')) continue
@@ -783,31 +829,56 @@ export function registerIpcHandlers(): void {
         const port = parseInt(parts[idx + 1] ?? '8080', 10)
         const username = parts[idx + 2] || undefined
         const password = parts[idx + 3] || undefined
-        if (!host || isNaN(port)) { failed++; continue }
+
+        // Run the same validator the single-create path uses so the bulk
+        // path can't smuggle in malformed hostnames.
+        const verr = validateProxyInput({ type, host, port, username, password })
+        if (verr) {
+          failed++
+          errors.push({ line, reason: `${verr.field}: ${verr.message}` })
+          continue
+        }
+
         const id = uuidv4()
         db.createProxy({ id, name: `${host}:${port}`, type, host, port, username, password })
         imported++
-      } catch {
+      } catch (e) {
         failed++
+        errors.push({ line, reason: (e as Error).message })
       }
     }
-    return { imported, failed }
+    return { imported, failed, errors: errors.slice(0, 20) }
   })
 
   ipcMain.handle('proxies:test', async (_event, id: string) => {
-    const proxies = db.getAllProxies() as any[]
-    const proxy = proxies.find((p) => p.id === id)
+    // Use getProxy directly so credentials are decrypted for the launch path.
+    const proxy = db.getProxy(id) as any
     if (!proxy) throw new Error(`Proxy ${id} not found`)
 
     const start = Date.now()
     try {
       const result = await bm.testProxy(proxy)
       db.updateProxyHealth(id, result.latency_ms, true)
-      return { latency_ms: result.latency_ms, healthy: true, ip: result.ip }
+
+      // IP-leak detection: compare the proxied exit IP with the user's real
+      // public IP. If they match, the proxy is dead/transparent and traffic
+      // is going out via the direct connection.
+      const leak = await detectIpLeak(result.ip)
+
+      return {
+        latency_ms: result.latency_ms,
+        healthy: true,
+        ip: result.ip,
+        leak: {
+          status: leak.status,
+          real_ip: leak.realIp,
+          message: leak.message,
+        },
+      }
     } catch {
       const latency_ms = Date.now() - start
       db.updateProxyHealth(id, latency_ms, false)
-      return { latency_ms, healthy: false }
+      return { latency_ms, healthy: false, leak: null }
     }
   })
 

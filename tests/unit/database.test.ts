@@ -198,4 +198,68 @@ describe('Database — Proxy CRUD', () => {
     db.deleteProxy('px3')
     expect(db.getAllProxies()).toHaveLength(0)
   })
+
+  // ── Credential encryption (P0 security fix) ─────────────────────────────
+
+  it('encrypts proxy credentials at rest and decrypts on read', () => {
+    db.createProxy({
+      id: 'px-enc',
+      name: 'Auth',
+      type: 'http',
+      host: '1.2.3.4',
+      port: 8080,
+      username: 'alice',
+      password: 'super-secret',
+    })
+
+    // Round-trip via the public CRUD API returns plain text
+    const fetched = db.getProxy('px-enc')
+    expect(fetched.username).toBe('alice')
+    expect(fetched.password).toBe('super-secret')
+
+    // But the raw storage layer holds an `enc:v1:` ciphertext
+    const raw = db.queryAll
+      ? (db as any).queryAll('SELECT username, password FROM proxies WHERE id = ?', ['px-enc'])[0]
+      : null
+    if (raw) {
+      expect(raw.username).toMatch(/^enc:v1:/)
+      expect(raw.password).toMatch(/^enc:v1:/)
+    }
+  })
+
+  it('handles a proxy with no credentials', () => {
+    db.createProxy({ id: 'px-noauth', name: 'Open', type: 'http', host: 'open.proxy', port: 80 })
+    const fetched = db.getProxy('px-noauth')
+    expect(fetched.username).toBeNull()
+    expect(fetched.password).toBeNull()
+  })
+
+  it('encryptLegacyProxyCredentials migrates plain-text rows in place', () => {
+    // Manually insert a row with plain-text credentials, simulating
+    // a database created before the encryption upgrade.
+    ;(db as any).run(
+      `INSERT INTO proxies (id, name, type, host, port, username, password)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ['px-legacy', 'Legacy', 'http', 'old.proxy', 8080, 'olduser', 'oldpass'],
+    )
+
+    const result = db.encryptLegacyProxyCredentials()
+    expect(result.migrated).toBe(1)
+
+    // After migration, public reads still return plain text…
+    const fetched = db.getProxy('px-legacy')
+    expect(fetched.username).toBe('olduser')
+    expect(fetched.password).toBe('oldpass')
+
+    // …but the underlying storage is now encrypted.
+    const raw = (db as any).queryAll(
+      'SELECT username, password FROM proxies WHERE id = ?',
+      ['px-legacy'],
+    )[0]
+    expect(raw.username).toMatch(/^enc:v1:/)
+    expect(raw.password).toMatch(/^enc:v1:/)
+
+    // Re-running migration is a no-op
+    expect(db.encryptLegacyProxyCredentials().migrated).toBe(0)
+  })
 })

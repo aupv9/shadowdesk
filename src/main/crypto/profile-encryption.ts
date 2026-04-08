@@ -28,7 +28,12 @@ export interface EncryptionError {
  * Uses scrypt with standard parameters matching sync.ts pattern.
  */
 function deriveKey(masterKey: Buffer, salt: string): Buffer {
-  return scryptSync(masterKey, salt, SCRYPT_KEYLEN, 16384, 8, 1)
+  // Pre-existing bug: positional N/r/p args were silently ignored at runtime
+  // (only `keylen` was honoured), so the on-disk key happened to use scrypt
+  // defaults (N=16384, r=8, p=1). The options-object form below produces
+  // byte-identical output, so this fix is fully backwards-compatible with
+  // any data already encrypted under the old call.
+  return scryptSync(masterKey, salt, SCRYPT_KEYLEN, { N: 16384, r: 8, p: 1 })
 }
 
 /**
