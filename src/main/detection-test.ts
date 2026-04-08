@@ -994,8 +994,10 @@ export class DetectionTestRunner {
         })
         const synthKey = event.key
 
-        // Check if keyboard layout is available
-        const hasKeyboardApi = navigator.keyboard && typeof navigator.keyboard.getLayoutMap === 'function'
+        // Check if keyboard layout is available.
+        // navigator.keyboard is a non-standard Chromium API not in lib.dom.d.ts.
+        const nav = navigator as any
+        const hasKeyboardApi = nav.keyboard && typeof nav.keyboard.getLayoutMap === 'function'
 
         return {
           hasKeyboardApi,

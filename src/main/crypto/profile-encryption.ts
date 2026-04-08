@@ -180,6 +180,61 @@ export function safeDecryptProxyCredential(
 }
 
 /**
+ * Phase 19.1: Encrypt workflow run variables (JSON string) at rest.
+ *
+ * Workflow variables frequently carry secrets — API keys, OAuth tokens,
+ * credentials interpolated into automation steps via `{cred.password}`.
+ * Storing them plaintext in `workflow_runs.variables` exposes them to anyone
+ * who reads the SQLite database file.
+ *
+ * Salt: derived from the run id so every row uses a unique key bucket.
+ */
+export function encryptRunVariables(
+  variablesJson: string,
+  masterKey: Buffer,
+  runId: string,
+): string {
+  const salt = `workflow:run:variables:${runId}`
+  return encryptData(variablesJson, masterKey, salt)
+}
+
+/**
+ * Phase 19.1: Decrypt workflow run variables.
+ * Throws EncryptionError on failure.
+ */
+export function decryptRunVariables(
+  encrypted: string,
+  masterKey: Buffer,
+  runId: string,
+): string {
+  const salt = `workflow:run:variables:${runId}`
+  return decryptData(encrypted, masterKey, salt)
+}
+
+/**
+ * Phase 19.1: Safe decrypt wrapper used by database reads.
+ * Returns null on failure so callers can degrade gracefully (run history
+ * should still be browsable even if a single row's variables are corrupt).
+ */
+export function safeDecryptRunVariables(
+  encrypted: string | null,
+  masterKey: Buffer,
+  runId: string,
+  onError?: (err: EncryptionError) => void,
+): string | null {
+  if (!encrypted) return null
+
+  try {
+    return decryptRunVariables(encrypted, masterKey, runId)
+  } catch (error) {
+    const encErr = error as EncryptionError
+    onError?.(encErr)
+    console.error(`Failed to decrypt variables for run ${runId}:`, encErr.message)
+    return null
+  }
+}
+
+/**
  * Derive master encryption key from application secrets.
  * IMPORTANT: This must be deterministic and consistent across app restarts.
  * In production, consider:

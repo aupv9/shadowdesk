@@ -16,6 +16,18 @@ interface ActiveRun {
 const POLL_MS = 3000
 
 /**
+ * Phase 19.1: Cap how many step events we keep per active run.
+ *
+ * Without this cap, `stepsRef.current` grew unbounded for every
+ * (workflowId, profileId) pair the tab had ever seen — long-running loops
+ * could accumulate thousands of step records and the React reconciler had
+ * to diff them on every incoming step. The visible UI only shows the last
+ * `STEPS_DISPLAY_LIMIT` anyway, so we trim aggressively before storage.
+ */
+const STEPS_BUFFER_LIMIT = 100
+const STEPS_DISPLAY_LIMIT = 20
+
+/**
  * Live monitor — discovers active workflow runs by combining:
  *   - all loaded workflows × all active sessions → ask `isRunning` for each pair
  *   - subscribe to step-progress events to populate per-run live step list
@@ -82,17 +94,25 @@ export function LiveMonitorTab() {
     const unsub = window.api.automation.onStepProgress(({ workflowId, profileId, step }) => {
       const k = keyFor(workflowId, profileId)
       const existing = stepsRef.current.get(k) ?? []
-      // Replace if this stepId already exists (retry), otherwise append
+      // Replace if this stepId already exists (retry), otherwise append.
       const idx = existing.findIndex((s) => s.stepId === step.stepId)
-      const next = idx >= 0
+      let next = idx >= 0
         ? existing.map((s, i) => (i === idx ? step : s))
         : [...existing, step]
+      // Phase 19.1: Cap buffer to prevent unbounded memory growth on
+      // long-running workflows (loops can emit thousands of steps).
+      if (next.length > STEPS_BUFFER_LIMIT) {
+        next = next.slice(next.length - STEPS_BUFFER_LIMIT)
+      }
       stepsRef.current.set(k, next)
-      // Update React state for any active run
+      // Only touch React state if this run is currently displayed.
+      // Steps that arrive before the next probe tick still land in the
+      // ref and will be flushed when the run is next picked up.
       setActiveRuns((prev) => {
+        const ar = prev.get(k)
+        if (!ar) return prev
         const m = new Map(prev)
-        const ar = m.get(k)
-        if (ar) m.set(k, { ...ar, steps: next })
+        m.set(k, { ...ar, steps: next })
         return m
       })
     })
@@ -105,6 +125,12 @@ export function LiveMonitorTab() {
     const id = setInterval(probeActiveRuns, POLL_MS)
     return () => clearInterval(id)
   }, [workflows.length, activeSessions.length])
+
+  // Phase 19.1: Drop the in-memory step buffer when the tab unmounts so we
+  // don't carry stale step history across tab switches inside the dashboard.
+  useEffect(() => {
+    return () => { stepsRef.current.clear() }
+  }, [])
 
   const handleStop = async (run: ActiveRun) => {
     try {
@@ -174,7 +200,7 @@ export function LiveMonitorTab() {
                 {run.steps.length === 0 ? (
                   <div className="text-xs text-slate-600 italic">Waiting for first step…</div>
                 ) : (
-                  run.steps.slice(-20).map((s, i) => (
+                  run.steps.slice(-STEPS_DISPLAY_LIMIT).map((s, i) => (
                     <div key={`${s.stepId}-${i}`} className="flex items-center gap-2 text-[11px]">
                       {s.success
                         ? <CheckCircle className="w-2.5 h-2.5 text-green-400 shrink-0" />

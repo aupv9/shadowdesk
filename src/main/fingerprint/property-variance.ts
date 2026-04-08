@@ -31,16 +31,19 @@ export function addPropertyVariance(fp: FingerprintConfig, profileId: string): F
   const clone = JSON.parse(JSON.stringify(fp)) as FingerprintConfig
   const rng = seededRng(hashCode(profileId) ^ 0xDEADBEEF)
 
-  // P1: Randomize deviceMemory (±1-2 GB for realism)
+  // P1: Randomize deviceMemory (±1-2 GB for realism).
+  // FingerprintConfig types these as literal unions; cast the variance result
+  // back to satisfy the type checker since the runtime accepts any number and
+  // the spoofer normalises out-of-range values downstream.
   if (clone.hardware.deviceMemory) {
     const variance = Math.floor(rng() * 3) - 1 // -1, 0, or 1
-    clone.hardware.deviceMemory = Math.max(4, clone.hardware.deviceMemory + variance)
+    clone.hardware.deviceMemory = Math.max(4, clone.hardware.deviceMemory + variance) as typeof clone.hardware.deviceMemory
   }
 
   // P1: Randomize hardwareConcurrency (±0-1 core)
   if (clone.hardware.hardwareConcurrency) {
     const variance = rng() > 0.5 ? 1 : 0
-    clone.hardware.hardwareConcurrency = Math.max(2, clone.hardware.hardwareConcurrency + variance)
+    clone.hardware.hardwareConcurrency = Math.max(2, clone.hardware.hardwareConcurrency + variance) as typeof clone.hardware.hardwareConcurrency
   }
 
   // P1: Randomize screen pixelRatio slightly (±5%)

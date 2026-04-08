@@ -8,6 +8,8 @@ import {
   safeDecryptCookies,
   encryptProxyCredential,
   safeDecryptProxyCredential,
+  encryptRunVariables,
+  safeDecryptRunVariables,
   deriveMasterKey,
 } from './crypto/profile-encryption'
 import { getMachineId } from './license'
@@ -22,6 +24,40 @@ export class Database {
   private db!: SqlDatabase
   private dbPath!: string
   private masterKey: Buffer | null = null
+
+  /**
+   * Phase 19.1: In-memory cache for the Run Dashboard metrics queries.
+   *
+   * `getWorkflowRunMetrics()` and `getActionMetrics()` parse JSON `step_results`
+   * for the most recent 100-200 runs on every call. The Metrics tab refetches
+   * on workflow filter change, on tab switch, and on manual refresh — and the
+   * underlying data only changes when a run finishes.
+   *
+   * We therefore cache the computed result for `METRICS_CACHE_TTL_MS` and
+   * invalidate the entire cache whenever `addWorkflowRun()` writes a new row.
+   * This is conservative (any new run busts cache for every workflow filter)
+   * but avoids the per-call O(N*M) JSON.parse cost during normal browsing.
+   */
+  private metricsCache = new Map<string, { value: unknown; expiresAt: number }>()
+  private static readonly METRICS_CACHE_TTL_MS = 30_000
+
+  private getCachedMetric<T>(key: string, compute: () => T): T {
+    const now = Date.now()
+    const hit = this.metricsCache.get(key)
+    if (hit && hit.expiresAt > now) {
+      return hit.value as T
+    }
+    const value = compute()
+    this.metricsCache.set(key, {
+      value,
+      expiresAt: now + Database.METRICS_CACHE_TTL_MS,
+    })
+    return value
+  }
+
+  private invalidateMetricsCache(): void {
+    this.metricsCache.clear()
+  }
 
   static getInstance(): Database {
     if (!Database.instance) {
@@ -308,6 +344,23 @@ export class Database {
     try {
       this.db.exec(`ALTER TABLE workflow_runs ADD COLUMN variables TEXT`)
     } catch { /* exists */ }
+
+    // Phase 19.1 (Run Dashboard improvements): Encryption flag for run variables.
+    // 0 = plain-text (legacy), 1 = AES-256-GCM encrypted via encryptRunVariables().
+    try {
+      this.db.exec(`ALTER TABLE workflow_runs ADD COLUMN variables_encryption_version INTEGER DEFAULT 0`)
+    } catch { /* exists */ }
+
+    // Phase 19.1 (Run Dashboard improvements): Performance indexes for the
+    // metrics dashboard. The Run Dashboard's Metrics + History tabs run
+    // ORDER BY started_at DESC and filter by status — without these indexes
+    // every query forces a full table scan once workflow_runs grows large.
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_workflow_runs_started ON workflow_runs(started_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_workflow_runs_status  ON workflow_runs(status);
+      CREATE INDEX IF NOT EXISTS idx_workflow_runs_wf_started
+        ON workflow_runs(workflow_id, started_at DESC);
+    `)
 
     // Tier 3 RPA — workflow versioning (mirrors profile_versions pattern)
     this.db.exec(`
@@ -1124,6 +1177,9 @@ export class Database {
 
   deleteWorkflow(id: string): void {
     this.run('DELETE FROM workflows WHERE id = ?', [id])
+    // Phase 19.1: ON DELETE CASCADE removes workflow_runs rows; bust the
+    // metrics cache so the dashboard reflects the deletion immediately.
+    this.invalidateMetricsCache()
   }
 
   // ── Workflow Run Log ──────────────────────────────────────────────────────
@@ -1140,10 +1196,28 @@ export class Database {
     duration_ms?: number
     variables?: Record<string, string>
   }): void {
+    // Phase 19.1: Encrypt variables at rest. Run variables frequently contain
+    // secrets (API keys, passwords interpolated via {cred.password}). On
+    // encryption failure we fall back to plaintext + version 0 so the run is
+    // still recorded — observability beats silent data loss.
+    let variablesField: string | null = null
+    let variablesVersion = 0
+    if (run.variables) {
+      const json = JSON.stringify(run.variables)
+      try {
+        variablesField = encryptRunVariables(json, this.getMasterKey(), run.id)
+        variablesVersion = 1
+      } catch (error) {
+        console.error(`[Database] Failed to encrypt variables for run ${run.id}:`, error)
+        variablesField = json
+        variablesVersion = 0
+      }
+    }
+
     this.run(
       `INSERT INTO workflow_runs
-        (id, workflow_id, profile_id, status, step_results, error, started_at, completed_at, duration_ms, variables)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, workflow_id, profile_id, status, step_results, error, started_at, completed_at, duration_ms, variables, variables_encryption_version)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         run.id,
         run.workflow_id,
@@ -1154,21 +1228,58 @@ export class Database {
         run.started_at ?? new Date().toISOString(),
         run.completed_at,
         run.duration_ms ?? null,
-        run.variables ? JSON.stringify(run.variables) : null
+        variablesField,
+        variablesVersion,
       ]
     )
+    // Phase 19.1: New run invalidates the cached metrics aggregations.
+    this.invalidateMetricsCache()
+  }
+
+  /**
+   * Phase 19.1: Decrypt the variables column for a run row, returning a JSON
+   * string ready for `JSON.parse()`. Backward compatible with legacy plain
+   * text rows where `variables_encryption_version` is 0/null.
+   */
+  private decryptRunVariablesField(
+    variables: string | null | undefined,
+    version: number | null | undefined,
+    runId: string,
+  ): string | null {
+    if (!variables) return null
+    if (!version || version === 0) return variables
+    return safeDecryptRunVariables(variables, this.getMasterKey(), runId)
+  }
+
+  /**
+   * Phase 19.1: Walk a list of raw workflow_runs rows and replace the
+   * encrypted `variables` field with the decrypted JSON string in-place.
+   * Used by every code path that returns rows to the renderer or to exports.
+   */
+  private hydrateRunVariables<T extends { id: string; variables?: any; variables_encryption_version?: number | null }>(
+    rows: T[],
+  ): T[] {
+    for (const row of rows) {
+      row.variables = this.decryptRunVariablesField(
+        row.variables ?? null,
+        row.variables_encryption_version ?? 0,
+        row.id,
+      )
+    }
+    return rows
   }
 
   getWorkflowRuns(workflowId: string, limit = 20): any[] {
-    return this.queryAll(
+    const rows = this.queryAll(
       'SELECT * FROM workflow_runs WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?',
       [workflowId, limit]
     )
+    return this.hydrateRunVariables(rows)
   }
 
   /** Tier 2: Recent runs across ALL workflows for the metrics dashboard. */
   getRecentWorkflowRuns(limit = 100): any[] {
-    return this.queryAll(
+    const rows = this.queryAll(
       `SELECT r.*, w.name AS workflow_name, p.name AS profile_name
        FROM workflow_runs r
        LEFT JOIN workflows w ON w.id = r.workflow_id
@@ -1177,11 +1288,29 @@ export class Database {
        LIMIT ?`,
       [limit]
     )
+    return this.hydrateRunVariables(rows)
   }
 
   /** Tier 2: Aggregated stats for the metrics dashboard. Optionally scoped
    *  to a single workflow id. */
   getWorkflowRunMetrics(workflowId?: string): {
+    total: number
+    completed: number
+    failed: number
+    stopped: number
+    avgDurationMs: number
+    successRate: number
+    last7Days: { date: string; total: number; failed: number }[]
+    actionErrors: { action: string; count: number }[]
+  } {
+    return this.getCachedMetric(`runMetrics:${workflowId ?? '*'}`, () =>
+      this.computeWorkflowRunMetrics(workflowId),
+    )
+  }
+
+  /** Phase 19.1: Pure compute path for `getWorkflowRunMetrics()`. Wrapped by
+   *  the cache layer above; safe to call directly when fresh data is required. */
+  private computeWorkflowRunMetrics(workflowId?: string): {
     total: number
     completed: number
     failed: number
@@ -1265,6 +1394,21 @@ export class Database {
 
   /** Tier 5: detailed per-action metrics. Returns slowest/fastest/avg per action. */
   getActionMetrics(workflowId?: string, limit = 100): {
+    action: string
+    count: number
+    avg_ms: number
+    min_ms: number
+    max_ms: number
+    failure_rate: number
+  }[] {
+    return this.getCachedMetric(
+      `actionMetrics:${workflowId ?? '*'}:${limit}`,
+      () => this.computeActionMetrics(workflowId, limit),
+    )
+  }
+
+  /** Phase 19.1: Pure compute path for `getActionMetrics()`. */
+  private computeActionMetrics(workflowId?: string, limit = 100): {
     action: string
     count: number
     avg_ms: number
