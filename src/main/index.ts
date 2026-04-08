@@ -9,6 +9,7 @@ import { ApiServer } from './api-server'
 import { getSettings } from './settings'
 import { resolveFingerprint } from './fingerprint/presets'
 import { WorkflowScheduler } from './scheduler'
+import { CleanupWorker } from './cleanup-worker'
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -91,6 +92,11 @@ app.whenReady().then(async () => {
   // Phase 10.2 — start the workflow scheduler poller
   WorkflowScheduler.getInstance().start()
 
+  // Phase 2.3 — start the cleanup worker for async profile cleanup
+  const cleanupWorker = CleanupWorker.getInstance()
+  cleanupWorker.init(mainWindow)
+  cleanupWorker.start()
+
   // Auto-launch last used profile if setting is enabled
   const settings = getSettings()
   if (settings.autoLaunchLastSession) {
@@ -123,9 +129,10 @@ app.on('window-all-closed', () => {
   }
 })
 
-// Clean up API server + scheduler on quit
+// Clean up API server + scheduler + cleanup worker on quit
 app.on('before-quit', async () => {
   WorkflowScheduler.getInstance().stop()
+  CleanupWorker.getInstance().stop()
   await ApiServer.getInstance().stop()
 })
 

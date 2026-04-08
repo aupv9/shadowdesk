@@ -499,6 +499,91 @@ export class Database {
     `)
   }
 
+  /**
+   * Phase 2.1: Paginated profile listing with filtering
+   * @param limit - Number of profiles per page (default 50, max 100)
+   * @param offset - Pagination offset (0-based)
+   * @param filters - Optional filters: { groupId?: string, status?: 'active'|'archived' }
+   * @returns { profiles, total, hasMore }
+   */
+  getProfilesPaginated(
+    limit: number = 50,
+    offset: number = 0,
+    filters?: { groupId?: string; status?: 'active' | 'archived' }
+  ): { profiles: any[]; total: number; hasMore: boolean } {
+    // Normalize limit (min 1, max 100)
+    const normalizedLimit = Math.max(1, Math.min(limit, 100))
+    const normalizedOffset = Math.max(0, offset)
+
+    // Build WHERE clause
+    const whereConditions = []
+    const params: any[] = []
+
+    if (filters?.status) {
+      whereConditions.push(`p.status = ?`)
+      params.push(filters.status)
+    } else {
+      whereConditions.push(`p.status != 'archived'`)
+    }
+
+    if (filters?.groupId) {
+      whereConditions.push(`p.group_id = ?`)
+      params.push(filters.groupId)
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
+
+    // Count total
+    const countResult = this.queryOne(`SELECT COUNT(*) as count FROM profiles p ${whereClause}`, params)
+    const total = countResult?.count ?? 0
+
+    // Fetch paginated results
+    const profiles = this.queryAll(
+      `
+      SELECT p.*,
+             pr.host || ':' || CAST(pr.port AS TEXT) AS proxy_label,
+             pr.type AS proxy_type,
+             pg.name  AS group_name,
+             pg.color AS group_color
+      FROM profiles p
+      LEFT JOIN proxies pr ON p.proxy_id = pr.id
+      LEFT JOIN profile_groups pg ON p.group_id = pg.id
+      ${whereClause}
+      ORDER BY p.created_at DESC
+      LIMIT ? OFFSET ?
+    `,
+      [...params, normalizedLimit, normalizedOffset]
+    )
+
+    const hasMore = normalizedOffset + normalizedLimit < total
+
+    return { profiles, total, hasMore }
+  }
+
+  /**
+   * Count total profiles (optionally filtered)
+   */
+  countProfiles(filters?: { groupId?: string; status?: 'active' | 'archived' }): number {
+    const whereConditions = []
+    const params: any[] = []
+
+    if (filters?.status) {
+      whereConditions.push(`status = ?`)
+      params.push(filters.status)
+    } else {
+      whereConditions.push(`status != 'archived'`)
+    }
+
+    if (filters?.groupId) {
+      whereConditions.push(`group_id = ?`)
+      params.push(filters.groupId)
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
+    const result = this.queryOne(`SELECT COUNT(*) as count FROM profiles p ${whereClause}`, params)
+    return result?.count ?? 0
+  }
+
   getProfile(id: string): any {
     return this.queryOne(`
       SELECT p.*,
@@ -551,6 +636,65 @@ export class Database {
 
   deleteProfile(id: string): void {
     this.run(`UPDATE profiles SET status = 'archived' WHERE id = ?`, [id])
+  }
+
+  /**
+   * Phase 2.2: Bulk delete profiles (soft delete)
+   * @param ids - Array of profile IDs to delete (max 1000)
+   * @returns Number of profiles deleted
+   */
+  bulkDeleteProfiles(ids: string[]): number {
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 1000) {
+      throw new Error(`Bulk delete requires 1-1000 profile IDs, got ${ids.length}`)
+    }
+
+    const placeholders = ids.map(() => '?').join(',')
+    this.run(
+      `UPDATE profiles SET status = 'archived' WHERE id IN (${placeholders})`,
+      ids
+    )
+
+    return ids.length
+  }
+
+  /**
+   * Phase 2.2: Bulk assign proxy to profiles
+   * @param profileIds - Array of profile IDs (max 1000)
+   * @param proxyId - Proxy ID to assign (or null to unassign)
+   * @returns Number of profiles updated
+   */
+  bulkUpdateProxyId(profileIds: string[], proxyId: string | null): number {
+    if (!Array.isArray(profileIds) || profileIds.length === 0 || profileIds.length > 1000) {
+      throw new Error(`Bulk update requires 1-1000 profile IDs, got ${profileIds.length}`)
+    }
+
+    const placeholders = profileIds.map(() => '?').join(',')
+    this.run(
+      `UPDATE profiles SET proxy_id = ? WHERE id IN (${placeholders})`,
+      [proxyId ?? null, ...profileIds]
+    )
+
+    return profileIds.length
+  }
+
+  /**
+   * Phase 2.2: Bulk assign group to profiles
+   * @param profileIds - Array of profile IDs (max 1000)
+   * @param groupId - Group ID to assign (or null to unassign)
+   * @returns Number of profiles updated
+   */
+  bulkUpdateGroupId(profileIds: string[], groupId: string | null): number {
+    if (!Array.isArray(profileIds) || profileIds.length === 0 || profileIds.length > 1000) {
+      throw new Error(`Bulk update requires 1-1000 profile IDs, got ${profileIds.length}`)
+    }
+
+    const placeholders = profileIds.map(() => '?').join(',')
+    this.run(
+      `UPDATE profiles SET group_id = ? WHERE id IN (${placeholders})`,
+      [groupId ?? null, ...profileIds]
+    )
+
+    return profileIds.length
   }
 
   updateProfileLastUsed(id: string): void {

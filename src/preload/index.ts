@@ -3,10 +3,16 @@ import { contextBridge, ipcRenderer } from 'electron'
 const api = {
   profiles: {
     list:               ()                                    => ipcRenderer.invoke('profiles:list'),
+    // Phase 2.1: Pagination
+    listPaginated:      (limit: number, offset: number, filters?: any) => ipcRenderer.invoke('profiles:list-paginated', limit, offset, filters),
     create:             (input: unknown)                      => ipcRenderer.invoke('profiles:create', input),
     update:             (id: string, data: unknown)           => ipcRenderer.invoke('profiles:update', id, data),
     clone:              (id: string)                          => ipcRenderer.invoke('profiles:clone', id),
     delete:             (id: string)                          => ipcRenderer.invoke('profiles:delete', id),
+    // Phase 2.2: Bulk operations
+    bulkDelete:         (profileIds: string[])                => ipcRenderer.invoke('profiles:bulk-delete', profileIds),
+    bulkAssignProxy:    (profileIds: string[], proxyId: string | null) => ipcRenderer.invoke('profiles:bulk-proxy', profileIds, proxyId),
+    bulkAssignGroup:    (profileIds: string[], groupId: string | null) => ipcRenderer.invoke('profiles:bulk-group', profileIds, groupId),
     launch:             (id: string)                          => ipcRenderer.invoke('profiles:launch', id),
     close:              (id: string)                          => ipcRenderer.invoke('profiles:close', id),
     active:             ()                                    => ipcRenderer.invoke('profiles:active'),
@@ -334,6 +340,13 @@ const api = {
     // 16.D — Behaviour Pattern Library
     behaviorArchetypes:  ()                                                                => ipcRenderer.invoke('ai:behaviorArchetypes'),
     behaviorArchetype:   (id: string)                                                      => ipcRenderer.invoke('ai:behaviorArchetype', id)
+  },
+
+  // Phase 2.3 — Cleanup Worker
+  cleanup: {
+    status:       () => ipcRenderer.invoke('cleanup:status'),
+    retryFailed:  () => ipcRenderer.invoke('cleanup:retryFailed'),
+    clearFailed:  () => ipcRenderer.invoke('cleanup:clearFailed')
   }
 }
 

@@ -1100,3 +1100,38 @@ export interface IpcResponse<T> {
   data?: T
   error?: IpcErrorResponse
 }
+
+// ─── Pagination Types (Phase 2.1) ──────────────────────────────────────────
+
+export interface PaginationResponse<T> {
+  items: T[]
+  total: number
+  hasMore: boolean
+  limit: number
+  offset: number
+}
+
+export interface ProfileListOptions {
+  limit?: number
+  offset?: number
+  filters?: {
+    groupId?: string
+    status?: 'active' | 'archived'
+  }
+}
+
+// ─── Cleanup Worker Types (Phase 2.3) ──────────────────────────────────────
+
+export interface CleanupTaskStatus {
+  profileId: string
+  paths: string[]
+  retries: number
+  lastAttempt: string | null
+}
+
+export interface CleanupWorkerStatus {
+  queued: number
+  processing: number
+  failed: number
+  total: number
+}
