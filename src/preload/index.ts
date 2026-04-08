@@ -85,8 +85,24 @@ const api = {
     test:        (id: string)          => ipcRenderer.invoke('proxies:test', id),
     importBulk:  (lines: string[])     => ipcRenderer.invoke('proxies:importBulk', lines)
   },
+  // Phase 20 — Proxy Provider Marketplace (UI: "Phase 17 — Proxy API Integration")
+  proxyProviders: {
+    catalog:           ()                                  => ipcRenderer.invoke('proxyProviders:catalog'),
+    list:              ()                                  => ipcRenderer.invoke('proxyProviders:list'),
+    create:            (input: unknown)                    => ipcRenderer.invoke('proxyProviders:create', input),
+    update:            (id: string, patch: unknown)        => ipcRenderer.invoke('proxyProviders:update', id, patch),
+    delete:            (id: string)                        => ipcRenderer.invoke('proxyProviders:delete', id),
+    test:              (id: string)                        => ipcRenderer.invoke('proxyProviders:test', id),
+    refreshUsage:      (id: string)                        => ipcRenderer.invoke('proxyProviders:refreshUsage', id),
+    generate:          (id: string, options: unknown)      => ipcRenderer.invoke('proxyProviders:generate', id, options),
+    generateAndImport: (id: string, options: unknown)      => ipcRenderer.invoke('proxyProviders:generateAndImport', id, options)
+  },
   fingerprint: {
     presets: () => ipcRenderer.invoke('fingerprint:presets')
+  },
+  // Phase 17 — Behavioral Config UI preset bundles
+  behavior: {
+    presets: () => ipcRenderer.invoke('behavior:presets')
   },
   extensions: {
     list:       (profileId: string)                          => ipcRenderer.invoke('extensions:list', profileId),

@@ -3,6 +3,7 @@ import { Sidebar } from './components/Layout/Sidebar'
 import { ProfileManager } from './components/ProfileManager'
 import { ProxyManager } from './components/ProxyManager'
 import { FingerprintEditor } from './components/FingerprintEditor'
+import { BehavioralConfig } from './components/BehavioralConfig'
 import { DetectionDashboard } from './components/DetectionDashboard'
 import { AutomationBuilder } from './components/AutomationBuilder'
 import { RunDashboard } from './components/RunDashboard'
@@ -76,6 +77,9 @@ export default function App() {
         </ErrorBoundary>
         <ErrorBoundary section="Fingerprint">
           {section === 'fingerprint' && <FingerprintEditor />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Behavior">
+          {section === 'behavior'    && <BehavioralConfig />}
         </ErrorBoundary>
         <ErrorBoundary section="Detection">
           {section === 'detection'   && <DetectionDashboard onNavigate={setSection} />}

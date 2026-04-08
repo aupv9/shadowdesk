@@ -44,6 +44,9 @@ export type {
   ProfileVersion,
   BehaviorConfig,
   TimingConfig,
+  // Phase 17
+  BehaviorPreset,
+  BehaviorPresetId,
   // Phase 8
   ChromiumPatch,
   ChromiumPatchStatus,
@@ -80,14 +83,40 @@ export type {
   BehaviorArchetype,
   // Phase 17 — SEA Platform Templates
   SeaPlatform,
-  SeaPlatformKind
+  SeaPlatformKind,
+  // Phase 20 — Proxy Provider Marketplace ("Phase 17 — Proxy API Integration")
+  ProxyProviderType,
+  ProxyPoolType,
+  ProxySessionType,
+  ProxyProviderCatalogEntry,
+  ProxyProviderAccount,
+  ProxyProviderAccountView,
+  ProxyProviderCredentialsInput,
+  ProxyProviderUsage,
+  ProxyProviderTestResult,
+  ProxyGenerationOptions,
+  GeneratedProxy
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
 
 // Renderer-only types
 
-export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'detection' | 'settings' | 'team' | 'account' | 'automation' | 'runs' | 'patches' | 'marketplace' | 'ai' | 'sea-platforms'
+export type NavSection =
+  | 'profiles'
+  | 'proxies'
+  | 'fingerprint'
+  | 'behavior'       // Phase 17 — Behavioral Config UI
+  | 'detection'
+  | 'settings'
+  | 'team'
+  | 'account'
+  | 'automation'
+  | 'runs'
+  | 'patches'
+  | 'marketplace'
+  | 'ai'
+  | 'sea-platforms'  // Phase 17 — SEA Platform Templates
 
 export interface Toast {
   id: string

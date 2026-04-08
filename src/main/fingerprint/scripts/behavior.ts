@@ -9,11 +9,35 @@ import type { BehaviorConfig } from '../../../shared/types'
  *
  * All noise is deterministic via the profile seed so the same profile always
  * produces the same behavioural signature across sessions.
+ *
+ * Phase 17 — The Behavioral Config UI now lets users tune intensity for each
+ * stream (mouse jitter sigma, typing WPM/variance, scroll decay/noise). This
+ * function reads those advanced knobs if present; otherwise it falls back
+ * to the Phase 6 defaults so older profiles keep working.
  */
 export function buildBehaviorScript(config: BehaviorConfig, seed: number): string {
   if (!config.mouseJitter && !config.typingNoise && !config.scrollInertia) {
     return ''
   }
+
+  // Phase 17: clamp advanced params to sane ranges so a broken UI slider
+  // can't crash the injector or produce absurd values.
+  const clamp = (v: number, lo: number, hi: number) =>
+    Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo
+
+  const mouseSigma     = clamp(config.mouseJitterSigma ?? 0.4, 0, 2)
+  const typingWpm      = clamp(config.typingWpm ?? 75, 40, 200)
+  const typingVarPct   = clamp(config.typingVariancePct ?? 20, 0, 60)
+  const typingHoldSig  = clamp(config.typingHoldSigmaMs ?? 5, 0, 25)
+  const scrollDecay    = clamp(config.scrollDecay ?? 0.88, 0.6, 0.99)
+  const scrollNoise    = clamp(config.scrollNoisePx ?? 2, 0, 10)
+
+  // Derive inter-key sigma from WPM variance — this is what the script uses
+  // to jitter each keydown/keyup timestamp in ms.
+  //   baseInterKeyMs = (60 * 1000) / (typingWpm * 5)   [5 chars per word]
+  //   interKeySigma  = baseInterKeyMs * typingVarPct / 100
+  const baseInterKey   = (60 * 1000) / (typingWpm * 5)
+  const interKeySigma  = baseInterKey * (typingVarPct / 100)
 
   return `
 (function() {
@@ -40,14 +64,17 @@ ${config.mouseJitter ? `
   // ── Mouse jitter ─────────────────────────────────────────────────────────
   // Add sub-pixel noise to clientX/clientY/screenX/screenY so the pointer
   // path never looks perfectly mechanical (straight lines, constant speed).
+  // Phase 17: sigma is user-configurable via the Behavioral Config UI.
   (function() {
     var jitterSeed = ${(seed ^ 0xDEAD) >>> 0};
     var jRng = mkRng(jitterSeed);
+    var MOUSE_SIGMA = ${mouseSigma};
 
     function addJitter(evt) {
       if (!(evt instanceof MouseEvent)) return;
-      var dx = gaussNoise(jRng, 0.4);
-      var dy = gaussNoise(jRng, 0.4);
+      if (MOUSE_SIGMA <= 0) return;
+      var dx = gaussNoise(jRng, MOUSE_SIGMA);
+      var dy = gaussNoise(jRng, MOUSE_SIGMA);
       // Redefine read-only properties on the event prototype chain
       try {
         Object.defineProperties(evt, {
@@ -76,21 +103,24 @@ ${config.mouseJitter ? `
 
 ${config.typingNoise ? `
   // ── Typing cadence noise ──────────────────────────────────────────────────
-  // Real users have variable inter-keystroke timing (50–120 ms) and subtle
-  // key-hold durations. We expose this by patching timeStamp on KeyboardEvents
-  // so detection scripts that compute typing rhythm see realistic variance.
+  // Real users have variable inter-keystroke timing and subtle key-hold
+  // durations. We expose this by patching timeStamp on KeyboardEvents so
+  // detection scripts that compute typing rhythm see realistic variance.
+  // Phase 17: hold + inter-key sigma derived from user-selected WPM and
+  // variance percentage in the Behavioral Config UI.
   (function() {
     var typeSeed = ${(seed ^ 0xBEEF) >>> 0};
     var tRng = mkRng(typeSeed);
-    // Base hold jitter ±5 ms, inter-key jitter ±25 ms
+    var HOLD_SIGMA_MS       = ${typingHoldSig};
+    var INTER_KEY_SIGMA_MS  = ${interKeySigma.toFixed(3)};
     var holdJitter = 0;
     var interJitter = 0;
 
     var origDispatch = EventTarget.prototype.dispatchEvent;
     EventTarget.prototype.dispatchEvent = function(evt) {
       if (evt instanceof KeyboardEvent) {
-        holdJitter  = gaussNoise(tRng, 5);
-        interJitter = gaussNoise(tRng, 12);
+        holdJitter  = gaussNoise(tRng, HOLD_SIGMA_MS);
+        interJitter = gaussNoise(tRng, INTER_KEY_SIGMA_MS);
         try {
           Object.defineProperty(evt, 'timeStamp', {
             get: function() {
@@ -116,11 +146,15 @@ ${config.scrollInertia ? `
   // Real trackpad/mouse wheel scroll has deceleration momentum. We expose
   // this by patching WheelEvent.deltaY so burst-scrolling detectors see
   // decreasing delta magnitudes (inertia decay), not identical values.
+  // Phase 17: decay + noise are user-configurable.
   (function() {
     var scrollSeed = ${(seed ^ 0xFACE) >>> 0};
     var sRng = mkRng(scrollSeed);
     var lastDelta = 0;
-    var decayFactor = 0.82 + sRng() * 0.12; // 0.82–0.94
+    // Center the user-selected decay with a small deterministic +/- drift
+    // so identical configs across profiles still diverge slightly.
+    var decayFactor = ${scrollDecay} + (sRng() - 0.5) * 0.06;
+    var SCROLL_NOISE_PX = ${scrollNoise};
 
     var origAEL2 = EventTarget.prototype.addEventListener;
     EventTarget.prototype.addEventListener = function(type, listener, opts) {
@@ -129,7 +163,7 @@ ${config.scrollInertia ? `
           if (Math.abs(evt.deltaY) > 0) {
             var naturalDelta = lastDelta === 0
               ? evt.deltaY
-              : lastDelta * decayFactor + gaussNoise(sRng, 2);
+              : lastDelta * decayFactor + gaussNoise(sRng, SCROLL_NOISE_PX);
             lastDelta = naturalDelta;
             try {
               Object.defineProperty(evt, 'deltaY', {

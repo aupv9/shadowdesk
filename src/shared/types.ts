@@ -109,6 +109,10 @@ export interface NetworkConfig {
 }
 
 // Phase 6: Behavior simulation config
+// Phase 17: Extended with fine-grained parameters exposed in the
+// Behavioral Config UI. All advanced fields are optional so older
+// profiles continue to work unchanged — the scripts pick sensible
+// defaults derived from the legacy boolean toggles.
 export interface BehaviorConfig {
   // Mouse movement simulation: adds micro-jitter on pointer events
   mouseJitter: boolean
@@ -116,9 +120,31 @@ export interface BehaviorConfig {
   typingNoise: boolean
   // Scroll inertia: simulates natural momentum on wheel events
   scrollInertia: boolean
+
+  // ── Phase 17: Advanced mouse jitter tuning ──────────────────────────────
+  /** Gaussian sigma (px) applied to clientX/Y on pointer events. 0.1–2.0 */
+  mouseJitterSigma?: number
+  /** Intensity preset label — used by the UI to describe the current sigma */
+  mouseJitterIntensity?: 'off' | 'subtle' | 'moderate' | 'heavy'
+
+  // ── Phase 17: Typing cadence tuning ────────────────────────────────────
+  /** Target typing speed in words-per-minute. 40–180 */
+  typingWpm?: number
+  /** Percentage variance around typingWpm (e.g. 15 = ±15%). 0–50 */
+  typingVariancePct?: number
+  /** Key-hold duration jitter sigma in ms. 1–15 */
+  typingHoldSigmaMs?: number
+
+  // ── Phase 17: Scroll inertia tuning ────────────────────────────────────
+  /** Decay multiplier applied on each wheel event (0.7–0.98). */
+  scrollDecay?: number
+  /** Noise sigma in px added to each delta on scroll inertia. 0–5 */
+  scrollNoisePx?: number
 }
 
 // Phase 6: Timing attack defense config
+// Phase 17: Extended with advanced knobs — rAF jitter sigma, SAB/Atomics
+// noise toggle. Legacy fields are unchanged.
 export interface TimingConfig {
   // Reduce Date.now() precision to 100ms blocks
   dateNoisePrecision: 50 | 100 | 250
@@ -126,6 +152,24 @@ export interface TimingConfig {
   rafJitter: boolean
   // Clamp performance.now() to same precision as Date.now
   performanceClamp: boolean
+
+  // ── Phase 17 ───────────────────────────────────────────────────────────
+  /** Gaussian sigma (ms) added to rAF timestamps when rafJitter is on. 0.1–5 */
+  rafJitterSigmaMs?: number
+  /** Inject jitter into Atomics.wait() return timing (SAB-based timers) */
+  atomicsWaitNoise?: boolean
+}
+
+// ── Phase 17: Behavioral Config UI — shared presets ────────────────────────
+/** Builtin presets shown in the Behavioral Config UI */
+export type BehaviorPresetId = 'off' | 'subtle' | 'balanced' | 'heavy' | 'stealth'
+
+export interface BehaviorPreset {
+  id: BehaviorPresetId
+  name: string
+  description: string
+  behavior: BehaviorConfig
+  timing: TimingConfig
 }
 
 
@@ -140,6 +184,133 @@ export interface ProxyConfig {
   username?: string
   password?: string
   country?: string
+}
+
+// ─── Phase 20 — Proxy Provider Marketplace ──────────────────────────────────
+// (Tracked under user-facing "Phase 17 — Proxy API Integration" label)
+//
+// Adapters for built-in residential / datacenter proxy providers so users
+// can plug in their existing Smartproxy / BrightData / Oxylabs accounts and
+// generate working proxy entries on demand without manual host:port setup.
+
+export type ProxyProviderType = 'smartproxy' | 'brightdata' | 'oxylabs' | 'custom'
+
+export type ProxyPoolType = 'residential' | 'datacenter' | 'mobile' | 'isp'
+
+export type ProxySessionType = 'rotating' | 'sticky'
+
+/** Static catalog entry — describes a known provider's capabilities. */
+export interface ProxyProviderCatalogEntry {
+  type: ProxyProviderType
+  name: string
+  website: string
+  description: string
+  pools: ProxyPoolType[]
+  /** Public docs URL where the user fetches credentials */
+  docsUrl: string
+  /** Default rotating endpoint hostname */
+  defaultEndpoint: string
+  /** Default port for HTTP gateway */
+  defaultPort: number
+  /** Whether the provider exposes a REST API for usage / sub-user management */
+  hasUsageApi: boolean
+  /** SEA-region pool support flag (Vietnam, Thailand, Indonesia, Philippines) */
+  supportsSeaRegions: boolean
+}
+
+/** A user-configured account for a single provider. */
+export interface ProxyProviderAccount {
+  id: string
+  type: ProxyProviderType
+  label: string
+  /** Endpoint hostname override (defaults to catalog entry) */
+  endpoint: string
+  port: number
+  /** Default pool to draw from when generating proxies */
+  defaultPool: ProxyPoolType
+  /** Default session type for generated proxies */
+  defaultSession: ProxySessionType
+  /** Last-known account status */
+  status: 'unverified' | 'active' | 'invalid' | 'error'
+  lastTestedAt?: string | null
+  lastError?: string | null
+  /** Cached usage snapshot from last refresh */
+  usage?: ProxyProviderUsage | null
+  createdAt: string
+  updatedAt: string
+}
+
+/** Sensitive credentials — never sent to renderer. */
+export interface ProxyProviderCredentialsInput {
+  username: string
+  password: string
+  /** Optional REST API key (BrightData / Smartproxy dashboards) */
+  apiKey?: string
+  /** Optional zone or sub-user identifier (BrightData zones, Oxylabs sub-users) */
+  zone?: string
+}
+
+/** Renderer-safe view (no secrets, just metadata) */
+export interface ProxyProviderAccountView extends ProxyProviderAccount {
+  hasCredentials: boolean
+  hasApiKey: boolean
+  catalog: ProxyProviderCatalogEntry
+}
+
+/** Snapshot of remaining bandwidth / requests reported by the provider. */
+export interface ProxyProviderUsage {
+  /** GiB available on the plan */
+  bandwidthGbTotal?: number
+  /** GiB consumed so far */
+  bandwidthGbUsed?: number
+  /** Requests included in plan */
+  requestsTotal?: number
+  /** Requests consumed */
+  requestsUsed?: number
+  /** Plan name reported by provider (e.g. "Residential Pro") */
+  planName?: string
+  /** ISO timestamp when usage was last fetched */
+  refreshedAt: string
+}
+
+/** Result of testing a provider's credentials. */
+export interface ProxyProviderTestResult {
+  ok: boolean
+  /** Latency in ms for the test request */
+  latencyMs?: number
+  /** Public IP returned by the test endpoint */
+  exitIp?: string
+  /** Error message when ok=false */
+  error?: string
+}
+
+/** Options when generating proxies from a provider. */
+export interface ProxyGenerationOptions {
+  /** Number of proxy entries to generate */
+  count: number
+  /** Country code (ISO 3166-1 alpha-2) — e.g. "VN", "TH", "ID" */
+  country?: string
+  /** Pool type override */
+  pool?: ProxyPoolType
+  /** Session strategy override */
+  session?: ProxySessionType
+  /** Optional state / city filter (provider-specific) */
+  region?: string
+  /** Sticky-session lifetime in minutes (when session=sticky) */
+  stickyMinutes?: number
+}
+
+/** Proxy entries generated by a provider before being persisted. */
+export interface GeneratedProxy {
+  name: string
+  type: 'http' | 'socks5'
+  host: string
+  port: number
+  username: string
+  password: string
+  country?: string
+  /** Provider account id this proxy belongs to */
+  providerAccountId: string
 }
 
 // ─── Profile Types ────────────────────────────────────────────────────────────

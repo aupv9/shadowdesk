@@ -16,7 +16,8 @@ import {
   Store,
   Sparkles,
   Activity,
-  MapPin
+  MapPin,
+  Sliders
 } from 'lucide-react'
 import type { NavSection } from '../../types'
 import type { User as UserType, LicensePlan } from '../../types'
@@ -48,6 +49,7 @@ const NAV_ITEMS: { key: NavSection; icon: React.ElementType; label: string }[] =
   { key: 'profiles',      icon: LayoutGrid,   label: 'Profiles' },
   { key: 'proxies',       icon: Globe,        label: 'Proxies' },
   { key: 'fingerprint',   icon: Fingerprint,  label: 'Fingerprint' },
+  { key: 'behavior',      icon: Sliders,      label: 'Behavior' },
   { key: 'detection',     icon: Shield,       label: 'Detection' },
   { key: 'patches',       icon: Cpu,          label: 'Patches' },
   { key: 'automation',    icon: Bot,          label: 'Automation' },
