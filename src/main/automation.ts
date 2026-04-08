@@ -10,8 +10,10 @@ import type {
   AutomationRunResult,
   AutomationWorkflow,
   AssertResult,
-  AssertType
+  AssertType,
+  PreFlightValidationResult
 } from '../shared/types'
+import { validatePreFlight, analyzeRuntimeSignal } from './platform-hardener'
 import type { Page, ElementHandle } from 'puppeteer-core'
 import type { WebContents } from 'electron'
 import { app } from 'electron'
@@ -443,6 +445,13 @@ export class AutomationEngine {
       maxDurationMs?: number
       // Tier 7: enable auto-screenshot on step failure to this directory.
       screenshotOnFailureDir?: string
+      // Phase 17.H: abort the run if the pre-flight validator returns `block`.
+      // Defaults to false — the renderer is expected to have surfaced the
+      // validation card first, and explicit runs should be able to override.
+      enforcePreFlight?: boolean
+      // Phase 17.H: skip the pre-flight validator entirely (used by debug
+      // runs and internal retries where the renderer has already validated).
+      skipPreFlight?: boolean
     }
   ): Promise<AutomationRunResult> {
     const db = Database.getInstance()
@@ -466,10 +475,46 @@ export class AutomationEngine {
 
     // Resolve profile name for built-in {profileName} variable
     let profileName = profileId
+    let profileRowCached: any = null
     try {
-      const profileRow: any = db.getProfile(profileId)
-      if (profileRow?.name) profileName = profileRow.name
+      profileRowCached = db.getProfile(profileId)
+      if (profileRowCached?.name) profileName = profileRowCached.name
     } catch { /* non-fatal */ }
+
+    // ── Phase 17.H: Platform-Specific Detection Hardening ─────────────────
+    // Run the pre-flight validator before we touch the browser.  The result
+    // is streamed to the renderer via the `automation:pre-flight` event so
+    // the UI can show the validator card + one-click fix buttons.  If the
+    // verdict is `block` AND enforcePreFlight is true, we abort the run
+    // with a descriptive error.  Otherwise the result is informational and
+    // the workflow proceeds as before.
+    let preFlight: PreFlightValidationResult | null = null
+    if (!debugOpts?.skipPreFlight && profileRowCached) {
+      try {
+        preFlight = validatePreFlight(workflow, {
+          id: profileRowCached.id,
+          name: profileRowCached.name,
+          fingerprint: profileRowCached.fingerprint,
+        })
+        if (webContents && !webContents.isDestroyed()) {
+          try { webContents.send('automation:pre-flight', preFlight) } catch { /* non-fatal */ }
+        }
+        if (preFlight.verdict === 'block' && debugOpts?.enforcePreFlight) {
+          const blockers = preFlight.issues
+            .filter((i) => i.severity === 'critical')
+            .map((i) => i.message)
+            .join('; ')
+          throw new Error(
+            `Pre-flight validator blocked run: ${blockers || 'critical platform issues detected'}`
+          )
+        }
+      } catch (err: any) {
+        // Re-throw enforced blocks; swallow validator bugs so they never
+        // prevent a workflow from running.
+        if (err?.message?.startsWith('Pre-flight validator blocked')) throw err
+        preFlight = null
+      }
+    }
 
     // Merge stored variables with runtime overrides, then inject built-in variables
     const variables: Record<string, string> = {
@@ -993,6 +1038,32 @@ export class AutomationEngine {
           error: result.error,
           duration_ms: result.duration_ms
           }).catch(() => { /* non-fatal */ })
+
+          // ── Phase 17.H: Live adjustment on step failure ─────────────────
+          // Feed the error message + current URL into the hardener's
+          // runtime-signal analyzer. When a challenge pattern is detected
+          // (captcha / slider / rate-limit / selector-miss) we surface a
+          // recommended fix on the `automation:live-adjustment` channel so
+          // the renderer can display a toast with a "Apply fix" action.
+          if (workflowId && profileId && result.error) {
+            try {
+              let currentUrl: string | undefined
+              try { currentUrl = page.url() } catch { /* closed page */ }
+              const adjustment = analyzeRuntimeSignal({
+                workflowId,
+                profileId,
+                currentUrl,
+                kind: 'step-error',
+                detail: `${step.action}: ${result.error}`,
+              })
+              if (adjustment) {
+                await this.callHooks(runKey, 'live-adjustment', adjustment).catch(() => { /* non-fatal */ })
+                if (webContents && !webContents.isDestroyed()) {
+                  try { webContents.send('automation:live-adjustment', adjustment) } catch { /* non-fatal */ }
+                }
+              }
+            } catch { /* non-fatal */ }
+          }
         }
       }
 

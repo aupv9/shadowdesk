@@ -95,7 +95,14 @@ export type {
   ProxyProviderUsage,
   ProxyProviderTestResult,
   ProxyGenerationOptions,
-  GeneratedProxy
+  GeneratedProxy,
+  // Phase 17.H — Platform-Specific Detection Hardening
+  HardenerSeverity,
+  HardenerIssue,
+  HardenerFix,
+  PlatformTuningHint,
+  PreFlightValidationResult,
+  LiveAdjustmentEvent
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
