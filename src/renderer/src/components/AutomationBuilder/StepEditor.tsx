@@ -58,8 +58,13 @@ import { ActionBrowser } from './ActionBrowser'
 import { ACTION_META } from './actionMetadata'
 import { ParameterValidator } from './ParameterValidator'
 import { SelectorHelper } from './SelectorHelper'
+import { URLHelper } from './URLHelper'
+import { ActionGuide } from './ActionGuide'
+import { StepValidationBadge } from './StepValidationBadge'
+import { validateStep } from './stepValidator'
 import { DragHandle } from './DragHandle'
 import { DropZoneIndicator } from './DropZoneIndicator'
+import { HelpCircle } from 'lucide-react'
 
 
 interface StepEditorProps {
@@ -165,8 +170,12 @@ export function StepEditor({
   const [showRetry, setShowRetry] = useState(false)
   const [showActionBrowser, setShowActionBrowser] = useState(false)
   const [showSelectorHelper, setShowSelectorHelper] = useState(false)
+  const [showUrlHelper, setShowUrlHelper] = useState(false)
+  const [showActionGuide, setShowActionGuide] = useState(false)
   const [selectorFieldKey, setSelectorFieldKey] = useState<string>('')
+  const [urlFieldKey, setUrlFieldKey] = useState<string>('url')
   const meta = ACTION_META[step.action]
+  const validation = validateStep(step)
 
   const handleActionChange = (action: AutomationActionType) => {
     onUpdate({ action, params: getDefaultParams(action), label: ACTION_META[action].label })
@@ -176,6 +185,11 @@ export function StepEditor({
   const handleSelectorSelect = (selector: string) => {
     onUpdate({ params: { ...step.params, [selectorFieldKey]: selector } })
     setShowSelectorHelper(false)
+  }
+
+  const handleUrlSelect = (url: string) => {
+    onUpdate({ params: { ...step.params, [urlFieldKey]: url } })
+    setShowUrlHelper(false)
   }
 
   const handleParamChange = (key: string, value: any) => {
@@ -192,9 +206,16 @@ export function StepEditor({
 
       <div
         className={`
-          bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-hidden
+          bg-slate-800/50 border rounded-lg overflow-hidden
+          ${
+            validation.level === 'invalid'
+              ? 'border-red-500/40'
+              : validation.level === 'incomplete'
+                ? 'border-amber-500/30'
+                : 'border-slate-700/50'
+          }
           ${isDragging ? 'opacity-50' : ''}
-          transition-opacity duration-200
+          transition-all duration-200
         `}
         onDragOver={(e) => {
           e.preventDefault()
@@ -226,6 +247,7 @@ export function StepEditor({
           <span className="text-sm font-medium text-white flex-1">
             {step.label || meta.label}
           </span>
+          <StepValidationBadge result={validation} compact />
           {hasRetry && (
             <span className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">
               <RefreshCw className="w-2.5 h-2.5" />
@@ -239,6 +261,12 @@ export function StepEditor({
       {/* Step body */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-slate-700/50">
+          {/* Validation summary */}
+          {validation.level !== 'valid' && (
+            <div className="mt-3">
+              <StepValidationBadge result={validation} />
+            </div>
+          )}
           {/* Actions row */}
           <div className="flex items-center gap-1 mt-3 mb-4">
             <button onClick={() => onMove('up')} disabled={index === 0}
@@ -274,7 +302,17 @@ export function StepEditor({
 
           {/* Action type */}
           <div className="mb-3">
-            <label className="text-xs text-slate-500 mb-1 block">Action</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-slate-500">Action</label>
+              <button
+                onClick={() => setShowActionGuide(true)}
+                className="text-[10px] text-ghost-400 hover:text-ghost-300 transition-colors flex items-center gap-1"
+                title="Show best practices and examples for this action"
+              >
+                <HelpCircle className="w-3 h-3" />
+                About this action
+              </button>
+            </div>
             <button
               onClick={() => setShowActionBrowser(true)}
               className="w-full flex items-center gap-3 px-3 py-2 bg-slate-700 border border-slate-600 text-white text-sm rounded hover:bg-slate-600 transition-colors text-left"
@@ -307,6 +345,10 @@ export function StepEditor({
               setSelectorFieldKey(key)
               setShowSelectorHelper(true)
             }}
+            onShowUrlHelper={(key) => {
+              setUrlFieldKey(key)
+              setShowUrlHelper(true)
+            }}
           />
 
           {/* Selector helper modal */}
@@ -315,6 +357,20 @@ export function StepEditor({
               onSelect={handleSelectorSelect}
               onClose={() => setShowSelectorHelper(false)}
             />
+          )}
+
+          {/* URL helper modal */}
+          {showUrlHelper && (
+            <URLHelper
+              initialValue={String(step.params?.[urlFieldKey] ?? '')}
+              onSelect={handleUrlSelect}
+              onClose={() => setShowUrlHelper(false)}
+            />
+          )}
+
+          {/* Action guide modal */}
+          {showActionGuide && (
+            <ActionGuide action={step.action} onClose={() => setShowActionGuide(false)} />
           )}
 
           {/* Retry policy (collapsible) */}
@@ -371,15 +427,18 @@ function ParamEditor({
   action,
   params,
   onChange,
-  onShowSelectorHelper
+  onShowSelectorHelper,
+  onShowUrlHelper
 }: {
   action: AutomationActionType
   params: Record<string, any>
   onChange: (key: string, value: any) => void
   onShowSelectorHelper: (key: string) => void
+  onShowUrlHelper: (key: string) => void
 }) {
   const field = (key: string, label: string, type: 'text' | 'number' | 'checkbox' | 'textarea' = 'text', placeholder?: string) => {
     const isSelectorField = key === 'selector' || key.includes('Selector') || key.includes('selector')
+    const isUrlField = key === 'url' || key === 'pageUrl'
     const hasValidator = isSelectorField || key === 'url' || key.includes('timeout') || key.includes('ms') || key.includes('delay')
 
     return (
@@ -393,6 +452,15 @@ function ParamEditor({
             >
               <Eye className="w-3 h-3" />
               Helper
+            </button>
+          )}
+          {isUrlField && (
+            <button
+              onClick={() => onShowUrlHelper(key)}
+              className="text-[10px] text-ghost-400 hover:text-ghost-300 transition-colors flex items-center gap-1"
+            >
+              <Globe className="w-3 h-3" />
+              URL Helper
             </button>
           )}
         </div>
