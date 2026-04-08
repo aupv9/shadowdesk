@@ -1076,3 +1076,27 @@ export interface BehaviorArchetype {
   /** Sample tags */
   tags: string[]
 }
+
+// ─── IPC Error & Response Types (Phase Security Hardening) ───────────────────
+
+export type IpcErrorCode =
+  | 'VALIDATION_ERROR'
+  | 'NOT_FOUND'
+  | 'ALREADY_EXISTS'
+  | 'DATABASE_ERROR'
+  | 'ENCRYPTION_ERROR'
+  | 'FILE_SYSTEM_ERROR'
+  | 'INVALID_STATE'
+  | 'INTERNAL_ERROR'
+
+export interface IpcErrorResponse {
+  code: IpcErrorCode
+  message: string
+  details?: Record<string, unknown>
+}
+
+export interface IpcResponse<T> {
+  success: boolean
+  data?: T
+  error?: IpcErrorResponse
+}
