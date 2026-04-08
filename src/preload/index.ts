@@ -49,7 +49,7 @@ const api = {
   },
   // Phase 12.B.2 — Visual selector recorder
   recorder: {
-    start:             (profileId: string, captureScreenshots?: boolean) => ipcRenderer.invoke('recorder:start', profileId, captureScreenshots),
+    start:             (profileId: string, captureScreenshots?: boolean, captureNetwork?: boolean) => ipcRenderer.invoke('recorder:start', profileId, captureScreenshots, captureNetwork),
     stop:              (profileId: string) => ipcRenderer.invoke('recorder:stop', profileId),
     state:             (profileId: string) => ipcRenderer.invoke('recorder:state', profileId),
     isRecording:       (profileId: string) => ipcRenderer.invoke('recorder:isRecording', profileId),
@@ -297,6 +297,19 @@ const api = {
     const handler = (_ipcEvent: any, appEvent: any) => cb(appEvent)
     ipcRenderer.on('app:error', handler)
     return () => { ipcRenderer.removeListener('app:error', handler) }
+  },
+
+  // Phase 17 — Script-to-Workflow Generation
+  recording: {
+    sessions: {
+      list:   (profileId?: string)  => ipcRenderer.invoke('recording:sessions:list', profileId),
+      get:    (id: string)           => ipcRenderer.invoke('recording:sessions:get', id),
+      delete: (id: string)           => ipcRenderer.invoke('recording:sessions:delete', id),
+    },
+    previewSteps:   (sessionId: string)                                    => ipcRenderer.invoke('recording:previewSteps', sessionId),
+    analyze:        (sessionId: string)                                    => ipcRenderer.invoke('recording:analyze', sessionId),
+    refine:         (sessionId: string, options?: Record<string, any>)     => ipcRenderer.invoke('recording:refine', sessionId, options),
+    saveAsWorkflow: (sessionId: string, name: string, description?: string) => ipcRenderer.invoke('recording:saveAsWorkflow', sessionId, name, description),
   },
 
   // Phase 16 — AI-Assisted Automation
