@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Plus, RefreshCw, X, FolderPlus, CheckSquare, Trash2, ShieldAlert, Upload, MonitorX } from 'lucide-react'
+import { Plus, RefreshCw, X, FolderPlus, CheckSquare, ShieldAlert, Upload, MonitorX, LayoutGrid } from 'lucide-react'
 import { useProfileStore } from '../../stores/profileStore'
 import { useProxyStore } from '../../stores/proxyStore'
 import { useGroupStore } from '../../stores/groupStore'
@@ -17,6 +17,10 @@ import { ExtensionsModal } from './ExtensionsModal'
 import { WarmUpModal } from './WarmUpModal'
 import { CollisionsDrawer } from './CollisionsDrawer'
 import { ImportGuideModal } from './ImportGuideModal'
+// Phase 3 components
+import { PaginationControls } from './PaginationControls'
+import { CleanupMonitor } from './CleanupMonitor'
+import { BulkActionsToolbar } from './BulkActionsToolbar'
 import { Header } from '../Layout/Header'
 import type { Profile } from '../../types'
 
@@ -25,8 +29,11 @@ const GROUP_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3
 export function ProfileManager() {
   const {
     profiles, activeSessions, loading,
-    fetchProfiles, fetchActiveSessions,
+    pagination, paginationEnabled,
+    fetchProfiles, fetchActiveSessions, fetchProfilesPaginated,
+    setPaginationEnabled, setPaginationLimit, goToPage,
     launchProfile, closeProfile, deleteProfile, cloneProfile,
+    bulkDeleteProfiles, bulkAssignProxy, bulkAssignGroup,
     exportProfile, importProfile, setSyncExcluded
   } = useProfileStore()
   const { fetchProxies } = useProxyStore()
@@ -161,24 +168,82 @@ export function ProfileManager() {
   const handleBulkDelete = async () => {
     const ok = await confirm({
       title: `Delete ${selected.size} Profile${selected.size !== 1 ? 's' : ''}`,
-      message: `This will permanently delete ${selected.size} profile${selected.size !== 1 ? 's' : ''}. This cannot be undone.`,
+      message: `This will permanently delete ${selected.size} profile${selected.size !== 1 ? 's' : ''}. Cleanup happens in the background. This cannot be undone.`,
       confirmLabel: `Delete ${selected.size}`,
       destructive: true,
     })
     if (!ok) return
-    for (const id of selected) {
-      await deleteProfile(id)
+    try {
+      // Phase 3: Use new bulk delete API (async cleanup worker)
+      const ids = Array.from(selected)
+      const result = await bulkDeleteProfiles(ids)
+      pushToast(`Deleted ${result.deleted} profile${result.deleted !== 1 ? 's' : ''}. Cleanup running in background.`, 'success')
+      setSelected(new Set())
+      setSelectionMode(false)
+    } catch (e: any) {
+      pushToast(e.message ?? 'Bulk delete failed', 'error')
     }
-    setSelected(new Set())
-    setSelectionMode(false)
   }
 
   const handleBulkClone = async () => {
     for (const id of selected) {
       await cloneProfile(id)
     }
+    pushToast(`Cloned ${selected.size} profile${selected.size !== 1 ? 's' : ''}`, 'success')
     setSelected(new Set())
     setSelectionMode(false)
+  }
+
+  // Phase 3: Bulk assign proxy to selected profiles
+  const handleBulkAssignProxy = async (proxyId: string | null) => {
+    try {
+      const ids = Array.from(selected)
+      const result = await bulkAssignProxy(ids, proxyId)
+      pushToast(
+        proxyId
+          ? `Assigned proxy to ${result.updated} profile${result.updated !== 1 ? 's' : ''}`
+          : `Unassigned proxy from ${result.updated} profile${result.updated !== 1 ? 's' : ''}`,
+        'success',
+      )
+    } catch (e: any) {
+      pushToast(e.message ?? 'Bulk proxy assignment failed', 'error')
+    }
+  }
+
+  // Phase 3: Bulk assign group to selected profiles
+  const handleBulkAssignGroup = async (groupId: string | null) => {
+    try {
+      const ids = Array.from(selected)
+      const result = await bulkAssignGroup(ids, groupId)
+      pushToast(
+        groupId
+          ? `Assigned group to ${result.updated} profile${result.updated !== 1 ? 's' : ''}`
+          : `Ungrouped ${result.updated} profile${result.updated !== 1 ? 's' : ''}`,
+        'success',
+      )
+    } catch (e: any) {
+      pushToast(e.message ?? 'Bulk group assignment failed', 'error')
+    }
+  }
+
+  // Phase 3: Select all visible profiles on the current page
+  const handleSelectAll = () => {
+    const allIds = filtered.map((p) => p.id)
+    const allCurrentlySelected = allIds.every((id) => selected.has(id))
+    if (allCurrentlySelected) {
+      // Deselect all on page
+      setSelected((prev) => {
+        const next = new Set(prev)
+        allIds.forEach((id) => next.delete(id))
+        return next
+      })
+    } else {
+      setSelected((prev) => {
+        const next = new Set(prev)
+        allIds.forEach((id) => next.add(id))
+        return next
+      })
+    }
   }
 
   const handleExportBundle = async (id: string) => {
@@ -357,6 +422,15 @@ export function ProfileManager() {
           <div className="flex items-center gap-2">
             <button onClick={fetchProfiles} className="btn-ghost p-2 rounded-lg" title="Refresh">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            {/* Phase 3: Pagination mode toggle */}
+            <button
+              onClick={() => setPaginationEnabled(!paginationEnabled)}
+              className={`btn-ghost flex items-center gap-2 text-sm ${paginationEnabled ? 'text-ghost-400' : ''}`}
+              title={paginationEnabled ? 'Disable pagination (load all)' : 'Enable pagination (for large lists)'}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              {paginationEnabled ? 'Paged' : 'All'}
             </button>
             <button
               onClick={() => { setSelectionMode((v) => !v); setSelected(new Set()) }}
@@ -541,25 +615,36 @@ export function ProfileManager() {
               ))}
             </div>
 
-            {/* Sticky bulk-action bar */}
-            {selected.size > 0 && (
-              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-5 py-3
-                              bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl">
-                <span className="text-sm text-slate-300 font-medium">{selected.size} selected</span>
-                <div className="w-px h-4 bg-slate-600" />
-                <button onClick={handleBulkClone} className="btn-ghost text-xs flex items-center gap-1.5">
-                  Clone all
-                </button>
-                <button onClick={handleBulkDelete} className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                               text-red-400 hover:bg-red-600/20 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete all
-                </button>
-              </div>
-            )}
           </>
         )}
+
+        {/* Phase 3: Pagination controls — shown when pagination is enabled */}
+        {paginationEnabled && profiles.length > 0 && (
+          <PaginationControls
+            total={pagination.total}
+            limit={pagination.limit}
+            offset={pagination.offset}
+            hasMore={pagination.hasMore}
+            onPageChange={goToPage}
+            onLimitChange={setPaginationLimit}
+          />
+        )}
       </div>
+
+      {/* Phase 3: Enhanced Bulk Actions Toolbar */}
+      <BulkActionsToolbar
+        selectedCount={selected.size}
+        onClearSelection={() => { setSelected(new Set()); setSelectionMode(false) }}
+        onSelectAll={handleSelectAll}
+        allSelected={filtered.length > 0 && filtered.every((p) => selected.has(p.id))}
+        onBulkDelete={handleBulkDelete}
+        onBulkClone={handleBulkClone}
+        onBulkAssignProxy={handleBulkAssignProxy}
+        onBulkAssignGroup={handleBulkAssignGroup}
+      />
+
+      {/* Phase 3: Cleanup worker progress monitor */}
+      <CleanupMonitor />
 
       {showCreate && (
         <CreateProfileModal onClose={() => { setShowCreate(false); fetchProfiles() }} />

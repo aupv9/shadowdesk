@@ -10,7 +10,7 @@
  * Returns structured validation errors for IPC handlers to return to renderer.
  */
 
-import type { Profile, FingerprintConfig } from '../shared/types'
+import type { Profile, FingerprintConfig } from '../../shared/types'
 
 export interface ValidationError {
   code: 'INVALID_INPUT'

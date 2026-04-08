@@ -338,7 +338,7 @@ export function registerIpcHandlers(): void {
     markPendingChange()
 
     // Enqueue async cleanup of directories
-    const { CleanupWorker } = await import('./cleanup-worker')
+    const { CleanupWorker } = await import('../cleanup-worker')
     const cleanupWorker = CleanupWorker.getInstance()
     for (const id of profileIds) {
       const profileDataPath = join(app.getPath('userData'), 'profiles', id)
@@ -1794,20 +1794,20 @@ export function registerIpcHandlers(): void {
   // ── Phase 2.3: Cleanup Worker ──────────────────────────────────────────────
 
   ipcMain.handle('cleanup:status', () => {
-    const { CleanupWorker } = require('./cleanup-worker')
+    const { CleanupWorker } = require('../cleanup-worker')
     const cleanupWorker = CleanupWorker.getInstance()
     return cleanupWorker.getStatus()
   })
 
   ipcMain.handle('cleanup:retryFailed', () => {
-    const { CleanupWorker } = require('./cleanup-worker')
+    const { CleanupWorker } = require('../cleanup-worker')
     const cleanupWorker = CleanupWorker.getInstance()
     cleanupWorker.retryFailedCleanups()
     return { success: true }
   })
 
   ipcMain.handle('cleanup:clearFailed', () => {
-    const { CleanupWorker } = require('./cleanup-worker')
+    const { CleanupWorker } = require('../cleanup-worker')
     const cleanupWorker = CleanupWorker.getInstance()
     cleanupWorker.clearFailedCleanups()
     return { success: true }
