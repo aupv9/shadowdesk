@@ -1,0 +1,55 @@
+version: '3.9'
+
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=postgresql://shadow:shadow@postgres:5432/shadowdesk
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=dev-secret-change-in-production-must-be-32chars
+      - JWT_ACCESS_TTL=900
+      - JWT_REFRESH_TTL=2592000
+      - EMAIL_FROM=noreply@shadowdesk.io
+      - CORS_ORIGINS=*
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB:       shadowdesk
+      POSTGRES_USER:     shadow
+      POSTGRES_PASSWORD: shadow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shadow -d shadowdesk"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
