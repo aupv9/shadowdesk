@@ -1,4 +1,5 @@
 import type { FingerprintConfig } from '../../shared/types'
+import { applyAllVariance } from './property-variance'
 
 // 5 built-in fingerprint presets for MVP
 export const FINGERPRINT_PRESETS: Record<string, FingerprintConfig> = {
@@ -634,7 +635,11 @@ export function resolveFingerprint(
     }
   }
 
-  return clone
+  // P1 FIX: Add deterministic variance to hardware properties for realism
+  // Varies by ±5-10% per property, but deterministic per profile ID
+  const withVariance = applyAllVariance(clone, profileId)
+
+  return withVariance
 }
 
 // ── Locale / Timezone Validation ─────────────────────────────────────────────
