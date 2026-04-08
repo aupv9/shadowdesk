@@ -67,6 +67,9 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
   const [liveSteps, setLiveSteps] = useState<AutomationStepResult[]>([])
   // Import file ref
   const importInputRef = useRef<HTMLInputElement>(null)
+  // Drag & Drop state
+  const [draggedStepIndex, setDraggedStepIndex] = useState<number | null>(null)
+  const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null)
 
   // Reset overrides and live steps when switching workflows
   useEffect(() => {
@@ -158,6 +161,41 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
     if (swapIdx < 0 || swapIdx >= steps.length) return
     ;[steps[idx], steps[swapIdx]] = [steps[swapIdx], steps[idx]]
     updateWorkflow(selectedWorkflow.id, { steps })
+  }
+
+  const handleDragStart = (_e: React.DragEvent<HTMLButtonElement>, index: number) => {
+    setDraggedStepIndex(index)
+  }
+
+  const handleDragEnd = () => {
+    setDraggedStepIndex(null)
+    setDraggedOverIndex(null)
+  }
+
+  const handleDragOver = (_e: React.DragEvent<HTMLDivElement>, index: number) => {
+    setDraggedOverIndex(index)
+  }
+
+  const handleDragLeave = () => {
+    setDraggedOverIndex(null)
+  }
+
+  const handleDrop = (targetIndex: number) => {
+    if (!selectedWorkflow || draggedStepIndex === null) return
+    if (draggedStepIndex === targetIndex) {
+      setDraggedStepIndex(null)
+      setDraggedOverIndex(null)
+      return
+    }
+
+    const steps = [...selectedWorkflow.steps]
+    const [draggedStep] = steps.splice(draggedStepIndex, 1)
+    steps.splice(targetIndex, 0, draggedStep)
+    updateWorkflow(selectedWorkflow.id, { steps })
+
+    setDraggedStepIndex(null)
+    setDraggedOverIndex(null)
+    pushToast('Step reordered', 'success')
   }
 
   const handleRun = async () => {
@@ -772,6 +810,13 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
                     onDelete={() => handleDeleteStep(step.id)}
                     onDuplicate={() => handleDuplicateStep(step.id)}
                     onMove={(dir) => handleMoveStep(step.id, dir)}
+                    isDragging={draggedStepIndex === idx}
+                    draggedOverIndex={draggedOverIndex}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(_, targetIndex) => handleDrop(targetIndex)}
                   />
                 ))}
 
