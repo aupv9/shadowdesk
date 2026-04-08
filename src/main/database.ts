@@ -1125,10 +1125,16 @@ export class Database {
     const row = this.queryOne('SELECT * FROM recording_sessions WHERE id = ?', [id])
     if (!row) return null
     return {
-      ...row,
+      id: row.id,
+      profileId: row.profile_id,
+      startedAt: row.started_at,
+      stoppedAt: row.stopped_at,
+      pageTitle: row.page_title,
+      startUrl: row.start_url,
       events: JSON.parse(row.events || '[]'),
       captureScreenshots: !!row.capture_screenshots,
       captureNetwork: !!row.capture_network,
+      status: row.status,
     }
   }
 

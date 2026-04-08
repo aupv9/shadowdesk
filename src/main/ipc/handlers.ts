@@ -1669,12 +1669,12 @@ export function registerIpcHandlers(): void {
     try {
       const analysis = scriptAnalyzer.analyze({
         id: session.id,
-        profileId: session.profile_id,
-        startedAt: session.started_at,
-        stoppedAt: session.stopped_at,
+        profileId: session.profileId,
+        startedAt: session.startedAt,
+        stoppedAt: session.stoppedAt,
         events: session.events,
-        pageTitle: session.page_title,
-        startUrl: session.start_url,
+        pageTitle: session.pageTitle,
+        startUrl: session.startUrl,
         captureScreenshots: session.captureScreenshots,
         captureNetwork: session.captureNetwork,
         status: 'analyzing'
@@ -1694,12 +1694,12 @@ export function registerIpcHandlers(): void {
     // Re-analyze to get fresh analysis
     const analysis = scriptAnalyzer.analyze({
       id: session.id,
-      profileId: session.profile_id,
-      startedAt: session.started_at,
-      stoppedAt: session.stopped_at,
+      profileId: session.profileId,
+      startedAt: session.startedAt,
+      stoppedAt: session.stoppedAt,
       events: session.events,
-      pageTitle: session.page_title,
-      startUrl: session.start_url,
+      pageTitle: session.pageTitle,
+      startUrl: session.startUrl,
       captureScreenshots: session.captureScreenshots,
       captureNetwork: session.captureNetwork,
       status: 'analyzing'
@@ -1715,12 +1715,12 @@ export function registerIpcHandlers(): void {
     if (!session) throw new Error(`Session ${sessionId} not found`)
     const analysis = scriptAnalyzer.analyze({
       id: session.id,
-      profileId: session.profile_id,
-      startedAt: session.started_at,
-      stoppedAt: session.stopped_at,
+      profileId: session.profileId,
+      startedAt: session.startedAt,
+      stoppedAt: session.stoppedAt,
       events: session.events,
-      pageTitle: session.page_title,
-      startUrl: session.start_url,
+      pageTitle: session.pageTitle,
+      startUrl: session.startUrl,
       captureScreenshots: session.captureScreenshots,
       captureNetwork: session.captureNetwork,
       status: 'stopped'
