@@ -1,0 +1,20 @@
+[
+  {
+    "id": "1d7f1a72-619f-4b90-988c-4f984a099331",
+    "name": "E-commerce Testing",
+    "color": "#3b82f6",
+    "created_at": "2026-04-08T07:36:42.220Z"
+  },
+  {
+    "id": "c76608cc-e288-478f-87b4-c602207b0e27",
+    "name": "Social Media Testing",
+    "color": "#ef4444",
+    "created_at": "2026-04-08T07:36:42.221Z"
+  },
+  {
+    "id": "8f716463-16ac-4770-8f96-95dcdcfff1e7",
+    "name": "Geo-Testing",
+    "color": "#10b981",
+    "created_at": "2026-04-08T07:36:42.221Z"
+  }
+]

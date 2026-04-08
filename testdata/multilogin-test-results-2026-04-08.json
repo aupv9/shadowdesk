@@ -1,0 +1,354 @@
+[
+  {
+    "profile": "System",
+    "test": "Data Integrity (profiles)",
+    "passed": true,
+    "message": "profiles check passed",
+    "timestamp": "2026-04-08T07:36:47.925Z"
+  },
+  {
+    "profile": "System",
+    "test": "Data Integrity (proxies)",
+    "passed": true,
+    "message": "proxies check passed",
+    "timestamp": "2026-04-08T07:36:47.926Z"
+  },
+  {
+    "profile": "System",
+    "test": "Data Integrity (credentials)",
+    "passed": true,
+    "message": "credentials check passed",
+    "timestamp": "2026-04-08T07:36:47.926Z"
+  },
+  {
+    "profile": "System",
+    "test": "Data Integrity (profileCount)",
+    "passed": true,
+    "message": "profileCount check passed",
+    "timestamp": "2026-04-08T07:36:47.926Z"
+  },
+  {
+    "profile": "System",
+    "test": "Data Integrity (proxyCount)",
+    "passed": true,
+    "message": "proxyCount check passed",
+    "timestamp": "2026-04-08T07:36:47.926Z"
+  },
+  {
+    "profile": "System",
+    "test": "Data Integrity (uniqueIds)",
+    "passed": true,
+    "message": "uniqueIds check passed",
+    "timestamp": "2026-04-08T07:36:47.926Z"
+  },
+  {
+    "profile": "WIN10 CHROME120 - Account 1",
+    "test": "Fingerprint Consistency",
+    "passed": true,
+    "message": "Fingerprint is consistent across sessions",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "preset": "win10-chrome120",
+      "os": {
+        "platform": "Win32",
+        "version": "10.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      }
+    }
+  },
+  {
+    "profile": "WIN11 CHROME121 - Account 2",
+    "test": "Fingerprint Consistency",
+    "passed": true,
+    "message": "Fingerprint is consistent across sessions",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "preset": "win11-chrome121",
+      "os": {
+        "platform": "Win32",
+        "version": "10.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+      }
+    }
+  },
+  {
+    "profile": "MAC SONOMA CHROME121 - Account 3",
+    "test": "Fingerprint Consistency",
+    "passed": true,
+    "message": "Fingerprint is consistent across sessions",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "preset": "mac-sonoma-chrome121",
+      "os": {
+        "platform": "MacIntel",
+        "version": "14.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+      }
+    }
+  },
+  {
+    "profile": "LINUX UBUNTU CHROME120 - Account 4",
+    "test": "Fingerprint Consistency",
+    "passed": true,
+    "message": "Fingerprint is consistent across sessions",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "preset": "linux-ubuntu-chrome120",
+      "os": {
+        "platform": "Linux x86_64",
+        "version": "5.15.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      }
+    }
+  },
+  {
+    "profile": "ANDROID SAMSUNG CHROME120 - Account 5",
+    "test": "Fingerprint Consistency",
+    "passed": true,
+    "message": "Fingerprint is consistent across sessions",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "preset": "android-samsung-chrome120",
+      "os": {
+        "platform": "Linux armv8l",
+        "version": "13"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.193 Mobile Safari/537.36"
+      }
+    }
+  },
+  {
+    "profile": "USA - New York",
+    "test": "Proxy Configuration",
+    "passed": true,
+    "message": "Proxy configured for US",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "host": "proxy-ny.example.com",
+      "port": 8080,
+      "country": "US"
+    }
+  },
+  {
+    "profile": "UK - London",
+    "test": "Proxy Configuration",
+    "passed": true,
+    "message": "Proxy configured for GB",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "host": "proxy-london.example.com",
+      "port": 8080,
+      "country": "GB"
+    }
+  },
+  {
+    "profile": "Vietnam - Ho Chi Minh",
+    "test": "Proxy Configuration",
+    "passed": true,
+    "message": "Proxy configured for VN",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "host": "proxy-hcm.example.com",
+      "port": 8080,
+      "country": "VN"
+    }
+  },
+  {
+    "profile": "Thailand - Bangkok",
+    "test": "Proxy Configuration",
+    "passed": true,
+    "message": "Proxy configured for TH",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "host": "proxy-bkk.example.com",
+      "port": 8080,
+      "country": "TH"
+    }
+  },
+  {
+    "profile": "Indonesia - Jakarta",
+    "test": "Proxy Configuration",
+    "passed": true,
+    "message": "Proxy configured for ID",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "host": "proxy-jkt.example.com",
+      "port": 8080,
+      "country": "ID"
+    }
+  },
+  {
+    "profile": "WIN10 CHROME120 - Account 1",
+    "test": "Group Assignment",
+    "passed": true,
+    "message": "Assigned to group",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "groupId": "1d7f1a72-619f-4b90-988c-4f984a099331"
+    }
+  },
+  {
+    "profile": "WIN11 CHROME121 - Account 2",
+    "test": "Group Assignment",
+    "passed": true,
+    "message": "Assigned to group",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "groupId": "c76608cc-e288-478f-87b4-c602207b0e27"
+    }
+  },
+  {
+    "profile": "MAC SONOMA CHROME121 - Account 3",
+    "test": "Group Assignment",
+    "passed": true,
+    "message": "Assigned to group",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "groupId": "8f716463-16ac-4770-8f96-95dcdcfff1e7"
+    }
+  },
+  {
+    "profile": "LINUX UBUNTU CHROME120 - Account 4",
+    "test": "Group Assignment",
+    "passed": true,
+    "message": "Assigned to group",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "groupId": "1d7f1a72-619f-4b90-988c-4f984a099331"
+    }
+  },
+  {
+    "profile": "ANDROID SAMSUNG CHROME120 - Account 5",
+    "test": "Group Assignment",
+    "passed": true,
+    "message": "Assigned to group",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "groupId": "c76608cc-e288-478f-87b4-c602207b0e27"
+    }
+  },
+  {
+    "profile": "WIN10 CHROME120 - Account 1",
+    "test": "Credential Mapping",
+    "passed": true,
+    "message": "Mapped to account john.doe.us@gmail.com",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "username": "john.doe.us@gmail.com",
+      "service": "Gmail"
+    }
+  },
+  {
+    "profile": "WIN11 CHROME121 - Account 2",
+    "test": "Credential Mapping",
+    "passed": true,
+    "message": "Mapped to account alice.smith.uk@outlook.com",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "username": "alice.smith.uk@outlook.com",
+      "service": "Outlook"
+    }
+  },
+  {
+    "profile": "MAC SONOMA CHROME121 - Account 3",
+    "test": "Credential Mapping",
+    "passed": true,
+    "message": "Mapped to account vietnam.user.2024@gmail.com",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "username": "vietnam.user.2024@gmail.com",
+      "service": "Gmail"
+    }
+  },
+  {
+    "profile": "LINUX UBUNTU CHROME120 - Account 4",
+    "test": "Credential Mapping",
+    "passed": true,
+    "message": "Mapped to account bangkok.seller@email.com",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "username": "bangkok.seller@email.com",
+      "service": "Custom"
+    }
+  },
+  {
+    "profile": "ANDROID SAMSUNG CHROME120 - Account 5",
+    "test": "Credential Mapping",
+    "passed": true,
+    "message": "Mapped to account jakarta.entrepreneur@mail.com",
+    "timestamp": "2026-04-08T07:36:47.926Z",
+    "details": {
+      "username": "jakarta.entrepreneur@mail.com",
+      "service": "Custom"
+    }
+  },
+  {
+    "profile": "WIN10 CHROME120 - Account 1",
+    "test": "Proxy Mapping",
+    "passed": true,
+    "message": "Mapped to proxy in US",
+    "timestamp": "2026-04-08T07:36:47.927Z",
+    "details": {
+      "proxyId": "88456660-80de-400d-b846-8a8e9fea4d5b",
+      "proxyName": "USA - New York",
+      "country": "US"
+    }
+  },
+  {
+    "profile": "WIN11 CHROME121 - Account 2",
+    "test": "Proxy Mapping",
+    "passed": true,
+    "message": "Mapped to proxy in GB",
+    "timestamp": "2026-04-08T07:36:47.927Z",
+    "details": {
+      "proxyId": "30d91fd1-1db5-4a1c-be60-f236e54d32b9",
+      "proxyName": "UK - London",
+      "country": "GB"
+    }
+  },
+  {
+    "profile": "MAC SONOMA CHROME121 - Account 3",
+    "test": "Proxy Mapping",
+    "passed": true,
+    "message": "Mapped to proxy in VN",
+    "timestamp": "2026-04-08T07:36:47.927Z",
+    "details": {
+      "proxyId": "30de710d-5f7c-4ed3-b6ef-06b35943142e",
+      "proxyName": "Vietnam - Ho Chi Minh",
+      "country": "VN"
+    }
+  },
+  {
+    "profile": "LINUX UBUNTU CHROME120 - Account 4",
+    "test": "Proxy Mapping",
+    "passed": true,
+    "message": "Mapped to proxy in TH",
+    "timestamp": "2026-04-08T07:36:47.927Z",
+    "details": {
+      "proxyId": "df7ae525-7373-4fc4-a33c-e86aaf208c5e",
+      "proxyName": "Thailand - Bangkok",
+      "country": "TH"
+    }
+  },
+  {
+    "profile": "ANDROID SAMSUNG CHROME120 - Account 5",
+    "test": "Proxy Mapping",
+    "passed": true,
+    "message": "Mapped to proxy in ID",
+    "timestamp": "2026-04-08T07:36:47.927Z",
+    "details": {
+      "proxyId": "a25768d9-a6bb-4168-b64e-39774b2d1cca",
+      "proxyName": "Indonesia - Jakarta",
+      "country": "ID"
+    }
+  }
+]
