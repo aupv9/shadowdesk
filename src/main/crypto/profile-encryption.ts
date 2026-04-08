@@ -28,7 +28,11 @@ export interface EncryptionError {
  * Uses scrypt with standard parameters matching sync.ts pattern.
  */
 function deriveKey(masterKey: Buffer, salt: string): Buffer {
-  return scryptSync(masterKey, salt, SCRYPT_KEYLEN, 16384, 8, 1)
+  return scryptSync(masterKey, salt, SCRYPT_KEYLEN, {
+    N: 16384,
+    r: 8,
+    p: 1,
+  })
 }
 
 /**
