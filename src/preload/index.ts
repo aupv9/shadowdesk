@@ -250,6 +250,13 @@ const api = {
     get:                (id: string)                                   => ipcRenderer.invoke('templates:get', id),
     createFromTemplate: (templateId: string, name?: string)            => ipcRenderer.invoke('templates:createFromTemplate', templateId, name)
   },
+  // Phase 17 — SEA Platform Catalog
+  seaPlatforms: {
+    list:      ()                    => ipcRenderer.invoke('seaPlatforms:list'),
+    get:       (id: string)          => ipcRenderer.invoke('seaPlatforms:get', id),
+    templates: (id: string)          => ipcRenderer.invoke('seaPlatforms:templates', id),
+    regions:   ()                    => ipcRenderer.invoke('seaPlatforms:regions')
+  },
   automation: {
     /** Subscribe to per-step progress events emitted during a workflow run.
      *  Returns an unsubscribe function. */

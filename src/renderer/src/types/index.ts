@@ -77,14 +77,17 @@ export type {
   AiDetectionAdvice,
   AiWorkflowResult,
   AiSelectorHealResult,
-  BehaviorArchetype
+  BehaviorArchetype,
+  // Phase 17 — SEA Platform Templates
+  SeaPlatform,
+  SeaPlatformKind
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
 
 // Renderer-only types
 
-export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'detection' | 'settings' | 'team' | 'account' | 'automation' | 'runs' | 'patches' | 'marketplace' | 'ai'
+export type NavSection = 'profiles' | 'proxies' | 'fingerprint' | 'detection' | 'settings' | 'team' | 'account' | 'automation' | 'runs' | 'patches' | 'marketplace' | 'ai' | 'sea-platforms'
 
 export interface Toast {
   id: string

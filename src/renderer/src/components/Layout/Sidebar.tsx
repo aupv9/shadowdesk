@@ -15,7 +15,8 @@ import {
   Cpu,
   Store,
   Sparkles,
-  Activity
+  Activity,
+  MapPin
 } from 'lucide-react'
 import type { NavSection } from '../../types'
 import type { User as UserType, LicensePlan } from '../../types'
@@ -44,18 +45,19 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS: { key: NavSection; icon: React.ElementType; label: string }[] = [
-  { key: 'profiles',    icon: LayoutGrid,   label: 'Profiles' },
-  { key: 'proxies',     icon: Globe,        label: 'Proxies' },
-  { key: 'fingerprint', icon: Fingerprint,  label: 'Fingerprint' },
-  { key: 'detection',   icon: Shield,       label: 'Detection' },
-  { key: 'patches',     icon: Cpu,          label: 'Patches' },
-  { key: 'automation',  icon: Bot,          label: 'Automation' },
-  { key: 'runs',        icon: Activity,     label: 'Run Dashboard' },
-  { key: 'ai',         icon: Sparkles,     label: 'AI Assistant' },
-  { key: 'marketplace', icon: Store,        label: 'Marketplace' },
-  { key: 'team',        icon: Users,        label: 'Team' },
-  { key: 'account',     icon: User,         label: 'Account' },
-  { key: 'settings',    icon: Settings,     label: 'Settings' }
+  { key: 'profiles',      icon: LayoutGrid,   label: 'Profiles' },
+  { key: 'proxies',       icon: Globe,        label: 'Proxies' },
+  { key: 'fingerprint',   icon: Fingerprint,  label: 'Fingerprint' },
+  { key: 'detection',     icon: Shield,       label: 'Detection' },
+  { key: 'patches',       icon: Cpu,          label: 'Patches' },
+  { key: 'automation',    icon: Bot,          label: 'Automation' },
+  { key: 'runs',          icon: Activity,     label: 'Run Dashboard' },
+  { key: 'ai',            icon: Sparkles,     label: 'AI Assistant' },
+  { key: 'sea-platforms', icon: MapPin,       label: 'SEA Platforms' },
+  { key: 'marketplace',   icon: Store,        label: 'Marketplace' },
+  { key: 'team',          icon: Users,        label: 'Team' },
+  { key: 'account',       icon: User,         label: 'Account' },
+  { key: 'settings',      icon: Settings,     label: 'Settings' }
 ]
 
 export function Sidebar({ active, onChange, profileCount, activeSessionCount, user, plan = 'free' }: SidebarProps) {

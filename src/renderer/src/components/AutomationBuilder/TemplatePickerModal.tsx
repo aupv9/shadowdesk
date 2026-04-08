@@ -1,13 +1,29 @@
 import React, { useEffect, useState } from 'react'
-import { X, Layers, FileCode, Globe, ShoppingCart, Users, TestTube, Cog } from 'lucide-react'
+import {
+  X,
+  Layers,
+  FileCode,
+  Globe,
+  ShoppingCart,
+  Users,
+  TestTube,
+  Cog,
+  MapPin,
+  CreditCard,
+  Video
+} from 'lucide-react'
 import type { WorkflowTemplate } from '../../types'
 
 const CATEGORY_META: Record<string, { icon: React.ElementType; label: string; color: string }> = {
-  scraping:   { icon: Globe,        label: 'Scraping',    color: 'text-blue-400' },
-  testing:    { icon: TestTube,     label: 'Testing',     color: 'text-green-400' },
-  social:     { icon: Users,        label: 'Social',      color: 'text-purple-400' },
-  ecommerce:  { icon: ShoppingCart, label: 'E-Commerce',  color: 'text-amber-400' },
-  general:    { icon: Cog,          label: 'General',     color: 'text-slate-400' }
+  scraping:        { icon: Globe,        label: 'Scraping',        color: 'text-blue-400' },
+  testing:         { icon: TestTube,     label: 'Testing',         color: 'text-green-400' },
+  social:          { icon: Users,        label: 'Social',          color: 'text-purple-400' },
+  ecommerce:       { icon: ShoppingCart, label: 'E-Commerce',      color: 'text-amber-400' },
+  general:         { icon: Cog,          label: 'General',         color: 'text-slate-400' },
+  // Phase 17 — SEA Platform Templates
+  'sea-ecommerce': { icon: MapPin,       label: 'SEA E-Commerce',  color: 'text-orange-400' },
+  'sea-payments':  { icon: CreditCard,   label: 'SEA Payments',    color: 'text-emerald-400' },
+  'sea-social':    { icon: Video,        label: 'SEA Social',      color: 'text-pink-400' }
 }
 
 interface TemplatePickerModalProps {
@@ -82,10 +98,20 @@ export function TemplatePickerModal({ onClose, onCreated }: TemplatePickerModalP
                           </span>
                         </div>
                         <p className="text-xs text-slate-400 mb-2">{tpl.description}</p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs text-slate-500">
                             {tpl.steps.length} step{tpl.steps.length !== 1 ? 's' : ''}
                           </span>
+                          {tpl.platform && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/70 text-slate-300 capitalize">
+                              {tpl.platform.replace(/-/g, ' ')}
+                            </span>
+                          )}
+                          {tpl.region && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/70 text-slate-300">
+                              {tpl.region}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <button
