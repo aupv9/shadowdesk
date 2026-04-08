@@ -88,6 +88,10 @@ const api = {
   fingerprint: {
     presets: () => ipcRenderer.invoke('fingerprint:presets')
   },
+  // Phase 17 — Behavioral Config UI preset bundles
+  behavior: {
+    presets: () => ipcRenderer.invoke('behavior:presets')
+  },
   extensions: {
     list:       (profileId: string)                          => ipcRenderer.invoke('extensions:list', profileId),
     add:        (profileId: string, name: string, path: string) => ipcRenderer.invoke('extensions:add', profileId, name, path),

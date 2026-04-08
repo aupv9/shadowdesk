@@ -9,6 +9,7 @@ import { BrowserManager } from '../browser-manager'
 import { AutomationEngine } from '../automation'
 import { ApiServer } from '../api-server'
 import { resolveFingerprint, FINGERPRINT_PRESETS } from '../fingerprint/presets'
+import { getBehaviorPresets } from '../fingerprint/behavior-presets'
 import { getTemplates, getTemplate } from '../workflow-templates'
 import { getSettings, updateSettings } from '../settings'
 import { downloadUpdate, installUpdate } from '../auto-updater'
@@ -917,6 +918,13 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('fingerprint:presets', () => {
     return Object.keys(FINGERPRINT_PRESETS)
+  })
+
+  // ── Phase 17: Behavioral Config presets ──────────────────────────────────
+  // Exposes a short list of behavior/timing preset bundles to the renderer.
+  // The UI applies them by calling profiles:update with the merged fp.
+  ipcMain.handle('behavior:presets', () => {
+    return getBehaviorPresets()
   })
 
   // ── Settings ──────────────────────────────────────────────────────────────
