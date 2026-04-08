@@ -416,6 +416,33 @@ export class Database {
         value TEXT NOT NULL
       );
     `)
+
+    // Phase 20 — Proxy Provider Marketplace (UI label: "Phase 17")
+    // Stores user-configured residential proxy provider accounts. Credentials
+    // (username/password/api key/zone) are encrypted with the same master key
+    // used for the existing proxies + cookies tables.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS proxy_provider_accounts (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        label TEXT NOT NULL,
+        endpoint TEXT NOT NULL,
+        port INTEGER NOT NULL,
+        default_pool TEXT NOT NULL DEFAULT 'residential',
+        default_session TEXT NOT NULL DEFAULT 'rotating',
+        username_enc TEXT,
+        password_enc TEXT,
+        api_key_enc TEXT,
+        zone_enc TEXT,
+        status TEXT NOT NULL DEFAULT 'unverified',
+        last_tested_at TEXT,
+        last_error TEXT,
+        usage_json TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_proxy_provider_accounts_type ON proxy_provider_accounts(type);
+    `)
   }
 
   // ── Vault meta (Phase 12.C.3) ────────────────────────────────────────────
@@ -1085,6 +1112,202 @@ export class Database {
 
   deleteProxy(id: string): void {
     this.run('DELETE FROM proxies WHERE id = ?', [id])
+  }
+
+  // ── Phase 20 — Proxy Provider Marketplace ─────────────────────────────────
+  // Stored credentials use the same AES-256-GCM scheme as the proxies table.
+  // Each field is salted with a unique tag (e.g. `provider:username:<id>`)
+  // so a leak of one field can't be replayed for another.
+
+  private encryptProviderField(value: string, accountId: string, field: string): string {
+    const { createCipheriv, createHash, randomBytes } = require('crypto')
+    const masterKey = this.getMasterKey()
+    const salt = `provider:${field}:${accountId}`
+    const key = createHash('sha256').update(Buffer.concat([masterKey, Buffer.from(salt)])).digest()
+    const iv = randomBytes(12)
+    const cipher = createCipheriv('aes-256-gcm', key, iv)
+    const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()])
+    const authTag = cipher.getAuthTag()
+    return Buffer.concat([iv, authTag, encrypted]).toString('base64')
+  }
+
+  private decryptProviderField(blob: string, accountId: string, field: string): string {
+    const { createDecipheriv, createHash } = require('crypto')
+    const masterKey = this.getMasterKey()
+    const salt = `provider:${field}:${accountId}`
+    const key = createHash('sha256').update(Buffer.concat([masterKey, Buffer.from(salt)])).digest()
+    const buf = Buffer.from(blob, 'base64')
+    const iv = buf.subarray(0, 12)
+    const authTag = buf.subarray(12, 28)
+    const ciphertext = buf.subarray(28)
+    const decipher = createDecipheriv('aes-256-gcm', key, iv)
+    decipher.setAuthTag(authTag)
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8')
+  }
+
+  getAllProxyProviders(): any[] {
+    return this.queryAll(
+      `SELECT * FROM proxy_provider_accounts ORDER BY created_at DESC`
+    )
+  }
+
+  getProxyProvider(id: string): any {
+    return this.queryOne('SELECT * FROM proxy_provider_accounts WHERE id = ?', [id])
+  }
+
+  /**
+   * Returns plaintext credentials for the given account. The decryption keys
+   * are derived from the machine-bound master key, so credentials cannot be
+   * recovered by simply copying the SQLite file off the device.
+   */
+  getProxyProviderCredentials(id: string): {
+    username: string
+    password: string
+    apiKey?: string
+    zone?: string
+  } | null {
+    const row = this.getProxyProvider(id)
+    if (!row) return null
+    try {
+      const username = row.username_enc ? this.decryptProviderField(row.username_enc, id, 'username') : ''
+      const password = row.password_enc ? this.decryptProviderField(row.password_enc, id, 'password') : ''
+      const apiKey = row.api_key_enc ? this.decryptProviderField(row.api_key_enc, id, 'apiKey') : undefined
+      const zone = row.zone_enc ? this.decryptProviderField(row.zone_enc, id, 'zone') : undefined
+      return { username, password, apiKey, zone }
+    } catch (err) {
+      console.error(`[Database] Failed to decrypt provider credentials for ${id}:`, err)
+      return null
+    }
+  }
+
+  createProxyProvider(
+    account: {
+      id: string
+      type: string
+      label: string
+      endpoint: string
+      port: number
+      defaultPool: string
+      defaultSession: string
+      status: string
+    },
+    credentials: { username: string; password: string; apiKey?: string; zone?: string },
+  ): void {
+    const usernameEnc = credentials.username
+      ? this.encryptProviderField(credentials.username, account.id, 'username')
+      : null
+    const passwordEnc = credentials.password
+      ? this.encryptProviderField(credentials.password, account.id, 'password')
+      : null
+    const apiKeyEnc = credentials.apiKey
+      ? this.encryptProviderField(credentials.apiKey, account.id, 'apiKey')
+      : null
+    const zoneEnc = credentials.zone
+      ? this.encryptProviderField(credentials.zone, account.id, 'zone')
+      : null
+
+    this.run(
+      `INSERT INTO proxy_provider_accounts
+        (id, type, label, endpoint, port, default_pool, default_session,
+         username_enc, password_enc, api_key_enc, zone_enc, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        account.id,
+        account.type,
+        account.label,
+        account.endpoint,
+        account.port,
+        account.defaultPool,
+        account.defaultSession,
+        usernameEnc,
+        passwordEnc,
+        apiKeyEnc,
+        zoneEnc,
+        account.status,
+      ],
+    )
+  }
+
+  updateProxyProvider(
+    id: string,
+    patch: Partial<{
+      label: string
+      endpoint: string
+      port: number
+      defaultPool: string
+      defaultSession: string
+      credentials: { username?: string; password?: string; apiKey?: string; zone?: string }
+    }>,
+  ): void {
+    const sets: string[] = []
+    const params: any[] = []
+
+    if (patch.label !== undefined)         { sets.push('label = ?');           params.push(patch.label) }
+    if (patch.endpoint !== undefined)      { sets.push('endpoint = ?');        params.push(patch.endpoint) }
+    if (patch.port !== undefined)          { sets.push('port = ?');            params.push(patch.port) }
+    if (patch.defaultPool !== undefined)   { sets.push('default_pool = ?');    params.push(patch.defaultPool) }
+    if (patch.defaultSession !== undefined){ sets.push('default_session = ?'); params.push(patch.defaultSession) }
+
+    if (patch.credentials) {
+      if (patch.credentials.username !== undefined) {
+        sets.push('username_enc = ?')
+        params.push(patch.credentials.username
+          ? this.encryptProviderField(patch.credentials.username, id, 'username')
+          : null)
+      }
+      if (patch.credentials.password !== undefined) {
+        sets.push('password_enc = ?')
+        params.push(patch.credentials.password
+          ? this.encryptProviderField(patch.credentials.password, id, 'password')
+          : null)
+      }
+      if (patch.credentials.apiKey !== undefined) {
+        sets.push('api_key_enc = ?')
+        params.push(patch.credentials.apiKey
+          ? this.encryptProviderField(patch.credentials.apiKey, id, 'apiKey')
+          : null)
+      }
+      if (patch.credentials.zone !== undefined) {
+        sets.push('zone_enc = ?')
+        params.push(patch.credentials.zone
+          ? this.encryptProviderField(patch.credentials.zone, id, 'zone')
+          : null)
+      }
+    }
+
+    if (sets.length === 0) return
+
+    sets.push("updated_at = datetime('now')")
+    params.push(id)
+    this.run(
+      `UPDATE proxy_provider_accounts SET ${sets.join(', ')} WHERE id = ?`,
+      params,
+    )
+  }
+
+  updateProxyProviderStatus(
+    id: string,
+    update: { status: string; lastError: string | null; lastTestedAt: string },
+  ): void {
+    this.run(
+      `UPDATE proxy_provider_accounts
+       SET status = ?, last_error = ?, last_tested_at = ?, updated_at = datetime('now')
+       WHERE id = ?`,
+      [update.status, update.lastError, update.lastTestedAt, id],
+    )
+  }
+
+  updateProxyProviderUsage(id: string, usage: any): void {
+    this.run(
+      `UPDATE proxy_provider_accounts
+       SET usage_json = ?, updated_at = datetime('now')
+       WHERE id = ?`,
+      [JSON.stringify(usage), id],
+    )
+  }
+
+  deleteProxyProvider(id: string): void {
+    this.run('DELETE FROM proxy_provider_accounts WHERE id = ?', [id])
   }
 
   // ── Audit Log ──────────────────────────────────────────────────────────────
