@@ -107,3 +107,188 @@ export function clearAnalyticsQueue(): void {
     console.error('Failed to clear analytics queue:', e)
   }
 }
+
+/**
+ * Track when a user watches a guide video
+ */
+export function trackVideoWatched(
+  method: 'record' | 'template' | 'ai' | 'scratch',
+  duration: number
+): void {
+  const event = {
+    event: 'video_watched',
+    method,
+    duration, // seconds watched
+    timestamp: Date.now()
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Analytics]', event)
+  }
+
+  try {
+    const queue = JSON.parse(localStorage.getItem('analytics_queue') || '[]')
+    queue.push(event)
+    if (queue.length > 100) {
+      queue.shift()
+    }
+    localStorage.setItem('analytics_queue', JSON.stringify(queue))
+  } catch (e) {
+    console.error('Failed to store analytics event:', e)
+  }
+}
+
+/**
+ * Track when a user rates a guide as helpful/not helpful
+ */
+export function trackGuideRated(
+  method: 'record' | 'template' | 'ai' | 'scratch',
+  isHelpful: boolean
+): void {
+  const event = {
+    event: 'guide_rated_helpful',
+    method,
+    isHelpful,
+    timestamp: Date.now()
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Analytics]', event)
+  }
+
+  try {
+    const queue = JSON.parse(localStorage.getItem('analytics_queue') || '[]')
+    queue.push(event)
+    if (queue.length > 100) {
+      queue.shift()
+    }
+    localStorage.setItem('analytics_queue', JSON.stringify(queue))
+  } catch (e) {
+    console.error('Failed to store analytics event:', e)
+  }
+}
+
+/**
+ * Track when a recommendation is shown to user
+ */
+export function trackRecommendationShown(
+  method: 'record' | 'template' | 'ai' | 'scratch'
+): void {
+  const event = {
+    event: 'recommendation_shown',
+    method,
+    timestamp: Date.now()
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Analytics]', event)
+  }
+
+  try {
+    const queue = JSON.parse(localStorage.getItem('analytics_queue') || '[]')
+    queue.push(event)
+    if (queue.length > 100) {
+      queue.shift()
+    }
+    localStorage.setItem('analytics_queue', JSON.stringify(queue))
+  } catch (e) {
+    console.error('Failed to store analytics event:', e)
+  }
+}
+
+/**
+ * Track when a user accepts or rejects a recommendation
+ */
+export function trackRecommendationSelected(
+  method: 'record' | 'template' | 'ai' | 'scratch',
+  accepted: boolean
+): void {
+  const event = {
+    event: 'recommendation_selected',
+    method,
+    accepted,
+    timestamp: Date.now()
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Analytics]', event)
+  }
+
+  try {
+    const queue = JSON.parse(localStorage.getItem('analytics_queue') || '[]')
+    queue.push(event)
+    if (queue.length > 100) {
+      queue.shift()
+    }
+    localStorage.setItem('analytics_queue', JSON.stringify(queue))
+  } catch (e) {
+    console.error('Failed to store analytics event:', e)
+  }
+}
+
+/**
+ * Track A/B test variant assignment
+ */
+export function trackVariantAssigned(
+  method: 'record' | 'template' | 'ai' | 'scratch',
+  variant: string
+): void {
+  const event = {
+    event: 'variant_assigned',
+    method,
+    variant,
+    timestamp: Date.now()
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Analytics]', event)
+  }
+
+  try {
+    const queue = JSON.parse(localStorage.getItem('analytics_queue') || '[]')
+    queue.push(event)
+    if (queue.length > 100) {
+      queue.shift()
+    }
+    localStorage.setItem('analytics_queue', JSON.stringify(queue))
+  } catch (e) {
+    console.error('Failed to store analytics event:', e)
+  }
+}
+
+/**
+ * Get guide analytics summary
+ */
+export function getGuideAnalytics(): Record<string, any> {
+  try {
+    const queue = JSON.parse(localStorage.getItem('analytics_queue') || '[]')
+    const analytics: Record<string, any> = {}
+
+    const methods = ['record', 'template', 'ai', 'scratch']
+    methods.forEach((method) => {
+      const events = queue.filter((e: any) => e.method === method)
+      if (events.length > 0) {
+        const helpfulRatings = events.filter(
+          (e: any) => e.event === 'guide_rated_helpful'
+        )
+        const helpful = helpfulRatings.filter((e: any) => e.isHelpful).length
+        const total = helpfulRatings.length
+
+        analytics[`guide_${method}`] = {
+          views: events.filter((e: any) => e.event === 'method_guide_viewed').length,
+          videoWatches: events.filter((e: any) => e.event === 'video_watched').length,
+          ratings: {
+            total,
+            helpful,
+            score: total > 0 ? ((helpful / total) * 5).toFixed(2) : 'N/A'
+          }
+        }
+      }
+    })
+
+    return analytics
+  } catch (e) {
+    console.error('Failed to get guide analytics:', e)
+    return {}
+  }
+}

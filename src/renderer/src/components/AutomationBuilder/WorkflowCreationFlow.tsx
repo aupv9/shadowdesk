@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   X,
   Video,
@@ -10,10 +10,17 @@ import {
   Clock,
   GraduationCap,
   Info,
-  HelpCircle
+  HelpCircle,
+  Zap
 } from 'lucide-react'
 import { MethodGuideModal } from './MethodGuideModal'
-import { trackWorkflowCreationMethodSelected, trackMethodGuideViewed } from '../../utils/workflowAnalytics'
+import {
+  trackWorkflowCreationMethodSelected,
+  trackMethodGuideViewed,
+  trackRecommendationShown,
+  trackRecommendationSelected
+} from '../../utils/workflowAnalytics'
+import { getRecommendation } from '../../utils/recommendationEngine'
 
 /**
  * Phase 1 — Guided Entry Point for workflow creation.
@@ -124,8 +131,23 @@ export function WorkflowCreationFlow({
   const [selectedGuide, setSelectedGuide] = useState<WorkflowCreationMethod | null>(null)
   const [focusedIndex, setFocusedIndex] = useState(0)
 
+  // Compute recommendation from workflow history
+  const recommendation = useMemo(() => {
+    try {
+      const queue = JSON.parse(localStorage.getItem('analytics_queue') || '[]')
+      // For now, return null - would load actual workflow history from database
+      // This is Phase 2 foundation; Phase 3 will integrate with real workflow data
+      return getRecommendation([])
+    } catch {
+      return null
+    }
+  }, [])
+
   const handleSelect = (method: WorkflowCreationMethod) => {
     trackWorkflowCreationMethodSelected(method, isFirstTime)
+    if (recommendation) {
+      trackRecommendationSelected(method, method === recommendation.method)
+    }
     onSelectMethod(method)
   }
 
@@ -178,13 +200,25 @@ export function WorkflowCreationFlow({
                 Create a new workflow
               </h2>
             </div>
-            <p className="text-sm text-slate-400">
-              Choose how you want to build your automation. Not sure?{' '}
-              <span className="text-emerald-400 font-medium">
-                We recommend recording
-              </span>{' '}
-              for first-time users.
-            </p>
+            {recommendation ? (
+              <p className="text-sm text-slate-400">
+                <span className="flex items-center gap-1 text-violet-400 font-medium mb-1">
+                  <Zap className="w-4 h-4" />
+                  Our recommendation: {recommendation.method}
+                </span>
+                <span className="text-slate-400">
+                  {recommendation.reason}
+                </span>
+              </p>
+            ) : (
+              <p className="text-sm text-slate-400">
+                Choose how you want to build your automation. Not sure?{' '}
+                <span className="text-emerald-400 font-medium">
+                  We recommend recording
+                </span>{' '}
+                for first-time users.
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
