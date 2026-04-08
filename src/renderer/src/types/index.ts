@@ -77,7 +77,19 @@ export type {
   AiDetectionAdvice,
   AiWorkflowResult,
   AiSelectorHealResult,
-  BehaviorArchetype
+  BehaviorArchetype,
+  // Phase 20 — Proxy Provider Marketplace ("Phase 17 — Proxy API Integration")
+  ProxyProviderType,
+  ProxyPoolType,
+  ProxySessionType,
+  ProxyProviderCatalogEntry,
+  ProxyProviderAccount,
+  ProxyProviderAccountView,
+  ProxyProviderCredentialsInput,
+  ProxyProviderUsage,
+  ProxyProviderTestResult,
+  ProxyGenerationOptions,
+  GeneratedProxy
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
