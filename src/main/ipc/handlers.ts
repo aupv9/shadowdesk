@@ -56,6 +56,12 @@ import {
 } from '../ai-assistant'
 import { ScriptAnalyzer } from '../script-analyzer'
 import { RecordingRefiner } from '../recording-refiner'
+import { getProxyProviderManager } from '../proxy-providers/provider-manager'
+import type {
+  ProxyGenerationOptions,
+  ProxyProviderCredentialsInput,
+  ProxyProviderType,
+} from '../../shared/types'
 import type { CreateNodeInput, CreateWebhookInput, TelegramConfig, MarketplaceCategory, WebhookConfig } from '../../shared/types'
 import type { AutomationStep, DetectionVectorResult, RefineOptions } from '../../shared/types'
 
@@ -912,6 +918,80 @@ export function registerIpcHandlers(): void {
       return { latency_ms, healthy: false }
     }
   })
+
+  // ── Phase 20 — Proxy Provider Marketplace ─────────────────────────────────
+  // (User-facing label: "Phase 17 — Proxy API Integration")
+
+  const providerManager = getProxyProviderManager()
+
+  ipcMain.handle('proxyProviders:catalog', () => {
+    return providerManager.listCatalog()
+  })
+
+  ipcMain.handle('proxyProviders:list', () => {
+    return providerManager.listAccounts()
+  })
+
+  ipcMain.handle('proxyProviders:create', (_event, input: {
+    type: ProxyProviderType
+    label: string
+    endpoint?: string
+    port?: number
+    defaultPool?: 'residential' | 'datacenter' | 'mobile' | 'isp'
+    defaultSession?: 'rotating' | 'sticky'
+    credentials: ProxyProviderCredentialsInput
+  }) => {
+    if (!input || !input.type || !input.label) {
+      throw new ValidationError('Provider type and label are required')
+    }
+    if (!input.credentials?.username || !input.credentials?.password) {
+      throw new ValidationError('Provider username and password are required')
+    }
+    return providerManager.createAccount(input)
+  })
+
+  ipcMain.handle('proxyProviders:update', (_event, id: string, patch: any) => {
+    if (!id) throw new ValidationError('Account id is required')
+    return providerManager.updateAccount(id, patch)
+  })
+
+  ipcMain.handle('proxyProviders:delete', (_event, id: string) => {
+    if (!id) throw new ValidationError('Account id is required')
+    providerManager.deleteAccount(id)
+    return { ok: true }
+  })
+
+  ipcMain.handle('proxyProviders:test', async (_event, id: string) => {
+    if (!id) throw new ValidationError('Account id is required')
+    return providerManager.testAccount(id)
+  })
+
+  ipcMain.handle('proxyProviders:refreshUsage', async (_event, id: string) => {
+    if (!id) throw new ValidationError('Account id is required')
+    return providerManager.refreshUsage(id)
+  })
+
+  ipcMain.handle(
+    'proxyProviders:generate',
+    async (_event, id: string, options: ProxyGenerationOptions) => {
+      if (!id) throw new ValidationError('Account id is required')
+      if (!options?.count || options.count < 1 || options.count > 100) {
+        throw new ValidationError('count must be between 1 and 100')
+      }
+      return providerManager.generateProxies(id, options)
+    },
+  )
+
+  ipcMain.handle(
+    'proxyProviders:generateAndImport',
+    async (_event, id: string, options: ProxyGenerationOptions) => {
+      if (!id) throw new ValidationError('Account id is required')
+      if (!options?.count || options.count < 1 || options.count > 100) {
+        throw new ValidationError('count must be between 1 and 100')
+      }
+      return providerManager.generateAndImport(id, options)
+    },
+  )
 
   // ── Fingerprint Presets ───────────────────────────────────────────────────
 
