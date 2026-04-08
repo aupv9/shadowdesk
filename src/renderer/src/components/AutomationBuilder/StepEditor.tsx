@@ -151,7 +151,9 @@ const ALL_ACTIONS: AutomationActionType[] = [
   // Tier 7 RPA
   'tryCatch',
   // Tier 9 RPA
-  'dragAndDrop', 'keyCombo', 'selectContextMenu', 'setRangeInput', 'scrollIntoView', 'switchFrame'
+  'dragAndDrop', 'keyCombo', 'selectContextMenu', 'setRangeInput', 'scrollIntoView', 'switchFrame',
+  // Phase 18 — Data pipelines & control flow
+  'extractJson', 'forEachElement', 'whileLoop', 'waitForRequest', 'waitForResponse', 'paginate'
 ]
 
 interface StepEditorProps {
@@ -220,6 +222,12 @@ function getDefaultParams(action: AutomationActionType): Record<string, any> {
     case 'setRangeInput':      return { selector: '', value: 50, saveAs: '' }
     case 'scrollIntoView':     return { selector: '', behavior: 'smooth', timeout: 30000 }
     case 'switchFrame':        return { selector: '', index: undefined, urlPattern: '', exit: false, saveAs: '' }
+    case 'extractJson':        return { selector: '', path: '', saveAs: 'json' }
+    case 'forEachElement':     return { selector: '', prefix: 'element', steps: [] }
+    case 'whileLoop':          return { conditionType: 'var-truthy', variable: '', maxIterations: 0, steps: [] }
+    case 'waitForRequest':     return { urlPattern: '', timeout: 30000, saveAs: 'requestUrl' }
+    case 'waitForResponse':    return { urlPattern: '', timeout: 30000, saveAs: 'responseBody' }
+    case 'paginate':           return { selector: '', maxPages: 0, delayMs: 1000, collectSelector: '' }
     default:                   return {}
   }
 }
@@ -652,6 +660,450 @@ function ParamEditor({
           <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
             Loop steps are configured as nested steps within this action.
             Use templates or JSON edit to define loop body.
+          </div>
+        </>
+      )
+    case 'callWorkflow':
+      return (
+        <>
+          {field('workflowId', 'Workflow ID')}
+          {field('inputVars', 'Input variables (JSON)', 'textarea', '{}')}
+          {field('outputPrefix', 'Output variable prefix (optional)')}
+        </>
+      )
+    case 'parallelSteps':
+      return (
+        <>
+          {field('failFast', 'Fail fast on error', 'checkbox')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Parallel steps are configured as nested steps. All steps run concurrently.
+          </div>
+        </>
+      )
+    case 'jumpToStep':
+      return (
+        <>
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Condition type</label>
+            <select value={params.conditionType ?? 'var-equals'} onChange={(e) => onChange('conditionType', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="var-equals">Variable equals value</option>
+              <option value="var-contains">Variable contains text</option>
+              <option value="always">Always (unconditional)</option>
+            </select>
+          </div>
+          {params.conditionType !== 'always' && field('variable', 'Variable name')}
+          {params.conditionType !== 'always' && field('expected', 'Expected value')}
+          {field('targetStepId', 'Target step ID (or label)')}
+        </>
+      )
+    case 'interceptRequest':
+      return (
+        <>
+          {field('urlPattern', 'URL pattern (wildcard: *)')}
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Action</label>
+            <select value={params.action ?? 'block'} onChange={(e) => onChange('action', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="block">Block</option>
+              <option value="respond">Respond with custom</option>
+              <option value="continue">Continue (modify)</option>
+            </select>
+          </div>
+          {(params.action === 'respond' || params.action === 'continue') && field('status', 'HTTP Status', 'number')}
+          {(params.action === 'respond' || params.action === 'continue') && field('contentType', 'Content-Type')}
+          {(params.action === 'respond' || params.action === 'continue') && field('body', 'Response body (JSON)', 'textarea')}
+        </>
+      )
+    case 'clearIntercepts':
+      return (
+        <div className="text-xs text-slate-400">Clears all request intercepts. No parameters.</div>
+      )
+    case 'getCookies':
+      return (
+        <>
+          {field('url', 'URL (optional, defaults to current page)')}
+          {saveAsField('cookies')}
+        </>
+      )
+    case 'setCookies':
+      return (
+        <>
+          {field('name', 'Cookie name')}
+          {field('value', 'Cookie value')}
+          {field('domain', 'Domain (optional)')}
+          {field('path', 'Path (default: /)')}
+          {field('expires', 'Expires (Unix timestamp, optional)', 'number')}
+          {field('httpOnly', 'HTTP-only', 'checkbox')}
+        </>
+      )
+    case 'deleteCookies':
+      return (
+        <>
+          <div className="mb-2">
+            <label className="flex items-center gap-2 text-sm text-slate-300">
+              <input type="checkbox" checked={params.all ?? false} onChange={(e) => onChange('all', e.target.checked)} className="rounded border-slate-600 bg-slate-700" />
+              Delete all cookies
+            </label>
+          </div>
+          {!params.all && field('name', 'Cookie name')}
+          {!params.all && field('domain', 'Domain (optional)')}
+        </>
+      )
+    case 'assert':
+      return (
+        <>
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Assert type</label>
+            <select value={params.assertType ?? 'element-exists'} onChange={(e) => onChange('assertType', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="element-exists">Element exists</option>
+              <option value="element-text">Element text equals</option>
+              <option value="variable-equals">Variable equals</option>
+              <option value="expression">JavaScript expression</option>
+            </select>
+          </div>
+          {(params.assertType === 'element-exists' || params.assertType === 'element-text') && field('selector', 'CSS Selector')}
+          {params.assertType === 'element-text' && field('expected', 'Expected text')}
+          {params.assertType === 'variable-equals' && field('variable', 'Variable name')}
+          {params.assertType === 'variable-equals' && field('expected', 'Expected value')}
+          {params.assertType === 'expression' && field('script', 'JavaScript expression', 'textarea')}
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">On failure</label>
+            <select value={params.onFail ?? 'stop'} onChange={(e) => onChange('onFail', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="stop">Stop workflow</option>
+              <option value="log">Log warning</option>
+              <option value="continue">Continue</option>
+            </select>
+          </div>
+        </>
+      )
+    case 'openTab':
+      return (
+        <>
+          {field('url', 'URL to open')}
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Wait until</label>
+            <select value={params.waitUntil ?? 'networkidle2'} onChange={(e) => onChange('waitUntil', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="load">load</option>
+              <option value="domcontentloaded">domcontentloaded</option>
+              <option value="networkidle0">networkidle0</option>
+              <option value="networkidle2">networkidle2</option>
+            </select>
+          </div>
+          {saveAsField('tab')}
+        </>
+      )
+    case 'switchTab':
+      return (
+        <>
+          {field('index', 'Tab index (0-based, or empty to match pattern)', 'number')}
+          {field('urlPattern', 'Or match by URL pattern (regex or wildcard)')}
+          {field('titlePattern', 'Or match by title pattern')}
+          {saveAsField('tab')}
+        </>
+      )
+    case 'closeTab':
+      return (
+        <>
+          {field('index', 'Tab index to close (0-based)', 'number')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Closes the tab at the specified index. If not specified, closes the current tab.
+          </div>
+        </>
+      )
+    case 'getTabs':
+      return (
+        <>
+          {saveAsField('tabs')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Returns an array of all open tabs. Use {'{tabs}'} in later steps.
+          </div>
+        </>
+      )
+    case 'switchProxy':
+      return (
+        <>
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Strategy</label>
+            <select value={params.strategy ?? 'round-robin'} onChange={(e) => onChange('strategy', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="round-robin">Round-robin</option>
+              <option value="random">Random</option>
+              <option value="specific">Specific proxy ID</option>
+            </select>
+          </div>
+          {params.strategy === 'specific' && field('proxyId', 'Proxy ID')}
+          {field('prefix', 'Variable prefix for proxy info')}
+          {field('persistToProfile', 'Persist to profile', 'checkbox')}
+        </>
+      )
+    case 'clickByText':
+      return (
+        <>
+          {field('text', 'Text to find (exact or partial)')}
+          {field('exact', 'Exact match (vs. contains)', 'checkbox')}
+          {field('visible', 'Element must be visible', 'checkbox')}
+          {field('clickCount', 'Click count', 'number')}
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Button</label>
+            <select value={params.button ?? 'left'} onChange={(e) => onChange('button', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+              <option value="middle">Middle</option>
+            </select>
+          </div>
+          {field('timeout', 'Timeout (ms)', 'number')}
+          {saveAsField('foundElement')}
+        </>
+      )
+    case 'getStorage':
+      return (
+        <>
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Storage type</label>
+            <select value={params.type ?? 'localStorage'} onChange={(e) => onChange('type', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="localStorage">localStorage</option>
+              <option value="sessionStorage">sessionStorage</option>
+            </select>
+          </div>
+          {saveAsField('storage')}
+        </>
+      )
+    case 'setStorage':
+      return (
+        <>
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Storage type</label>
+            <select value={params.type ?? 'localStorage'} onChange={(e) => onChange('type', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="localStorage">localStorage</option>
+              <option value="sessionStorage">sessionStorage</option>
+            </select>
+          </div>
+          {field('key', 'Key name')}
+          {field('value', 'Value (JSON or string)')}
+        </>
+      )
+    case 'clearStorage':
+      return (
+        <>
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Clear</label>
+            <select value={params.type ?? 'all'} onChange={(e) => onChange('type', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="all">All storage (localStorage + sessionStorage)</option>
+              <option value="localStorage">localStorage only</option>
+              <option value="sessionStorage">sessionStorage only</option>
+            </select>
+          </div>
+        </>
+      )
+    case 'queryIndexedDB':
+      return (
+        <>
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Queries all IndexedDB databases and stores. Configure via JSON edit for complex queries.
+          </div>
+          {saveAsField('idbData')}
+        </>
+      )
+    case 'forEachRow':
+      return (
+        <>
+          {field('filePath', 'CSV file path (relative to profile)')}
+          {field('prefix', 'Variable prefix (e.g. row)')}
+          {field('limit', 'Max rows (0 = all)', 'number')}
+          {field('failFast', 'Fail fast on error', 'checkbox')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Nested steps run for each row. Use {'{row.columnName}'} to access CSV columns.
+          </div>
+        </>
+      )
+    case 'readFile':
+      return (
+        <>
+          {field('filePath', 'File path (relative to profile)')}
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Encoding</label>
+            <select value={params.encoding ?? 'utf-8'} onChange={(e) => onChange('encoding', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="utf-8">UTF-8</option>
+              <option value="binary">Binary (base64)</option>
+            </select>
+          </div>
+          {saveAsField('fileContent')}
+        </>
+      )
+    case 'writeFile':
+      return (
+        <>
+          {field('filePath', 'File path (relative to profile)')}
+          {field('content', 'Content to write', 'textarea')}
+          {field('append', 'Append to file (vs. overwrite)', 'checkbox')}
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Encoding</label>
+            <select value={params.encoding ?? 'utf-8'} onChange={(e) => onChange('encoding', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="utf-8">UTF-8</option>
+              <option value="binary">Binary (base64)</option>
+            </select>
+          </div>
+        </>
+      )
+    case 'waitForDownload':
+      return (
+        <>
+          {field('directory', 'Download directory to monitor')}
+          {field('pattern', 'File name pattern (wildcard or regex)')}
+          {field('timeout', 'Timeout (ms)', 'number')}
+          {field('pollInterval', 'Poll interval (ms)', 'number')}
+          {saveAsField('downloadedFile')}
+        </>
+      )
+    case 'tryCatch':
+      return (
+        <>
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Try/Catch blocks are configured as nested steps (tryBlock, catchBlock, finallyBlock).
+            Use JSON edit to define nested steps.
+          </div>
+          {field('errorPrefix', 'Error variable prefix')}
+        </>
+      )
+    case 'dragAndDrop':
+      return (
+        <>
+          {field('selector', 'Element to drag (CSS selector)')}
+          {field('targetSelector', 'Target element (CSS selector)')}
+          {field('steps', 'Number of drag steps', 'number')}
+          {field('offsetX', 'Offset X (px)', 'number')}
+          {field('offsetY', 'Offset Y (px)', 'number')}
+        </>
+      )
+    case 'keyCombo':
+      return (
+        <>
+          {field('keys', 'Key combination (e.g. Control+a, Command+v)')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Supported modifiers: Control, Shift, Alt, Meta. Separate keys with +.
+          </div>
+        </>
+      )
+    case 'selectContextMenu':
+      return (
+        <>
+          {field('selector', 'CSS selector to right-click')}
+          {field('menuItemText', 'Menu item text to click')}
+          {field('exact', 'Exact text match (vs. contains)', 'checkbox')}
+          {field('menuDelay', 'Delay before clicking menu item (ms)', 'number')}
+        </>
+      )
+    case 'setRangeInput':
+      return (
+        <>
+          {field('selector', 'CSS selector (input[type=range])')}
+          {field('value', 'Value to set', 'number')}
+          {saveAsField('rangeValue')}
+        </>
+      )
+    case 'scrollIntoView':
+      return (
+        <>
+          {field('selector', 'CSS selector to scroll into view')}
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Behavior</label>
+            <select value={params.behavior ?? 'smooth'} onChange={(e) => onChange('behavior', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="smooth">Smooth</option>
+              <option value="auto">Auto (instant)</option>
+            </select>
+          </div>
+          {field('timeout', 'Timeout (ms)', 'number')}
+        </>
+      )
+    case 'switchFrame':
+      return (
+        <>
+          {field('selector', 'Frame selector (iframe CSS selector)')}
+          {field('index', 'Or frame index (0-based)', 'number')}
+          {field('urlPattern', 'Or match by URL pattern')}
+          {field('exit', 'Exit current frame (return to parent)', 'checkbox')}
+          {saveAsField('frameHandle')}
+        </>
+      )
+    case 'extractJson':
+      return (
+        <>
+          {field('selector', 'CSS selector containing JSON (or empty for page text)')}
+          {field('path', 'JSONPath query (optional, e.g. $.data[0].name)')}
+          {saveAsField('extractedJson')}
+        </>
+      )
+    case 'forEachElement':
+      return (
+        <>
+          {field('selector', 'CSS selector to iterate')}
+          {field('prefix', 'Variable prefix for element')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Iterates over matching elements. Use {'{elementIndex}'} and {'{elementText}'} in nested steps.
+          </div>
+        </>
+      )
+    case 'whileLoop':
+      return (
+        <>
+          <div className="mb-2">
+            <label className="text-xs text-slate-500 mb-1 block">Condition</label>
+            <select value={params.conditionType ?? 'var-truthy'} onChange={(e) => onChange('conditionType', e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ghost-500">
+              <option value="var-truthy">Variable is truthy</option>
+              <option value="selector-exists">Selector exists</option>
+              <option value="expression">JavaScript expression</option>
+            </select>
+          </div>
+          {field('variable', 'Variable name')}
+          {field('maxIterations', 'Max iterations (0 = unlimited)', 'number')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Nested steps run while condition is true.
+          </div>
+        </>
+      )
+    case 'waitForRequest':
+      return (
+        <>
+          {field('urlPattern', 'URL pattern to match (wildcard or regex)')}
+          {field('timeout', 'Timeout (ms)', 'number')}
+          {saveAsField('requestUrl')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Waits for an XHR/fetch request matching the pattern. Useful before extracting response data.
+          </div>
+        </>
+      )
+    case 'waitForResponse':
+      return (
+        <>
+          {field('urlPattern', 'URL pattern to match (wildcard or regex)')}
+          {field('timeout', 'Timeout (ms)', 'number')}
+          {saveAsField('responseBody')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Waits for a response and captures the response body (JSON/text).
+          </div>
+        </>
+      )
+    case 'paginate':
+      return (
+        <>
+          {field('selector', 'Next button CSS selector')}
+          {field('maxPages', 'Max pages to visit (0 = unlimited)', 'number')}
+          {field('delayMs', 'Delay between pages (ms)', 'number')}
+          {field('collectSelector', 'Optional: selector to collect data from (use with extractText)')}
+          <div className="mt-2 p-2 bg-slate-700/50 rounded text-xs text-slate-400">
+            Clicks the next button and waits for page load, repeating until button disappears or max pages reached.
           </div>
         </>
       )
