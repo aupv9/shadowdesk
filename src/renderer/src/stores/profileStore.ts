@@ -40,6 +40,8 @@ interface ProfileState {
   bulkRestoreProfiles: (ids: string[])                => Promise<{ restored: number; cancelledCleanups: number }>
   bulkAssignProxy:    (ids: string[], proxyId: string | null) => Promise<{ updated: number }>
   bulkAssignGroup:    (ids: string[], groupId: string | null) => Promise<{ updated: number }>
+  bulkLaunchProfiles: (ids: string[])                 => Promise<{ launched: number; failed: number }>
+  bulkCloseProfiles:  (ids: string[])                 => Promise<{ closed: number; failed: number }>
   launchProfile:      (id: string)                    => Promise<void>
   closeProfile:       (id: string)                    => Promise<void>
   rerollFingerprint:  (id: string)                    => Promise<void>
@@ -236,6 +238,78 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   closeProfile: async (id: string) => {
     await window.api.profiles.close(id)
     set((s) => ({ activeSessions: s.activeSessions.filter((x) => x !== id) }))
+  },
+
+  // Bulk launch multiple profiles in parallel
+  bulkLaunchProfiles: async (ids: string[]) => {
+    if (ids.length === 0) return { launched: 0, failed: 0 }
+    let launched = 0
+    let failed = 0
+    const launchedIds: string[] = []
+
+    try {
+      // Launch all profiles in parallel with Promise.allSettled to handle individual failures
+      const results = await Promise.allSettled(
+        ids.map((id) => window.api.profiles.launch(id))
+      )
+
+      for (let i = 0; i < results.length; i++) {
+        if (results[i].status === 'fulfilled') {
+          launched++
+          launchedIds.push(ids[i])
+        } else {
+          failed++
+        }
+      }
+
+      // Update active sessions with all successfully launched profiles
+      if (launchedIds.length > 0) {
+        set((s) => ({
+          activeSessions: [...new Set([...s.activeSessions, ...launchedIds])]
+        }))
+      }
+
+      return { launched, failed }
+    } catch (e: any) {
+      set({ error: e.message })
+      throw e
+    }
+  },
+
+  // Bulk close multiple profiles in parallel
+  bulkCloseProfiles: async (ids: string[]) => {
+    if (ids.length === 0) return { closed: 0, failed: 0 }
+    let closed = 0
+    let failed = 0
+    const closedIds: string[] = []
+
+    try {
+      // Close all profiles in parallel with Promise.allSettled to handle individual failures
+      const results = await Promise.allSettled(
+        ids.map((id) => window.api.profiles.close(id))
+      )
+
+      for (let i = 0; i < results.length; i++) {
+        if (results[i].status === 'fulfilled') {
+          closed++
+          closedIds.push(ids[i])
+        } else {
+          failed++
+        }
+      }
+
+      // Update active sessions by removing all successfully closed profiles
+      if (closedIds.length > 0) {
+        set((s) => ({
+          activeSessions: s.activeSessions.filter((x) => !closedIds.includes(x))
+        }))
+      }
+
+      return { closed, failed }
+    } catch (e: any) {
+      set({ error: e.message })
+      throw e
+    }
   },
 
   rerollFingerprint: async (id: string) => {

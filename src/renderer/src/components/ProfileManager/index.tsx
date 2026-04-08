@@ -34,6 +34,7 @@ export function ProfileManager() {
     setPaginationEnabled, setPaginationLimit, goToPage,
     launchProfile, closeProfile, deleteProfile, cloneProfile,
     bulkDeleteProfiles, bulkRestoreProfiles, bulkAssignProxy, bulkAssignGroup,
+    bulkLaunchProfiles, bulkCloseProfiles,
     exportProfile, importProfile, setSyncExcluded
   } = useProfileStore()
   // Phase 4.3: undo toast support
@@ -249,6 +250,46 @@ export function ProfileManager() {
       )
     } catch (e: any) {
       pushToast(e.message ?? 'Bulk group assignment failed', 'error')
+    }
+  }
+
+  // Bulk launch multiple profiles in parallel
+  const handleBulkLaunch = async () => {
+    try {
+      const ids = Array.from(selected)
+      const result = await bulkLaunchProfiles(ids)
+      if (result.launched > 0) {
+        pushToast(
+          `Launched ${result.launched} profile${result.launched !== 1 ? 's' : ''}${
+            result.failed > 0 ? ` (${result.failed} failed)` : ''
+          }`,
+          'success',
+        )
+      } else if (result.failed > 0) {
+        pushToast(`Failed to launch ${result.failed} profile${result.failed !== 1 ? 's' : ''}`, 'error')
+      }
+    } catch (e: any) {
+      pushToast(e.message ?? 'Bulk launch failed', 'error')
+    }
+  }
+
+  // Bulk close multiple profiles in parallel
+  const handleBulkClose = async () => {
+    try {
+      const ids = Array.from(selected)
+      const result = await bulkCloseProfiles(ids)
+      if (result.closed > 0) {
+        pushToast(
+          `Closed ${result.closed} profile${result.closed !== 1 ? 's' : ''}${
+            result.failed > 0 ? ` (${result.failed} failed)` : ''
+          }`,
+          'success',
+        )
+      } else if (result.failed > 0) {
+        pushToast(`Failed to close ${result.failed} profile${result.failed !== 1 ? 's' : ''}`, 'error')
+      }
+    } catch (e: any) {
+      pushToast(e.message ?? 'Bulk close failed', 'error')
     }
   }
 
@@ -663,6 +704,8 @@ export function ProfileManager() {
         onClearSelection={() => { setSelected(new Set()); setSelectionMode(false) }}
         onSelectAll={handleSelectAll}
         allSelected={filtered.length > 0 && filtered.every((p) => selected.has(p.id))}
+        onBulkLaunch={handleBulkLaunch}
+        onBulkClose={handleBulkClose}
         onBulkDelete={handleBulkDelete}
         onBulkClone={handleBulkClone}
         onBulkAssignProxy={handleBulkAssignProxy}
