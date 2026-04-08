@@ -1964,19 +1964,13 @@ export class AutomationEngine {
         // Phase 18.1: Audit log credential access for compliance
         const db = Database.getInstance()
         try {
-          db.insertAuditLog({
+          db.addAuditEntry({
+            id: uuidv4(),
             user_id: 'system',  // TODO: Get from IPC context
             user_name: 'automation',
             action: 'credential_access',
             target_id: cred.id,
-            target_name: cred.label,
-            timestamp: new Date().toISOString(),
-            ip_address: 'localhost',
-            metadata: {
-              workflow_id: profileId || 'unknown',
-              step_id: step.id,
-              action_type: 'useCredential'
-            }
+            target_name: cred.label
           })
         } catch (auditErr) {
           // Log audit failure but don't fail the workflow

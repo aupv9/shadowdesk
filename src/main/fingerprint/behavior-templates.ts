@@ -32,7 +32,7 @@ const BEHAVIOR_TEMPLATES: Record<BehaviorProfileTemplate, Partial<FingerprintCon
       scrollInertia: true     // Page-by-page scrolls
     },
     timing: {
-      dateNoisePrecision: 500,   // Less frequent time updates
+      dateNoisePrecision: 250,   // Less frequent time updates
       rafJitter: true,           // Moderate frame jitter
       performanceClamp: true     // Hide precise timing
     },
@@ -104,7 +104,7 @@ const BEHAVIOR_TEMPLATES: Record<BehaviorProfileTemplate, Partial<FingerprintCon
       scrollInertia: true     // Natural scrolling
     },
     timing: {
-      dateNoisePrecision: 1000,   // Coarse timing
+      dateNoisePrecision: 250,    // Coarse timing
       rafJitter: true,            // Maximum variance
       performanceClamp: true      // Hide everything
     },
