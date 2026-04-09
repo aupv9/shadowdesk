@@ -24,6 +24,11 @@ import { WarmUpModal } from './WarmUpModal'
 import { CollisionsDrawer } from './CollisionsDrawer'
 import { ImportGuideModal } from './ImportGuideModal'
 import { useImportStore } from '../../stores/importStore'
+import {
+  AdvancedFilters, DEFAULT_FILTERS,
+  matchesPlatformFilter, matchesProxyFilter, matchesDateRange,
+  type AdvancedFilterState
+} from './AdvancedFilters'
 // Phase 3 components
 import { PaginationControls } from './PaginationControls'
 import { CleanupMonitor } from './CleanupMonitor'
@@ -89,6 +94,7 @@ export function ProfileManager() {
   const [viewMode,    setViewMode]    = useLocalStorage<ViewMode>('ghostbrowser.profiles.viewMode', 'grid')
   const [sortKey,     setSortKey]     = useLocalStorage<SortKey>('ghostbrowser.profiles.sortKey', 'last-used')
   const [quickFilter, setQuickFilter] = useLocalStorage<QuickFilter>('ghostbrowser.profiles.quickFilter', 'all')
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilterState>({ ...DEFAULT_FILTERS })
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
 
   // Group creation inline state
@@ -123,7 +129,8 @@ export function ProfileManager() {
         p.name.toLowerCase().includes(q) ||
         (p.notes ?? '').toLowerCase().includes(q) ||
         p.fingerprint.os.platform.toLowerCase().includes(q) ||
-        (p.proxy_label ?? '').toLowerCase().includes(q)
+        (p.proxy_label ?? '').toLowerCase().includes(q) ||
+        p.fingerprint.preset.toLowerCase().includes(q)
       const matchGroup = activeGroup === null || p.group_id === activeGroup
       let matchQuick = true
       switch (quickFilter) {
@@ -133,7 +140,12 @@ export function ProfileManager() {
         case 'never-used': matchQuick = !p.last_used_at; break
         default:           matchQuick = true
       }
-      return matchSearch && matchGroup && matchQuick
+      // Advanced filters
+      const matchPlatform = matchesPlatformFilter(p.fingerprint.os.platform, p.fingerprint.preset, advancedFilters.platform)
+      const matchProxy = matchesProxyFilter(p.proxy_id, (p as any).proxy_type, advancedFilters.proxy)
+      const matchDate = matchesDateRange(p.created_at, advancedFilters.dateRange)
+      const matchPreset = !advancedFilters.presetSearch || p.fingerprint.preset.toLowerCase().includes(advancedFilters.presetSearch.toLowerCase())
+      return matchSearch && matchGroup && matchQuick && matchPlatform && matchProxy && matchDate && matchPreset
     })
 
     // Sort in-place on a copy — mutating `profiles` would confuse Zustand.
@@ -148,7 +160,7 @@ export function ProfileManager() {
       case 'created-asc':  sorted.sort((a, b) => ts(a.created_at) - ts(b.created_at)); break
     }
     return sorted
-  }, [profiles, search, activeGroup, quickFilter, sortKey, activeSessions])
+  }, [profiles, search, activeGroup, quickFilter, sortKey, activeSessions, advancedFilters])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -667,6 +679,9 @@ export function ProfileManager() {
 
       {/* Stats strip doubles as quick-filter chips */}
       <ProfileStatsBar stats={stats} active={quickFilter} onChange={setQuickFilter} />
+
+      {/* Advanced filters: platform, proxy, date range, preset */}
+      <AdvancedFilters filters={advancedFilters} onChange={setAdvancedFilters} />
 
       {/* Group filter bar — always visible so user can create first group */}
       <div className="px-6 pt-3 pb-1 flex items-center gap-2 flex-wrap">
