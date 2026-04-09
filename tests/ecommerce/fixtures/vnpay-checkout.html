@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<!--
+  Offline fixture: VNPay SANDBOX checkout page
+  Used by: tpl-sea-vnpay-checkout
+  Selectors exercised:
+    div.bank-list, div.list-bank           — bank grid
+    div[data-bank-code="NCB"]              — test bank tile
+    input[name="cardNumber"]
+    input[name="cardHolder"]
+    input[name="issueDate"]
+    button.btn-pay                         — submit
+  Use SANDBOX test card only. This fixture must never contain a real PAN.
+-->
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>VNPAY SANDBOX - Cổng thanh toán thử nghiệm</title>
+</head>
+<body>
+  <main class="vnpay-gateway">
+    <section class="amount-summary">
+      <div class="merchant">Ghost Browser Test Merchant</div>
+      <div class="order-info">Order #GB-TEST-2026-0409</div>
+      <div class="amount txn-amount">1.990.000 VND</div>
+    </section>
+
+    <section class="payment-methods">
+      <div class="bank-list list-bank">
+        <div class="bank-item NCB" data-bank-code="NCB">
+          <img src="/bank-ncb.png" alt="NCB">
+          <div class="bank-name">NCB</div>
+          <div class="bank-label">Ngân Hàng NCB (Thử nghiệm)</div>
+        </div>
+        <div class="bank-item BIDV" data-bank-code="BIDV">
+          <img src="/bank-bidv.png" alt="BIDV">
+          <div class="bank-name">BIDV</div>
+        </div>
+        <div class="bank-item TCB" data-bank-code="TCB">
+          <img src="/bank-tcb.png" alt="TCB">
+          <div class="bank-name">Techcombank</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card-form">
+      <label>Số thẻ
+        <input name="cardNumber" type="text" placeholder="9704 xxxx xxxx xxxx">
+      </label>
+      <label>Tên chủ thẻ
+        <input name="cardHolder" type="text" placeholder="NGUYEN VAN A">
+      </label>
+      <label>Ngày phát hành
+        <input name="issueDate" type="text" placeholder="MM/YY">
+      </label>
+      <button class="btn-pay" type="submit">Thanh toán</button>
+    </section>
+
+    <footer>
+      <span class="txn-ref transaction-ref">TXN-SANDBOX-0409-0001</span>
+    </footer>
+  </main>
+</body>
+</html>

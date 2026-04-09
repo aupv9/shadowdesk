@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<!--
+  Offline fixture: GrabFood VN restaurant list page
+  Used by: tpl-sea-grab-food-browse
+  Selectors exercised:
+    input[placeholder*="delivery address"], input[placeholder*="địa chỉ"]  — address input
+    a[data-testid="restaurant-card"]                                       — restaurant cards
+    a[data-testid="restaurant-card"] h6                                    — restaurant names
+-->
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>GrabFood - Giao đồ ăn tận nơi</title>
+</head>
+<body>
+  <header>
+    <input placeholder="Nhập địa chỉ giao hàng" type="text" value="Nguyen Hue Walking Street, Ho Chi Minh City">
+  </header>
+
+  <main>
+    <section class="restaurant-grid">
+      <a data-testid="restaurant-card" href="/vn/vi/restaurant/1001">
+        <img src="/r0.jpg">
+        <h6>Phở Thìn Bờ Hồ - Nguyễn Huệ</h6>
+        <div class="meta">Vietnamese · ₫₫ · 15-20 min</div>
+        <div class="rating">4.7 (3,245)</div>
+      </a>
+
+      <a data-testid="restaurant-card" href="/vn/vi/restaurant/1002">
+        <img src="/r1.jpg">
+        <h6>Bún Chả Hương Liên Quận 1</h6>
+        <div class="meta">Vietnamese · ₫ · 20-25 min</div>
+        <div class="rating">4.8 (1,892)</div>
+      </a>
+
+      <a data-testid="restaurant-card" href="/vn/vi/restaurant/1003">
+        <img src="/r2.jpg">
+        <h6>Cơm Tấm Ba Ghiền Đặng Văn Ngữ</h6>
+        <div class="meta">Vietnamese · ₫ · 10-15 min</div>
+        <div class="rating">4.6 (5,123)</div>
+      </a>
+
+      <a data-testid="restaurant-card" href="/vn/vi/restaurant/1004">
+        <img src="/r3.jpg">
+        <h6>The Pizza Company - Saigon Centre</h6>
+        <div class="meta">Pizza · ₫₫₫ · 25-35 min</div>
+        <div class="rating">4.3 (892)</div>
+      </a>
+
+      <a data-testid="restaurant-card" href="/vn/vi/restaurant/1005">
+        <img src="/r4.jpg">
+        <h6>Starbucks Reserve - Nguyen Hue</h6>
+        <div class="meta">Coffee & Tea · ₫₫₫ · 10-15 min</div>
+        <div class="rating">4.5 (2,438)</div>
+      </a>
+
+      <a data-testid="restaurant-card" href="/vn/vi/restaurant/1006">
+        <img src="/r5.jpg">
+        <h6>Highlands Coffee - Saigon Square</h6>
+        <div class="meta">Coffee & Tea · ₫₫ · 15-20 min</div>
+        <div class="rating">4.4 (6,721)</div>
+      </a>
+
+      <a data-testid="restaurant-card" href="/vn/vi/restaurant/1007">
+        <img src="/r6.jpg">
+        <h6>Bánh Mì Huỳnh Hoa - Lê Thị Riêng</h6>
+        <div class="meta">Vietnamese · ₫ · 15-25 min</div>
+        <div class="rating">4.6 (4,215)</div>
+      </a>
+
+      <a data-testid="restaurant-card" href="/vn/vi/restaurant/1008">
+        <img src="/r7.jpg">
+        <h6>Pizza 4Ps - Lê Thánh Tôn</h6>
+        <div class="meta">Pizza · ₫₫₫ · 30-40 min</div>
+        <div class="rating">4.7 (3,127)</div>
+      </a>
+    </section>
+  </main>
+</body>
+</html>
