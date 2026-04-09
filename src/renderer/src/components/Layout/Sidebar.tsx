@@ -19,7 +19,8 @@ import {
   MapPin,
   Sliders,
   Flame,
-  Radar
+  Radar,
+  ChevronLeft
 } from 'lucide-react'
 import type { NavSection } from '../../types'
 import type { User as UserType, LicensePlan } from '../../types'
@@ -68,6 +69,7 @@ const NAV_ITEMS: { key: NavSection; icon: React.ElementType; label: string }[] =
 
 export function Sidebar({ active, onChange, profileCount, activeSessionCount, user, plan = 'free' }: SidebarProps) {
   const [update, setUpdate] = useState<UpdateStatus | null>(null)
+  const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
     const cleanup = window.api.updater.onStatus(setUpdate)
@@ -83,74 +85,91 @@ export function Sidebar({ active, onChange, profileCount, activeSessionCount, us
   const badge = PLAN_BADGE[plan] ?? PLAN_BADGE.free
 
   return (
-    <aside className="flex flex-col w-56 min-h-screen bg-slate-900 border-r border-slate-800 select-none">
+    <aside className={`flex flex-col min-h-screen bg-slate-900 border-r border-slate-800 select-none transition-all duration-300 ease-in-out ${collapsed ? 'w-20' : 'w-56'}`}>
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 py-5 border-b border-slate-800">
-        <div className="w-8 h-8 rounded-lg bg-ghost-600 flex items-center justify-center">
-          <Ghost className="w-5 h-5 text-white" />
+      <div className="flex items-center justify-between gap-2.5 px-4 py-5 border-b border-slate-800">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-ghost-600 flex items-center justify-center shrink-0">
+            <Ghost className="w-5 h-5 text-white" />
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <div className="font-semibold text-white text-sm leading-none truncate">Ghost Browser</div>
+              <div className="text-xs text-slate-500 mt-0.5 truncate">Anti-Detect</div>
+            </div>
+          )}
         </div>
-        <div>
-          <div className="font-semibold text-white text-sm leading-none">Ghost Browser</div>
-          <div className="text-xs text-slate-500 mt-0.5">Anti-Detect</div>
-        </div>
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors shrink-0"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
+        </button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 px-3 py-3 border-b border-slate-800">
-        <div className="bg-slate-800 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-white">{profileCount}</div>
-          <div className="text-xs text-slate-400">Profiles</div>
+      {!collapsed && (
+        <div className="grid grid-cols-2 gap-2 px-3 py-3 border-b border-slate-800">
+          <div className="bg-slate-800/50 rounded-lg p-2 text-center hover:bg-slate-800 transition-colors">
+            <div className="text-lg font-bold text-white">{profileCount}</div>
+            <div className="text-xs text-slate-400">Profiles</div>
+          </div>
+          <div className="bg-slate-800/50 rounded-lg p-2 text-center hover:bg-slate-800 transition-colors">
+            <div className="text-lg font-bold text-green-400">{activeSessionCount}</div>
+            <div className="text-xs text-slate-400">Active</div>
+          </div>
         </div>
-        <div className="bg-slate-800 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-green-400">{activeSessionCount}</div>
-          <div className="text-xs text-slate-400">Active</div>
-        </div>
-      </div>
+      )}
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-3 space-y-1">
+      <nav className={`flex-1 ${collapsed ? 'px-1.5 py-3 space-y-0.5' : 'px-2 py-3 space-y-1'}`} aria-label="Main navigation">
         {NAV_ITEMS.map(({ key, icon: Icon, label }) => (
           <button
             key={key}
             onClick={() => onChange(key)}
+            title={collapsed ? label : undefined}
+            aria-current={active === key ? 'page' : undefined}
             className={`
-              w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left
+              w-full flex items-center gap-3 ${collapsed ? 'px-2.5 py-2' : 'px-3 py-2.5'} rounded-lg text-sm font-medium transition-all duration-200 text-left
+              focus:outline-none focus:ring-2 focus:ring-ghost-500/50 focus:ring-offset-1 focus:ring-offset-slate-900
               ${active === key
-                ? 'bg-ghost-600/20 text-ghost-400'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                ? 'bg-ghost-600/20 text-ghost-400 shadow-lg'
+                : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
               }
             `}
           >
-            <Icon className="w-4 h-4 shrink-0" />
-            {label}
+            <Icon className={`shrink-0 ${collapsed ? 'w-5 h-5' : 'w-4 h-4'}`} />
+            {!collapsed && <span className="truncate">{label}</span>}
           </button>
         ))}
       </nav>
 
       {/* Update banner */}
       {update && (update.status === 'available' || update.status === 'downloading' || update.status === 'ready') && (
-        <div className="mx-2 mb-2">
+        <div className={collapsed ? 'mx-1.5 mb-2' : 'mx-2 mb-2'}>
           <button
             onClick={handleUpdateAction}
             disabled={update.status === 'downloading'}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors bg-ghost-600/20 text-ghost-400 hover:bg-ghost-600/30"
+            title={collapsed ? 'Update available' : undefined}
+            className={`w-full flex items-center gap-2 rounded-lg text-xs font-medium transition-colors bg-ghost-600/20 text-ghost-400 hover:bg-ghost-600/30 disabled:opacity-60 ${collapsed ? 'px-2 py-2 justify-center' : 'px-3 py-2'}`}
           >
             {update.status === 'available' && (
               <>
-                <Download className="w-3.5 h-3.5" />
-                Update {update.version} available
+                <Download className="w-3.5 h-3.5 shrink-0" />
+                {!collapsed && `Update ${update.version}`}
               </>
             )}
             {update.status === 'downloading' && (
               <>
-                <Download className="w-3.5 h-3.5 animate-bounce" />
-                Downloading... {update.percent}%
+                <Download className="w-3.5 h-3.5 shrink-0 animate-bounce" />
+                {!collapsed && `${update.percent}%`}
               </>
             )}
             {update.status === 'ready' && (
               <>
-                <ArrowUpCircle className="w-3.5 h-3.5" />
-                Restart to update
+                <ArrowUpCircle className="w-3.5 h-3.5 shrink-0" />
+                {!collapsed && 'Restart'}
               </>
             )}
           </button>
@@ -158,33 +177,37 @@ export function Sidebar({ active, onChange, profileCount, activeSessionCount, us
       )}
 
       {/* User / Plan footer */}
-      <div className="px-3 py-3 border-t border-slate-800">
+      <div className={`border-t border-slate-800 ${collapsed ? 'px-2 py-3' : 'px-3 py-3'}`}>
         {user ? (
           <button
             onClick={() => onChange('account')}
-            className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+            className={`w-full flex items-center gap-2.5 rounded-lg hover:bg-slate-800 transition-colors ${collapsed ? 'px-1.5 py-2 justify-center' : 'px-2 py-1.5'}`}
           >
-            <div className="w-7 h-7 rounded-full bg-ghost-600/20 flex items-center justify-center text-xs font-medium text-ghost-400">
+            <div className="w-7 h-7 rounded-full bg-ghost-600/20 flex items-center justify-center text-xs font-medium text-ghost-400 shrink-0">
               {user.name.charAt(0).toUpperCase()}
             </div>
-            <div className="flex-1 text-left min-w-0">
-              <div className="text-xs font-medium text-white truncate">{user.name}</div>
-              <div className="text-[10px] text-slate-500 truncate">{user.email}</div>
-            </div>
-            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${badge.color}`}>
-              {badge.label}
-            </span>
+            {!collapsed && (
+              <>
+                <div className="flex-1 text-left min-w-0">
+                  <div className="text-xs font-medium text-white truncate">{user.name}</div>
+                  <div className="text-[10px] text-slate-500 truncate">{user.email}</div>
+                </div>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${badge.color}`}>
+                  {badge.label}
+                </span>
+              </>
+            )}
           </button>
         ) : (
           <button
             onClick={() => onChange('account')}
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+            className={`w-full flex items-center gap-2 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors ${collapsed ? 'px-2 py-2 justify-center' : 'px-2 py-1.5'}`}
           >
-            <User className="w-4 h-4" />
-            Sign in
+            <User className="w-4 h-4 shrink-0" />
+            {!collapsed && 'Sign in'}
           </button>
         )}
-        <div className="text-[10px] text-slate-600 mt-1.5 px-2">v0.5.0 Beta</div>
+        {!collapsed && <div className="text-[10px] text-slate-600 mt-1.5 px-2">v0.5.0 Beta</div>}
       </div>
     </aside>
   )
