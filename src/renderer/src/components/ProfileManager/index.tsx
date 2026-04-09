@@ -1,5 +1,8 @@
-import React, { useEffect, useState } from 'react'
-import { Plus, RefreshCw, X, FolderPlus, CheckSquare, ShieldAlert, Upload, MonitorX, LayoutGrid } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import {
+  Plus, RefreshCw, X, FolderPlus, CheckSquare, ShieldAlert, Upload, MonitorX,
+  LayoutGrid, List, ArrowDownAZ, ArrowUpAZ, CalendarClock, CalendarPlus,
+} from 'lucide-react'
 import { useProfileStore } from '../../stores/profileStore'
 import { useProxyStore } from '../../stores/proxyStore'
 import { useGroupStore } from '../../stores/groupStore'
@@ -7,7 +10,10 @@ import { useLicenseStore } from '../../stores/licenseStore'
 import { useToastStore } from '../../stores/toastStore'
 import { useConfirm } from '../UI/ConfirmDialog'
 import { EmptyState } from '../UI/EmptyState'
+import { useLocalStorage } from '../../hooks/useLocalStorage'
 import { ProfileCard } from './ProfileCard'
+import { ProfileListRow } from './ProfileListRow'
+import { ProfileStatsBar, type QuickFilter } from './ProfileStatsBar'
 import { CreateProfileModal } from './CreateProfileModal'
 import { EditProfileModal } from './EditProfileModal'
 import { CookieModal } from './CookieModal'
@@ -23,6 +29,18 @@ import { CleanupMonitor } from './CleanupMonitor'
 import { BulkActionsToolbar } from './BulkActionsToolbar'
 import { Header } from '../Layout/Header'
 import type { Profile } from '../../types'
+
+/** Sort options for the profile list. Persisted via `useLocalStorage`. */
+type SortKey = 'name-asc' | 'name-desc' | 'last-used' | 'created-desc' | 'created-asc'
+type ViewMode = 'grid' | 'list'
+
+const SORT_OPTIONS: { key: SortKey; label: string; icon: React.ReactNode }[] = [
+  { key: 'name-asc',     label: 'Name (A→Z)',     icon: <ArrowDownAZ className="w-3.5 h-3.5" /> },
+  { key: 'name-desc',    label: 'Name (Z→A)',     icon: <ArrowUpAZ className="w-3.5 h-3.5" /> },
+  { key: 'last-used',    label: 'Last used',      icon: <CalendarClock className="w-3.5 h-3.5" /> },
+  { key: 'created-desc', label: 'Newest first',   icon: <CalendarPlus className="w-3.5 h-3.5" /> },
+  { key: 'created-asc',  label: 'Oldest first',   icon: <CalendarPlus className="w-3.5 h-3.5" /> },
+]
 
 const GROUP_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444']
 
@@ -64,6 +82,13 @@ export function ProfileManager() {
   const [showImportGuide, setShowImportGuide] = useState(false)
   const [highlightId,    setHighlightId]    = useState<string | null>(null)
 
+  // Preferences persisted to localStorage so power users don't need to
+  // re-set their preferred view every time they re-open the app.
+  const [viewMode,    setViewMode]    = useLocalStorage<ViewMode>('ghostbrowser.profiles.viewMode', 'grid')
+  const [sortKey,     setSortKey]     = useLocalStorage<SortKey>('ghostbrowser.profiles.sortKey', 'last-used')
+  const [quickFilter, setQuickFilter] = useLocalStorage<QuickFilter>('ghostbrowser.profiles.quickFilter', 'all')
+  const [sortMenuOpen, setSortMenuOpen] = useState(false)
+
   // Group creation inline state
   const [showNewGroup,  setShowNewGroup]  = useState(false)
   const [newGroupName,  setNewGroupName]  = useState('')
@@ -79,16 +104,49 @@ export function ProfileManager() {
     return () => clearInterval(interval)
   }, [])
 
-  const filtered = profiles.filter((p) => {
+  // Computed stats — always from the full list so they stay meaningful
+  // regardless of the currently applied filters.
+  const stats = useMemo(() => ({
+    total: profiles.length,
+    running: profiles.filter((p) => activeSessions.includes(p.id)).length,
+    warmed: profiles.filter((p) => !!p.warmed_up).length,
+    noProxy: profiles.filter((p) => !p.proxy_id).length,
+    neverUsed: profiles.filter((p) => !p.last_used_at).length,
+  }), [profiles, activeSessions])
+
+  const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    const matchSearch = !q ||
-      p.name.toLowerCase().includes(q) ||
-      (p.notes ?? '').toLowerCase().includes(q) ||
-      p.fingerprint.os.platform.toLowerCase().includes(q) ||
-      (p.proxy_label ?? '').toLowerCase().includes(q)
-    const matchGroup  = activeGroup === null || p.group_id === activeGroup
-    return matchSearch && matchGroup
-  })
+    const list = profiles.filter((p) => {
+      const matchSearch = !q ||
+        p.name.toLowerCase().includes(q) ||
+        (p.notes ?? '').toLowerCase().includes(q) ||
+        p.fingerprint.os.platform.toLowerCase().includes(q) ||
+        (p.proxy_label ?? '').toLowerCase().includes(q)
+      const matchGroup = activeGroup === null || p.group_id === activeGroup
+      let matchQuick = true
+      switch (quickFilter) {
+        case 'running':    matchQuick = activeSessions.includes(p.id); break
+        case 'warmed':     matchQuick = !!p.warmed_up; break
+        case 'no-proxy':   matchQuick = !p.proxy_id; break
+        case 'never-used': matchQuick = !p.last_used_at; break
+        default:           matchQuick = true
+      }
+      return matchSearch && matchGroup && matchQuick
+    })
+
+    // Sort in-place on a copy — mutating `profiles` would confuse Zustand.
+    const sorted = [...list]
+    const byName = (a: Profile, b: Profile) => a.name.localeCompare(b.name)
+    const ts = (v: string | undefined | null) => (v ? new Date(v).getTime() : 0)
+    switch (sortKey) {
+      case 'name-asc':     sorted.sort(byName); break
+      case 'name-desc':    sorted.sort((a, b) => byName(b, a)); break
+      case 'last-used':    sorted.sort((a, b) => ts(b.last_used_at) - ts(a.last_used_at)); break
+      case 'created-desc': sorted.sort((a, b) => ts(b.created_at) - ts(a.created_at)); break
+      case 'created-asc':  sorted.sort((a, b) => ts(a.created_at) - ts(b.created_at)); break
+    }
+    return sorted
+  }, [profiles, search, activeGroup, quickFilter, sortKey, activeSessions])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -482,7 +540,11 @@ export function ProfileManager() {
     <div className="flex flex-col h-full">
       <Header
         title="Browser Profiles"
-        subtitle={`${profiles.length} profiles · ${activeSessions.length} running`}
+        subtitle={
+          filtered.length !== profiles.length
+            ? `${filtered.length} shown · ${profiles.length} total · ${activeSessions.length} running`
+            : `${profiles.length} profiles · ${activeSessions.length} running`
+        }
         search={search}
         onSearchChange={setSearch}
         actions={
@@ -490,6 +552,67 @@ export function ProfileManager() {
             <button onClick={fetchProfiles} className="btn-ghost p-2 rounded-lg" title="Refresh">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
+
+            {/* View mode toggle — grid vs list. Persisted across sessions. */}
+            <div className="flex items-center rounded-lg bg-slate-800 border border-slate-700 p-0.5">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-md transition-colors ${
+                  viewMode === 'grid' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'
+                }`}
+                title="Grid view"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-md transition-colors ${
+                  viewMode === 'list' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'
+                }`}
+                title="List view"
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Sort dropdown. Current selection shown inline. */}
+            <div className="relative">
+              <button
+                onClick={() => setSortMenuOpen((v) => !v)}
+                className="btn-ghost flex items-center gap-2 text-sm"
+                title="Sort profiles"
+              >
+                {SORT_OPTIONS.find((o) => o.key === sortKey)?.icon}
+                <span className="hidden xl:inline">
+                  {SORT_OPTIONS.find((o) => o.key === sortKey)?.label}
+                </span>
+              </button>
+              {sortMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setSortMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 top-10 z-20 w-44 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-1">
+                    {SORT_OPTIONS.map((o) => (
+                      <button
+                        key={o.key}
+                        onClick={() => { setSortKey(o.key); setSortMenuOpen(false) }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg transition-colors ${
+                          sortKey === o.key
+                            ? 'bg-ghost-600/20 text-ghost-300'
+                            : 'text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {o.icon}
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* Phase 3: Pagination mode toggle */}
             <button
               onClick={() => setPaginationEnabled(!paginationEnabled)}
@@ -531,6 +654,9 @@ export function ProfileManager() {
           </div>
         }
       />
+
+      {/* Stats strip doubles as quick-filter chips */}
+      <ProfileStatsBar stats={stats} active={quickFilter} onChange={setQuickFilter} />
 
       {/* Group filter bar — always visible so user can create first group */}
       <div className="px-6 pt-3 pb-1 flex items-center gap-2 flex-wrap">
@@ -629,60 +755,114 @@ export function ProfileManager() {
             <EmptyState
               icon={MonitorX}
               title="No profiles match"
-              description="Try a different search term or group filter."
+              description={
+                quickFilter !== 'all'
+                  ? 'Try clearing the quick filter above, changing your search, or switching groups.'
+                  : 'Try a different search term or group filter.'
+              }
+              actionLabel={quickFilter !== 'all' ? 'Clear quick filter' : undefined}
+              onAction={quickFilter !== 'all' ? () => setQuickFilter('all') : undefined}
             />
           )
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filtered.map((profile) => (
+              <div
+                key={profile.id}
+                id={`profile-card-${profile.id}`}
+                className={`relative transition-shadow ${
+                  highlightId === profile.id
+                    ? 'ring-2 ring-amber-400 rounded-xl shadow-lg shadow-amber-500/20'
+                    : ''
+                }`}
+              >
+                {selectionMode && (
+                  <div
+                    className="absolute inset-0 z-10 flex items-start justify-end p-2 cursor-pointer"
+                    onClick={() => toggleSelect(profile.id)}
+                  >
+                    <input
+                      type="checkbox"
+                      readOnly
+                      checked={selected.has(profile.id)}
+                      className="w-4 h-4 accent-indigo-500 cursor-pointer"
+                    />
+                  </div>
+                )}
+                <ProfileCard
+                  profile={profile}
+                  isActive={activeSessions.includes(profile.id)}
+                  isLaunching={launching === profile.id}
+                  onLaunch={() => handleLaunch(profile.id)}
+                  onClose={() => closeProfile(profile.id)}
+                  onEdit={() => setEditProfile(profile)}
+                  onClone={() => handleClone(profile.id)}
+                  onDelete={() => handleDelete(profile.id)}
+                  onImportCookies={() => setCookieModal({ profile, mode: 'browse' })}
+                  onExportCookies={() => setCookieModal({ profile, mode: 'export' })}
+                  onStorage={() => setStorageProfile(profile)}
+                  onExportBundle={() => handleExportBundle(profile.id)}
+                  onImportBundle={handleImportBundle}
+                  onHistory={() => setHistoryProfile(profile)}
+                  onExtensions={() => setExtensionsProfile(profile)}
+                  onWarmUp={() => setWarmUpProfile(profile)}
+                  onApplyDrift={() => handleApplyDrift(profile)}
+                  onToggleSyncExcluded={() => handleToggleSyncExcluded(profile)}
+                />
+              </div>
+            ))}
+          </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filtered.map((profile) => (
-                <div
-                  key={profile.id}
-                  id={`profile-card-${profile.id}`}
-                  className={`relative transition-shadow ${
-                    highlightId === profile.id
-                      ? 'ring-2 ring-amber-400 rounded-xl shadow-lg shadow-amber-500/20'
-                      : ''
-                  }`}
-                >
-                  {selectionMode && (
-                    <div
-                      className="absolute inset-0 z-10 flex items-start justify-end p-2 cursor-pointer"
-                      onClick={() => toggleSelect(profile.id)}
-                    >
-                      <input
-                        type="checkbox"
-                        readOnly
-                        checked={selected.has(profile.id)}
-                        className="w-4 h-4 accent-indigo-500 cursor-pointer"
-                      />
-                    </div>
-                  )}
-                  <ProfileCard
-                    profile={profile}
-                    isActive={activeSessions.includes(profile.id)}
-                    isLaunching={launching === profile.id}
-                    onLaunch={() => handleLaunch(profile.id)}
-                    onClose={() => closeProfile(profile.id)}
-                    onEdit={() => setEditProfile(profile)}
-                    onClone={() => handleClone(profile.id)}
-                    onDelete={() => handleDelete(profile.id)}
-                    onImportCookies={() => setCookieModal({ profile, mode: 'browse' })}
-                    onExportCookies={() => setCookieModal({ profile, mode: 'export' })}
-                    onStorage={() => setStorageProfile(profile)}
-                    onExportBundle={() => handleExportBundle(profile.id)}
-                    onImportBundle={handleImportBundle}
-                    onHistory={() => setHistoryProfile(profile)}
-                    onExtensions={() => setExtensionsProfile(profile)}
-                    onWarmUp={() => setWarmUpProfile(profile)}
-                    onApplyDrift={() => handleApplyDrift(profile)}
-                    onToggleSyncExcluded={() => handleToggleSyncExcluded(profile)}
-                  />
-                </div>
-              ))}
+          // List view — denser, scannable row layout. Shares the same action
+          // set as ProfileCard via the overflow menu so feature parity is
+          // preserved across both view modes.
+          <div className="rounded-xl border border-slate-800 bg-slate-900/30 overflow-hidden">
+            <div className="hidden md:flex items-center gap-4 px-4 py-2 text-[10px] uppercase tracking-wide text-slate-500 border-b border-slate-800 bg-slate-800/40">
+              {selectionMode && <span className="w-4" />}
+              <span className="w-9" />
+              <span className="flex-1">Profile</span>
+              <span className="w-40">Proxy</span>
+              <span className="hidden lg:inline w-24">Screen</span>
+              <span className="hidden lg:inline w-28">Last used</span>
+              <span className="w-[76px]">Action</span>
+              <span className="w-7" />
             </div>
-
-          </>
+            {filtered.map((profile) => (
+              <div
+                key={profile.id}
+                id={`profile-card-${profile.id}`}
+                className={`transition-shadow ${
+                  highlightId === profile.id
+                    ? 'ring-2 ring-inset ring-amber-400 shadow-inner shadow-amber-500/20'
+                    : ''
+                }`}
+              >
+                <ProfileListRow
+                  profile={profile}
+                  isActive={activeSessions.includes(profile.id)}
+                  isLaunching={launching === profile.id}
+                  selected={selected.has(profile.id)}
+                  selectionMode={selectionMode}
+                  onToggleSelect={() => toggleSelect(profile.id)}
+                  onLaunch={() => handleLaunch(profile.id)}
+                  onClose={() => closeProfile(profile.id)}
+                  onEdit={() => setEditProfile(profile)}
+                  onClone={() => handleClone(profile.id)}
+                  onDelete={() => handleDelete(profile.id)}
+                  onImportCookies={() => setCookieModal({ profile, mode: 'browse' })}
+                  onExportCookies={() => setCookieModal({ profile, mode: 'export' })}
+                  onStorage={() => setStorageProfile(profile)}
+                  onExportBundle={() => handleExportBundle(profile.id)}
+                  onImportBundle={handleImportBundle}
+                  onHistory={() => setHistoryProfile(profile)}
+                  onExtensions={() => setExtensionsProfile(profile)}
+                  onWarmUp={() => setWarmUpProfile(profile)}
+                  onApplyDrift={() => handleApplyDrift(profile)}
+                  onToggleSyncExcluded={() => handleToggleSyncExcluded(profile)}
+                />
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Phase 3: Pagination controls — shown when pagination is enabled */}
