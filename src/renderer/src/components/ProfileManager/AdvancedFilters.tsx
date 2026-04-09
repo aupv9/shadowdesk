@@ -123,7 +123,7 @@ function FilterDropdown({ label, icon, value, isActive, children }: DropdownProp
           <div className="absolute top-full left-0 mt-1 z-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 min-w-[160px]">
             {React.Children.map(children, (child) =>
               React.isValidElement<{ onClick?: () => void }>(child)
-                ? React.cloneElement(child, { onClick: (...args: any[]) => { child.props.onClick?.(...args); setOpen(false) } })
+                ? React.cloneElement(child, { onClick: (...args: []) => { child.props.onClick?.(); setOpen(false) } })
                 : child
             )}
           </div>

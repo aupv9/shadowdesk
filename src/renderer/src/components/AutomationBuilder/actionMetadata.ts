@@ -616,6 +616,30 @@ export const ACTION_META: Record<AutomationActionType, ActionMetadata> = {
     description: 'Select an item from a context menu',
     whenToUse: 'To click items in right-click menus',
     difficulty: 'Medium'
+  },
+  break: {
+    icon: SkipForward,
+    label: 'Break',
+    color: 'text-red-400',
+    description: 'Exit the current loop early',
+    whenToUse: 'To stop iterating when a condition is met',
+    difficulty: 'Easy'
+  },
+  continue: {
+    icon: IterationCcw,
+    label: 'Continue',
+    color: 'text-yellow-400',
+    description: 'Skip to the next iteration of the current loop',
+    whenToUse: 'To skip processing for a specific item in a loop',
+    difficulty: 'Easy'
+  },
+  switch: {
+    icon: GitBranch,
+    label: 'Switch',
+    color: 'text-indigo-400',
+    description: 'Match an expression against multiple cases and execute the matching branch',
+    whenToUse: 'To handle multiple possible values with different actions',
+    difficulty: 'Medium'
   }
 }
 

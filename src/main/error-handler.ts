@@ -9,6 +9,8 @@
  */
 
 import { app } from 'electron'
+import { appendFile, mkdir } from 'fs/promises'
+import { join } from 'path'
 
 export type ErrorCode =
   | 'VALIDATION_ERROR'
@@ -261,6 +263,24 @@ function normalizeError(error: unknown): IpcError {
 }
 
 /**
+ * Writes an error log entry to a date-stamped diagnostic log file.
+ * Fully self-contained — never throws so logging failures cannot crash the app.
+ */
+async function writeDiagnosticLog(errorLog: object): Promise<void> {
+  try {
+    const logDir = join(app.getPath('userData'), 'logs')
+    await mkdir(logDir, { recursive: true })
+
+    const date = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+    const logFile = join(logDir, `ghost-browser-${date}.log`)
+
+    await appendFile(logFile, JSON.stringify(errorLog) + '\n', 'utf-8')
+  } catch {
+    // Silently ignore — diagnostic logging must never crash the app
+  }
+}
+
+/**
  * Logs IPC errors with full context for diagnostics.
  */
 function logIpcError(channel: string, ipcError: IpcError, originalError: unknown): void {
@@ -277,8 +297,8 @@ function logIpcError(channel: string, ipcError: IpcError, originalError: unknown
   // Log to console
   console.error(`[IPC Error] ${channel}:`, errorLog)
 
-  // TODO: Send to diagnostic log file or remote logger
-  // Example: await diagnosticLogger.log(errorLog)
+  // Fire-and-forget diagnostic file logging
+  writeDiagnosticLog(errorLog)
 }
 
 /**

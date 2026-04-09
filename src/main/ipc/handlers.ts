@@ -1557,8 +1557,8 @@ export function registerIpcHandlers(): void {
     return db.getActionMetrics(workflowId, limit)
   })
 
-  ipcMain.handle('workflows:dryRun', (_event, workflowId: string, variables?: Record<string, string>) => {
-    return automation.dryRunWorkflow(workflowId, variables)
+  ipcMain.handle('workflows:dryRun', (_event, workflowId: string, profileId?: string) => {
+    return automation.dryRunWorkflow(workflowId, profileId)
   })
 
   ipcMain.handle('workflows:debug:run', async (
