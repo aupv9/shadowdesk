@@ -86,7 +86,8 @@ function parseZipBundle(buffer: Buffer): { row: NormalisedRow; cookies: string |
       notes: meta.notes ?? '',
       proxyId: null,
       groupId: null,
-      fingerprint
+      fingerprint,
+      cookies
     },
     cookies
   }

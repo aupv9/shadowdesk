@@ -121,11 +121,10 @@ function FilterDropdown({ label, icon, value, isActive, children }: DropdownProp
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div className="absolute top-full left-0 mt-1 z-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 min-w-[160px]">
-            {React.Children.map(children, (child) =>
-              React.isValidElement<{ onClick?: () => void }>(child)
-                ? React.cloneElement(child, { onClick: (...args: any[]) => { child.props.onClick?.(...args); setOpen(false) } })
-                : child
-            )}
+            {React.Children.map(children, (child) => {
+              if (!React.isValidElement<{ onClick?: () => void }>(child)) return child
+              return React.cloneElement(child, { onClick: () => { child.props.onClick?.(); setOpen(false) } } as any)
+            })}
           </div>
         </>
       )}
@@ -146,13 +145,26 @@ function FilterOption({ active, label, onClick }: { active: boolean; label: stri
   )
 }
 
-const PLATFORM_LABELS: Record<OsPlatformFilter, { label: string; icon: React.ReactNode }> = {
-  all:     { label: 'All',     icon: <Globe2 size={12} /> },
-  windows: { label: 'Windows', icon: <Monitor size={12} /> },
-  macos:   { label: 'macOS',   icon: <Monitor size={12} /> },
-  linux:   { label: 'Linux',   icon: <Monitor size={12} /> },
-  android: { label: 'Android', icon: <Smartphone size={12} /> },
-  ios:     { label: 'iOS',     icon: <Tablet size={12} /> }
+const PLATFORM_LABEL_TEXT: Record<OsPlatformFilter, string> = {
+  all:     'All',
+  windows: 'Windows',
+  macos:   'macOS',
+  linux:   'Linux',
+  android: 'Android',
+  ios:     'iOS'
+}
+
+// Helper to get platform icon
+function getPlatformIcon(filter: OsPlatformFilter): React.ReactNode {
+  switch (filter) {
+    case 'all':     return <Globe2 size={12} />
+    case 'windows':
+    case 'macos':
+    case 'linux':   return <Monitor size={12} />
+    case 'android': return <Smartphone size={12} />
+    case 'ios':     return <Tablet size={12} />
+    default:        return <Globe2 size={12} />
+  }
 }
 
 const PROXY_LABELS: Record<ProxyFilter, string> = {
@@ -194,12 +206,12 @@ export function AdvancedFilters({ filters, onChange }: Props) {
       {/* Platform filter */}
       <FilterDropdown
         label="Platform"
-        icon={PLATFORM_LABELS[filters.platform].icon}
-        value={PLATFORM_LABELS[filters.platform].label}
+        icon={getPlatformIcon(filters.platform)}
+        value={PLATFORM_LABEL_TEXT[filters.platform]}
         isActive={filters.platform !== 'all'}
       >
-        {(Object.keys(PLATFORM_LABELS) as OsPlatformFilter[]).map((k) => (
-          <FilterOption key={k} active={filters.platform === k} label={PLATFORM_LABELS[k].label} onClick={() => update({ platform: k })} />
+        {(Object.keys(PLATFORM_LABEL_TEXT) as OsPlatformFilter[]).map((k) => (
+          <FilterOption key={k} active={filters.platform === k} label={PLATFORM_LABEL_TEXT[k]} onClick={() => update({ platform: k })} />
         ))}
       </FilterDropdown>
 
@@ -255,7 +267,7 @@ export function AdvancedFilters({ filters, onChange }: Props) {
         <>
           <div className="w-px h-5 bg-slate-700 mx-1" />
           {filters.platform !== 'all' && (
-            <FilterBadge label={`Platform: ${PLATFORM_LABELS[filters.platform].label}`} onClear={() => update({ platform: 'all' })} />
+            <FilterBadge label={`Platform: ${PLATFORM_LABEL_TEXT[filters.platform]}`} onClear={() => update({ platform: 'all' })} />
           )}
           {filters.proxy !== 'all' && (
             <FilterBadge label={`Proxy: ${PROXY_LABELS[filters.proxy]}`} onClear={() => update({ proxy: 'all' })} />
