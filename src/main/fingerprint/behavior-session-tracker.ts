@@ -14,6 +14,9 @@
  * recommend rotating profiles or increasing randomization.
  */
 
+import { Database } from '../database'
+import { v4 as uuidv4 } from 'uuid'
+
 export interface BehaviorSessionMetrics {
   sessionId: string
   profileId: string
@@ -152,12 +155,28 @@ export function analyzeBehaviorDrift(
  * In production, integrates with detection-test.ts database
  */
 export function storeSessionMetrics(metrics: BehaviorSessionMetrics): void {
-  // TODO: Store in database
-  // db.saveBehaviorSessionMetrics(metrics)
   console.log('[Behavior Tracker] Session metrics stored:', {
     profileId: metrics.profileId,
     sessionId: metrics.sessionId,
     botScore: metrics.botConsistencyScore
+  })
+
+  const db = Database.getInstance()
+  db.saveBehaviorSession({
+    id: uuidv4(),
+    profile_id: metrics.profileId,
+    session_id: metrics.sessionId,
+    timestamp: metrics.timestamp,
+    mouse_velocity_avg: metrics.mouseVelocityAvg,
+    mouse_acceleration_variance: metrics.mouseAccelerationVariance,
+    mouse_direction_changes: metrics.mouseDirectionChanges,
+    typing_wpm: metrics.typingWPM,
+    typing_variance: metrics.typingVariance,
+    typing_pause_frequency: metrics.typingPauseFrequency,
+    scroll_speed_avg: metrics.scrollSpeedAvg,
+    scroll_pause_count: metrics.scrollPauseCount,
+    scroll_direction_changes: metrics.scrollDirectionChanges,
+    bot_consistency_score: metrics.botConsistencyScore,
   })
 }
 
@@ -165,9 +184,24 @@ export function storeSessionMetrics(metrics: BehaviorSessionMetrics): void {
  * Get historical metrics for a profile
  */
 export function getHistoricalMetrics(profileId: string, limit: number = 10): BehaviorSessionMetrics[] {
-  // TODO: Query database
-  // return db.getBehaviorSessionMetrics(profileId, limit)
-  return []
+  const db = Database.getInstance()
+  const rows = db.getBehaviorSessions(profileId, limit)
+
+  return rows.map((row: any) => ({
+    sessionId: row.session_id as string,
+    profileId: row.profile_id as string,
+    timestamp: row.timestamp as string,
+    mouseVelocityAvg: row.mouse_velocity_avg as number,
+    mouseAccelerationVariance: row.mouse_acceleration_variance as number,
+    mouseDirectionChanges: row.mouse_direction_changes as number,
+    typingWPM: row.typing_wpm as number,
+    typingVariance: row.typing_variance as number,
+    typingPauseFrequency: row.typing_pause_frequency as number,
+    scrollSpeedAvg: row.scroll_speed_avg as number,
+    scrollPauseCount: row.scroll_pause_count as number,
+    scrollDirectionChanges: row.scroll_direction_changes as number,
+    botConsistencyScore: row.bot_consistency_score as number,
+  }))
 }
 
 /**

@@ -924,6 +924,16 @@ export interface AutomationRunResult {
   metrics?: AutomationRunMetrics
 }
 
+export interface WorkflowDryRunResult {
+  valid: boolean
+  stepCount: number
+  errors: string[]
+  warnings: string[]
+  variableNames: string[]
+  actionTypes: string[]
+  estimatedDurationMs: number | null
+}
+
 export interface CreateWorkflowInput {
   name: string
   description?: string
@@ -1139,6 +1149,26 @@ export interface ProfileVersion {
   fingerprint: FingerprintConfig
   savedAt: string
   label: string
+}
+
+// ── Profile Health Score ─────────────────────────────────────────────────────
+
+export interface ProfileHealthScore {
+  profileId: string
+  overallScore: number          // 0-100
+  detectionScore: number        // 0-100 (from latest detection test)
+  behaviorScore: number         // 0-100 (inverse of bot_consistency_score)
+  freshnessScore: number        // 0-100 (based on last_used_at recency)
+  riskLevel: 'low' | 'medium' | 'high' | 'critical'
+  factors: ProfileHealthFactor[]
+  calculatedAt: string
+}
+
+export interface ProfileHealthFactor {
+  name: string
+  score: number
+  weight: number
+  detail: string
 }
 
 // ─── Workflow Version Types (Tier 3) ─────────────────────────────────────────

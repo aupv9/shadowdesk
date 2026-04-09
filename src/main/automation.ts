@@ -21,7 +21,8 @@ import type {
   CircuitBreakerState,
   AutomationRunMetrics,
   AiRecoveryConfig,
-  AiRecoveryIntervention
+  AiRecoveryIntervention,
+  WorkflowDryRunResult
 } from '../shared/types'
 import { validatePreFlight, analyzeRuntimeSignal } from './platform-hardener'
 import { generateRecoverySteps } from './ai-assistant'
@@ -909,6 +910,214 @@ export class AutomationEngine {
     }
   }
 
+  /**
+   * Recursively collects all steps from nested structures (conditional
+   * thenSteps/elseSteps, loop steps, tryCatch blocks, switch cases,
+   * parallelSteps, forEachRow, forEachElement, whileLoop).
+   * Returns a flat array of every step found at any depth.
+   */
+  static collectNestedSteps(steps: AutomationStep[]): AutomationStep[] {
+    const collected: AutomationStep[] = []
+    for (const step of steps) {
+      collected.push(step)
+      if (step.action === 'conditional') {
+        if (Array.isArray(step.params?.thenSteps)) {
+          collected.push(...AutomationEngine.collectNestedSteps(step.params.thenSteps))
+        }
+        if (Array.isArray(step.params?.elseSteps)) {
+          collected.push(...AutomationEngine.collectNestedSteps(step.params.elseSteps))
+        }
+      }
+      if (step.action === 'loop' && Array.isArray(step.params?.steps)) {
+        collected.push(...AutomationEngine.collectNestedSteps(step.params.steps))
+      }
+      if (step.action === 'whileLoop' && Array.isArray(step.params?.steps)) {
+        collected.push(...AutomationEngine.collectNestedSteps(step.params.steps))
+      }
+      if (step.action === 'forEachRow' && Array.isArray(step.params?.steps)) {
+        collected.push(...AutomationEngine.collectNestedSteps(step.params.steps))
+      }
+      if (step.action === 'forEachElement' && Array.isArray(step.params?.steps)) {
+        collected.push(...AutomationEngine.collectNestedSteps(step.params.steps))
+      }
+      if (step.action === 'tryCatch') {
+        if (Array.isArray(step.params?.tryBlock)) {
+          collected.push(...AutomationEngine.collectNestedSteps(step.params.tryBlock))
+        }
+        if (Array.isArray(step.params?.catchBlock)) {
+          collected.push(...AutomationEngine.collectNestedSteps(step.params.catchBlock))
+        }
+        if (Array.isArray(step.params?.finallyBlock)) {
+          collected.push(...AutomationEngine.collectNestedSteps(step.params.finallyBlock))
+        }
+      }
+      if (step.action === 'parallelSteps' && Array.isArray(step.params?.steps)) {
+        collected.push(...AutomationEngine.collectNestedSteps(step.params.steps))
+      }
+      if (step.action === 'switch') {
+        if (Array.isArray(step.params?.cases)) {
+          for (const c of step.params.cases) {
+            if (Array.isArray(c.steps)) {
+              collected.push(...AutomationEngine.collectNestedSteps(c.steps))
+            }
+          }
+        }
+        if (Array.isArray(step.params?.defaultSteps)) {
+          collected.push(...AutomationEngine.collectNestedSteps(step.params.defaultSteps))
+        }
+      }
+    }
+    return collected
+  }
+
+  /**
+   * Dry-run / validation mode: validates a workflow without executing it.
+   * Parses steps, checks structure, collects variables and action types,
+   * estimates duration, and optionally runs pre-flight validation.
+   */
+  async dryRunWorkflow(
+    workflowId: string,
+    profileId?: string
+  ): Promise<WorkflowDryRunResult> {
+    const VALID_ACTIONS = new Set<string>([
+      'navigate', 'click', 'type', 'wait', 'waitForSelector', 'screenshot',
+      'extractText', 'scroll', 'select', 'keyPress', 'evaluate', 'conditional',
+      'loop', 'hover', 'rightClick', 'doubleClick', 'waitForNavigation',
+      'setAttribute', 'httpRequest', 'upload', 'download', 'solveCaptcha',
+      'injectCaptchaToken', 'useCredential', 'whileLoop', 'forEachRow',
+      'forEachElement', 'tryCatch', 'parallelSteps', 'switchTab', 'switchFrame',
+      'break', 'continue', 'switch'
+    ])
+
+    const errors: string[] = []
+    const warnings: string[] = []
+
+    const db = Database.getInstance()
+    const workflowRow = db.getWorkflow(workflowId)
+    if (!workflowRow) {
+      return {
+        valid: false,
+        stepCount: 0,
+        errors: [`Workflow ${workflowId} not found`],
+        warnings: [],
+        variableNames: [],
+        actionTypes: [],
+        estimatedDurationMs: null
+      }
+    }
+
+    let steps: AutomationStep[]
+    try {
+      steps = JSON.parse(workflowRow.steps)
+    } catch {
+      return {
+        valid: false,
+        stepCount: 0,
+        errors: ['Failed to parse workflow steps JSON'],
+        warnings: [],
+        variableNames: [],
+        actionTypes: [],
+        estimatedDurationMs: null
+      }
+    }
+
+    // Regex validation
+    try {
+      this.validateWorkflowRegex(steps)
+    } catch (e: any) {
+      errors.push(e.message)
+    }
+
+    // Collect all steps (including nested)
+    const allSteps = AutomationEngine.collectNestedSteps(steps)
+
+    // Validate each step has required fields and known action type
+    for (const step of allSteps) {
+      if (!step.id) {
+        errors.push(`Step missing required field "id" (label: ${step.label || 'unknown'})`)
+      }
+      if (!step.action) {
+        errors.push(`Step missing required field "action" (id: ${step.id || 'unknown'})`)
+      }
+      if (!step.label) {
+        warnings.push(`Step "${step.id || 'unknown'}" has no label`)
+      }
+      if (step.action && !VALID_ACTIONS.has(step.action)) {
+        errors.push(`Step "${step.label || step.id}" uses unknown action type: "${step.action}"`)
+      }
+    }
+
+    // Collect all variable references {varName} from step params
+    const variableSet = new Set<string>()
+    const varPattern = /\{(\w+)\}/g
+    for (const step of allSteps) {
+      if (step.params) {
+        const paramStr = JSON.stringify(step.params)
+        let match: RegExpExecArray | null
+        while ((match = varPattern.exec(paramStr)) !== null) {
+          variableSet.add(match[1])
+        }
+      }
+    }
+
+    // Collect unique action types
+    const actionTypeSet = new Set<string>()
+    for (const step of allSteps) {
+      if (step.action) actionTypeSet.add(step.action)
+    }
+
+    // Estimate duration: wait step ms values + 500ms per action step
+    let estimatedDurationMs = 0
+    for (const step of allSteps) {
+      if (step.action === 'wait' && typeof step.params?.ms === 'number') {
+        estimatedDurationMs += step.params.ms
+      } else {
+        estimatedDurationMs += 500
+      }
+    }
+
+    // Pre-flight validation (optional — only when profileId is provided)
+    if (profileId) {
+      try {
+        const profileRow = db.getProfile(profileId)
+        if (profileRow) {
+          const workflow: AutomationWorkflow = {
+            ...workflowRow,
+            steps,
+            variables: workflowRow.variables ? JSON.parse(workflowRow.variables) : undefined,
+            variableDefinitions: workflowRow.variable_definitions ? JSON.parse(workflowRow.variable_definitions) : undefined,
+            circuitBreaker: workflowRow.circuit_breaker ? JSON.parse(workflowRow.circuit_breaker) : undefined,
+            aiRecovery: workflowRow.ai_recovery ? JSON.parse(workflowRow.ai_recovery) : undefined
+          }
+          const preFlight = validatePreFlight(workflow, {
+            id: profileRow.id,
+            name: profileRow.name,
+            fingerprint: profileRow.fingerprint
+          })
+          if (preFlight && preFlight.issues) {
+            for (const issue of preFlight.issues) {
+              warnings.push(`[pre-flight] ${issue.severity}: ${issue.message}`)
+            }
+          }
+        } else {
+          warnings.push(`Profile ${profileId} not found — skipped pre-flight validation`)
+        }
+      } catch (e: any) {
+        warnings.push(`Pre-flight validation error: ${e.message}`)
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      stepCount: allSteps.length,
+      errors,
+      warnings,
+      variableNames: [...variableSet],
+      actionTypes: [...actionTypeSet],
+      estimatedDurationMs
+    }
+  }
+
   async executeWorkflow(
     workflowId: string,
     profileId: string,
@@ -1259,250 +1468,6 @@ export class AutomationEngine {
     }
   }
 
-  // ── Tier 2: Dry-run validation ─────────────────────────────────────────
-
-  /**
-   * Validate a workflow without executing it. Checks for:
-   * - unknown action types
-   * - missing required params
-   * - jumpToStep targets that don't exist in the same step list
-   * - callWorkflow targets that don't exist in the database
-   * - unresolved {variable} placeholders
-   */
-  dryRunWorkflow(workflowId: string, runtimeVars?: Record<string, string>): {
-    valid: boolean
-    issues: { stepId?: string; severity: 'error' | 'warning'; message: string }[]
-    stepCount: number
-  } {
-    const db = Database.getInstance()
-    const row = db.getWorkflow(workflowId)
-    if (!row) throw new Error(`Workflow ${workflowId} not found`)
-
-    const steps: AutomationStep[] = JSON.parse(row.steps)
-    const storedVars: Record<string, string> = row.variables ? JSON.parse(row.variables) : {}
-    const varDefs: VariableDefinition[] = row.variable_definitions ? JSON.parse(row.variable_definitions) : []
-    const knownVars = new Set([
-      ...Object.keys(storedVars),
-      ...Object.keys(runtimeVars ?? {}),
-      ...varDefs.map(d => d.name),
-      'timestamp', 'runId', 'random', 'profileName'
-    ])
-
-    const issues: { stepId?: string; severity: 'error' | 'warning'; message: string }[] = []
-
-    // Phase 1 Typed Variables: Validate variable definitions
-    const validTypes = new Set<string>(['string', 'number', 'boolean', 'array', 'object'])
-    for (const def of varDefs) {
-      if (!def.name || typeof def.name !== 'string') {
-        issues.push({ severity: 'error', message: `Variable definition missing name` })
-      }
-      if (!validTypes.has(def.type)) {
-        issues.push({ severity: 'error', message: `Variable "${def.name}" has invalid type "${def.type}"` })
-      }
-      if (def.required && def.default === undefined && !storedVars[def.name]) {
-        issues.push({ severity: 'warning', message: `Required variable "${def.name}" (${def.type}) has no default — must be provided at runtime` })
-      }
-    }
-
-    // Required params per action type — keep tight: only the must-haves.
-    const REQUIRED: Record<string, string[]> = {
-      navigate: ['url'],
-      click: ['selector'],
-      doubleClick: ['selector'],
-      rightClick: ['selector'],
-      hover: ['selector'],
-      type: ['selector', 'text'],
-      waitForSelector: ['selector'],
-      extractText: ['selector'],
-      select: ['selector', 'value'],
-      keyPress: ['key'],
-      evaluate: ['script'],
-      setAttribute: ['selector', 'attribute'],
-      httpRequest: ['url'],
-      upload: ['selector', 'filePath'],
-      download: ['url', 'savePath'],
-      solveCaptcha: ['siteKey'],
-      injectCaptchaToken: ['token'],
-      callWorkflow: ['workflowId'],
-      jumpToStep: ['targetStepId'],
-      interceptRequest: ['urlPattern'],
-      setCookies: [],
-      deleteCookies: [],
-      getCookies: [],
-      // Phase 18 — Data pipelines & advanced control flow
-      extractJson: [],               // at least one of: variable | value | script | selector
-      forEachElement: ['selector'],
-      whileLoop: [],                 // condition validated by runtime
-      waitForRequest: ['urlPattern'],
-      waitForResponse: ['urlPattern'],
-      paginate: ['nextSelector'],
-      // Phase 4 — Enhanced flow control
-      switch: ['expression'],
-      break: [],
-      continue: []
-    }
-
-    const KNOWN_ACTIONS = new Set([
-      'navigate', 'click', 'doubleClick', 'rightClick', 'type', 'wait',
-      'waitForSelector', 'waitForNavigation', 'screenshot', 'extractText',
-      'scroll', 'select', 'keyPress', 'evaluate', 'hover', 'setAttribute',
-      'httpRequest', 'upload', 'download', 'solveCaptcha', 'injectCaptchaToken',
-      'useCredential', 'conditional', 'loop',
-      'callWorkflow', 'parallelSteps', 'jumpToStep',
-      'interceptRequest', 'clearIntercepts',
-      'getCookies', 'setCookies', 'deleteCookies',
-      // Tier 3-6 additions
-      'assert',
-      'openTab', 'switchTab', 'closeTab', 'getTabs',
-      'switchProxy', 'clickByText',
-      'getStorage', 'setStorage', 'clearStorage', 'queryIndexedDB',
-      'forEachRow', 'readFile', 'writeFile', 'waitForDownload',
-      // Tier 7
-      'tryCatch',
-      // Tier 9
-      'dragAndDrop', 'keyCombo', 'selectContextMenu', 'setRangeInput', 'scrollIntoView', 'switchFrame',
-      // Phase 18 — Data pipelines & advanced control flow
-      'extractJson', 'forEachElement', 'whileLoop', 'waitForRequest', 'waitForResponse', 'paginate',
-      // Phase 4 — Enhanced flow control
-      'break', 'continue', 'switch'
-    ])
-
-    // Pre-collect ids that produce variables so {var} references resolve.
-    const producedVars = new Set<string>(knownVars)
-    const collectProduced = (list: AutomationStep[]) => {
-      for (const s of list) {
-        if (s.params?.saveAs) producedVars.add(String(s.params.saveAs))
-        if (s.action === 'useCredential') {
-          const prefix = s.params?.prefix || 'cred'
-          producedVars.add(`${prefix}.username`)
-          producedVars.add(`${prefix}.password`)
-        }
-        // Phase 18: forEachElement exposes el.* variables inside its body
-        if (s.action === 'forEachElement') {
-          const prefix = s.params?.prefix || 'el'
-          for (const k of ['index', 'total', 'text', 'html', 'tag', 'href', 'value', 'selector']) {
-            producedVars.add(`${prefix}.${k}`)
-          }
-        }
-        if (s.action === 'paginate') {
-          producedVars.add('pg.index')
-          producedVars.add('pg.count')
-        }
-        // Recurse into nested step containers
-        if (Array.isArray(s.params?.thenSteps)) collectProduced(s.params.thenSteps)
-        if (Array.isArray(s.params?.elseSteps)) collectProduced(s.params.elseSteps)
-        if (Array.isArray(s.params?.steps)) collectProduced(s.params.steps)
-        // Tier 7: tryCatch sub-blocks
-        if (Array.isArray(s.params?.tryBlock))     collectProduced(s.params.tryBlock)
-        if (Array.isArray(s.params?.catchBlock))   collectProduced(s.params.catchBlock)
-        if (Array.isArray(s.params?.finallyBlock)) collectProduced(s.params.finallyBlock)
-        // Phase 4: switch cases + default
-        if (Array.isArray(s.params?.cases)) {
-          for (const c of s.params.cases) {
-            if (Array.isArray(c.steps)) collectProduced(c.steps)
-          }
-        }
-        if (Array.isArray(s.params?.defaultSteps)) collectProduced(s.params.defaultSteps)
-      }
-    }
-    collectProduced(steps)
-
-    const validateStepList = (list: AutomationStep[], parentIds: Set<string>) => {
-      const localIds = new Set(list.map((s) => s.id))
-      for (const step of list) {
-        // Unknown action
-        if (!KNOWN_ACTIONS.has(step.action)) {
-          issues.push({ stepId: step.id, severity: 'error', message: `Unknown action: ${step.action}` })
-          continue
-        }
-
-        // Required params
-        const reqs = REQUIRED[step.action] ?? []
-        for (const r of reqs) {
-          if (step.params == null || step.params[r] === undefined || step.params[r] === '') {
-            issues.push({
-              stepId: step.id,
-              severity: 'error',
-              message: `${step.action}: missing required param "${r}"`
-            })
-          }
-        }
-
-        // jumpToStep target must exist somewhere in the workflow tree.
-        if (step.action === 'jumpToStep' && step.params?.targetStepId) {
-          const target = String(step.params.targetStepId)
-          if (!localIds.has(target) && !parentIds.has(target)) {
-            issues.push({
-              stepId: step.id,
-              severity: 'error',
-              message: `jumpToStep target "${target}" not found in workflow`
-            })
-          }
-        }
-
-        // callWorkflow target must exist in DB.
-        if (step.action === 'callWorkflow' && step.params?.workflowId) {
-          const targetId = String(step.params.workflowId)
-          const target = db.getWorkflow(targetId)
-          if (!target) {
-            issues.push({
-              stepId: step.id,
-              severity: 'error',
-              message: `callWorkflow: workflow "${targetId}" does not exist`
-            })
-          } else if (targetId === workflowId) {
-            issues.push({
-              stepId: step.id,
-              severity: 'warning',
-              message: 'callWorkflow targets itself — possible infinite recursion'
-            })
-          }
-        }
-
-        // Unresolved {variable} placeholders in any string param.
-        try {
-          const json = JSON.stringify(step.params ?? {})
-          const refs = json.match(/\{([\w.]+)\}/g) ?? []
-          for (const raw of refs) {
-            const key = raw.slice(1, -1)
-            if (!producedVars.has(key)) {
-              issues.push({
-                stepId: step.id,
-                severity: 'warning',
-                message: `${step.action}: references unknown variable "${key}"`
-              })
-            }
-          }
-        } catch { /* unstringifiable params, ignore */ }
-
-        // Recurse
-        const nextParents = new Set([...parentIds, ...localIds])
-        if (Array.isArray(step.params?.thenSteps)) validateStepList(step.params.thenSteps, nextParents)
-        if (Array.isArray(step.params?.elseSteps)) validateStepList(step.params.elseSteps, nextParents)
-        if (Array.isArray(step.params?.steps)) validateStepList(step.params.steps, nextParents)
-        // Tier 7: tryCatch sub-blocks
-        if (Array.isArray(step.params?.tryBlock))     validateStepList(step.params.tryBlock, nextParents)
-        if (Array.isArray(step.params?.catchBlock))   validateStepList(step.params.catchBlock, nextParents)
-        if (Array.isArray(step.params?.finallyBlock)) validateStepList(step.params.finallyBlock, nextParents)
-        // Phase 4: switch cases + default
-        if (Array.isArray(step.params?.cases)) {
-          for (const c of step.params.cases) {
-            if (Array.isArray(c.steps)) validateStepList(c.steps, nextParents)
-          }
-        }
-        if (Array.isArray(step.params?.defaultSteps)) validateStepList(step.params.defaultSteps, nextParents)
-      }
-    }
-
-    validateStepList(steps, new Set())
-
-    return {
-      valid: issues.filter((i) => i.severity === 'error').length === 0,
-      issues,
-      stepCount: steps.length
-    }
-  }
-
   /** Execute a list of steps, collecting results. Returns overall status. */
   private async executeSteps(
     page: Page,
@@ -1597,7 +1562,7 @@ export class AutomationEngine {
       }
       if (cb) cb.markHalfOpenAttempt()
 
-      const result = await this.executeStep(page, liveStep, control, stepResults, variables, profileId, typedVars, variableDefinitions, runKey)
+      const result = await this.executeStep(page, liveStep, control, stepResults, variables, profileId, typedVars, variableDefinitions, runKey, aiRecovery)
       stepResults.push(result)
 
       // Phase 2: Feed result into circuit breaker
@@ -1901,7 +1866,8 @@ export class AutomationEngine {
     profileId?: string,
     typedVars?: Map<string, TypedVariable>,
     variableDefinitions?: VariableDefinition[],
-    runKey?: string
+    runKey?: string,
+    aiRecovery?: AiRecoveryConfig
   ): Promise<AutomationStepResult> {
     const start = Date.now()
     const { params } = step
@@ -1939,7 +1905,7 @@ export class AutomationEngine {
       }
       try {
         // Tier 7: per-step timeout — race the action against a timer.
-        const actionPromise = this.runAction(page, step, control, allResults, variables, profileId, typedVars, variableDefinitions)
+        const actionPromise = this.runAction(page, step, control, allResults, variables, profileId, typedVars, variableDefinitions, aiRecovery)
         const output = step.timeoutMs && step.timeoutMs > 0
           ? await Promise.race([
               actionPromise,
@@ -2045,7 +2011,8 @@ export class AutomationEngine {
     variables: Record<string, string>,
     profileId?: string,
     typedVars?: Map<string, TypedVariable>,
-    variableDefinitions?: VariableDefinition[]
+    variableDefinitions?: VariableDefinition[],
+    aiRecovery?: AiRecoveryConfig
   ): Promise<any> {
     // Tier 4: switchTab may have changed the active page — always resolve here
     const page: Page = (profileId ? this.currentPages.get(profileId) : undefined) ?? _page
@@ -2934,7 +2901,7 @@ export class AutomationEngine {
               ...s,
               params: interpolateParams(s.params, variables)
             }
-            return this.executeStep(page, liveStep, control, allResults, variables, profileId, typedVars, variableDefinitions, undefined)
+            return this.executeStep(page, liveStep, control, allResults, variables, profileId, typedVars, variableDefinitions, undefined, aiRecovery)
           })
         )
 

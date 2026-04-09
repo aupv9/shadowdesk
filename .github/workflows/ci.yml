@@ -6,12 +6,25 @@ on:
   pull_request:
     branches: [main]
 
-# Cancel in-progress runs for the same PR / branch when a new commit lands.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run npm audit
+        run: npm audit --audit-level=high || true
+
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
@@ -36,7 +49,15 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm test
+      - name: Run tests with coverage
+        run: npm run test:coverage
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
 
   build:
     name: Build
@@ -51,3 +72,25 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: out/
+          retention-days: 7
+
+  # Summary job for branch protection — single required check
+  ci-ok:
+    name: CI Complete
+    if: always()
+    needs: [audit, typecheck, test, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check results
+        run: |
+          if [[ "${{ needs.typecheck.result }}" == "failure" || "${{ needs.test.result }}" == "failure" || "${{ needs.build.result }}" == "failure" ]]; then
+            echo "❌ One or more required jobs failed"
+            exit 1
+          fi
+          echo "✅ All required CI jobs passed"

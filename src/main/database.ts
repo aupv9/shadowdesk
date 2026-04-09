@@ -13,6 +13,7 @@ import {
   deriveMasterKey,
 } from './crypto/profile-encryption'
 import { getMachineId } from './license'
+import type { ProfileHealthScore, ProfileHealthFactor } from '../shared/types'
 
 // Phase 4.1: Profile data encryption
 // Master key is deterministic per-machine (derived from machine ID + app secret)
@@ -582,6 +583,29 @@ export class Database {
       );
       CREATE INDEX IF NOT EXISTS idx_import_records_session ON import_records(session_id);
       CREATE INDEX IF NOT EXISTS idx_import_records_status ON import_records(status);
+    `)
+
+    // Phase P3: Behavior session tracking (session-to-session drift)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS behavior_sessions (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        mouse_velocity_avg REAL,
+        mouse_acceleration_variance REAL,
+        mouse_direction_changes INTEGER,
+        typing_wpm REAL,
+        typing_variance REAL,
+        typing_pause_frequency REAL,
+        scroll_speed_avg REAL,
+        scroll_pause_count INTEGER,
+        scroll_direction_changes INTEGER,
+        bot_consistency_score REAL,
+        FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_behavior_sessions_profile ON behavior_sessions(profile_id);
+      CREATE INDEX IF NOT EXISTS idx_behavior_sessions_timestamp ON behavior_sessions(timestamp);
     `)
 
     // Backfill fingerprint_hash for existing profiles that don't have one
@@ -2534,6 +2558,164 @@ export class Database {
       totalSessions: (stats?.totalSessions as number) ?? 0,
       totalImported: (stats?.totalImported as number) ?? 0,
       totalErrors: (stats?.totalErrors as number) ?? 0
+    }
+  }
+
+  // ── Behavior Session Tracking (P3: Session-to-Session Drift) ──────────
+
+  /** Insert a behavior session metrics row. */
+  saveBehaviorSession(metrics: {
+    id: string
+    profile_id: string
+    session_id: string
+    timestamp: string
+    mouse_velocity_avg: number
+    mouse_acceleration_variance: number
+    mouse_direction_changes: number
+    typing_wpm: number
+    typing_variance: number
+    typing_pause_frequency: number
+    scroll_speed_avg: number
+    scroll_pause_count: number
+    scroll_direction_changes: number
+    bot_consistency_score: number
+  }): void {
+    this.run(
+      `INSERT INTO behavior_sessions (id, profile_id, session_id, timestamp,
+        mouse_velocity_avg, mouse_acceleration_variance, mouse_direction_changes,
+        typing_wpm, typing_variance, typing_pause_frequency,
+        scroll_speed_avg, scroll_pause_count, scroll_direction_changes,
+        bot_consistency_score)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        metrics.id,
+        metrics.profile_id,
+        metrics.session_id,
+        metrics.timestamp,
+        metrics.mouse_velocity_avg,
+        metrics.mouse_acceleration_variance,
+        metrics.mouse_direction_changes,
+        metrics.typing_wpm,
+        metrics.typing_variance,
+        metrics.typing_pause_frequency,
+        metrics.scroll_speed_avg,
+        metrics.scroll_pause_count,
+        metrics.scroll_direction_changes,
+        metrics.bot_consistency_score,
+      ]
+    )
+  }
+
+  /** Retrieve the most recent behavior sessions for a profile. */
+  getBehaviorSessions(profileId: string, limit: number = 10): any[] {
+    return this.queryAll(
+      `SELECT * FROM behavior_sessions
+       WHERE profile_id = ?
+       ORDER BY timestamp DESC
+       LIMIT ?`,
+      [profileId, limit]
+    )
+  }
+
+  /** Calculate a composite health score for a profile. */
+  getProfileHealthScore(profileId: string): ProfileHealthScore | null {
+    // Get profile basics
+    const profile = this.queryOne(
+      'SELECT id, last_used_at, created_at FROM profiles WHERE id = ?',
+      [profileId]
+    )
+    if (!profile) return null
+
+    // Latest detection test score
+    const detectionRow = this.queryOne(
+      'SELECT overall_score FROM detection_tests WHERE profile_id = ? ORDER BY tested_at DESC LIMIT 1',
+      [profileId]
+    )
+    const detectionScore: number = detectionRow ? detectionRow.overall_score : 50
+
+    // Latest behavior session bot_consistency_score (table may not exist)
+    let behaviorScore = 70
+    try {
+      const behaviorRow = this.queryOne(
+        'SELECT bot_consistency_score FROM behavior_sessions WHERE profile_id = ? ORDER BY timestamp DESC LIMIT 1',
+        [profileId]
+      )
+      if (behaviorRow) {
+        behaviorScore = 100 - behaviorRow.bot_consistency_score
+      }
+    } catch {
+      // behavior_sessions table may not exist yet — use default
+    }
+
+    // Freshness score based on days since last_used_at
+    let freshnessScore = 50
+    if (profile.last_used_at) {
+      const lastUsed = new Date(profile.last_used_at).getTime()
+      const now = Date.now()
+      const daysSinceUse = (now - lastUsed) / (1000 * 60 * 60 * 24)
+      if (daysSinceUse <= 0) {
+        freshnessScore = 100
+      } else if (daysSinceUse >= 30) {
+        freshnessScore = 20
+      } else {
+        // Linear interpolation: 0 days → 100, 30 days → 20
+        freshnessScore = Math.round(100 - (daysSinceUse / 30) * 80)
+      }
+    }
+
+    // Weighted average: detection 40%, behavior 35%, freshness 25%
+    const overallScore = Math.round(
+      detectionScore * 0.4 + behaviorScore * 0.35 + freshnessScore * 0.25
+    )
+
+    // Risk level
+    let riskLevel: 'low' | 'medium' | 'high' | 'critical'
+    if (overallScore >= 80) {
+      riskLevel = 'low'
+    } else if (overallScore >= 60) {
+      riskLevel = 'medium'
+    } else if (overallScore >= 40) {
+      riskLevel = 'high'
+    } else {
+      riskLevel = 'critical'
+    }
+
+    const factors: ProfileHealthFactor[] = [
+      {
+        name: 'Detection Test',
+        score: detectionScore,
+        weight: 0.4,
+        detail: detectionRow
+          ? `Latest detection test score: ${detectionScore}`
+          : 'No detection tests run — using default score of 50',
+      },
+      {
+        name: 'Behavior Consistency',
+        score: behaviorScore,
+        weight: 0.35,
+        detail: behaviorScore !== 70
+          ? `Bot consistency inverse: ${behaviorScore}`
+          : 'No behavior sessions recorded — using default score of 70',
+      },
+      {
+        name: 'Profile Freshness',
+        score: freshnessScore,
+        weight: 0.25,
+        detail: profile.last_used_at
+          ? `Last used: ${profile.last_used_at}`
+          : 'Profile has never been used',
+      },
+    ]
+
+    return {
+      profileId,
+      overallScore,
+      detectionScore,
+      behaviorScore,
+      freshnessScore,
+      riskLevel,
+      factors,
+      calculatedAt: new Date().toISOString(),
     }
   }
 }
