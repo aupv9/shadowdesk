@@ -497,6 +497,10 @@ export function registerIpcHandlers(): void {
     return detectCollisions(profiles)
   })
 
+  ipcMain.handle('profiles:healthScore', (_event, profileId: string) => {
+    return db.getProfileHealthScore(profileId)
+  })
+
   // ── Cookies ───────────────────────────────────────────────────────────────
 
   ipcMain.handle('cookies:import', async (
@@ -2197,5 +2201,26 @@ export function registerIpcHandlers(): void {
     const cleanupWorker = CleanupWorker.getInstance()
     cleanupWorker.clearFailedCleanups()
     return { success: true }
+  })
+
+  // ── Database Backup ──────────────────────────────────────────────────────
+  ipcMain.handle('backup:create', async (_event, label?: string) => {
+    const { createBackup } = await import('../backup')
+    return createBackup(label)
+  })
+
+  ipcMain.handle('backup:list', async () => {
+    const { listBackups } = await import('../backup')
+    return listBackups()
+  })
+
+  ipcMain.handle('backup:restore', async (_event, backupPath: string) => {
+    const { restoreBackup } = await import('../backup')
+    return restoreBackup(backupPath)
+  })
+
+  ipcMain.handle('backup:delete', async (_event, backupPath: string) => {
+    const { deleteBackup } = await import('../backup')
+    return deleteBackup(backupPath)
   })
 }

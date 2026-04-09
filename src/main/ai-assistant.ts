@@ -385,6 +385,114 @@ Respond with valid JSON:
 }`
 
 /**
+ * Rule-based fallback recovery when LLM is unavailable.
+ * Maps error categories to sensible recovery steps without AI.
+ */
+function generateFallbackRecovery(
+  failedStep: AutomationStep,
+  errorContext: ErrorContext
+): AiRecoveryResult {
+  const steps: AutomationStep[] = []
+  let reasoning = ''
+
+  switch (errorContext.errorCategory) {
+    case 'timeout':
+      steps.push({
+        id: 'fallback-wait',
+        action: 'wait',
+        label: 'Wait before retry (timeout recovery)',
+        params: { ms: 3000 }
+      })
+      if (failedStep.params?.selector) {
+        steps.push({
+          id: 'fallback-wait-selector',
+          action: 'waitForSelector',
+          label: 'Wait for element to appear',
+          params: { selector: failedStep.params.selector, timeout: 15000 }
+        })
+      }
+      reasoning = 'Timeout detected — added wait + retry with longer timeout.'
+      break
+
+    case 'network':
+      steps.push({
+        id: 'fallback-wait-network',
+        action: 'wait',
+        label: 'Wait for network recovery',
+        params: { ms: 5000 }
+      })
+      if (failedStep.action === 'navigate' && failedStep.params?.url) {
+        steps.push({
+          id: 'fallback-retry-nav',
+          action: 'navigate',
+          label: 'Retry navigation',
+          params: { url: failedStep.params.url, waitUntil: 'domcontentloaded' }
+        })
+      }
+      reasoning = 'Network error detected — added wait + retry navigation.'
+      break
+
+    case 'selector':
+      steps.push({
+        id: 'fallback-wait-dom',
+        action: 'wait',
+        label: 'Wait for DOM to stabilize',
+        params: { ms: 2000 }
+      })
+      steps.push({
+        id: 'fallback-screenshot',
+        action: 'screenshot',
+        label: 'Capture page state for debugging',
+        params: {}
+      })
+      reasoning = 'Selector not found — added DOM wait + screenshot for debugging.'
+      break
+
+    case 'navigation':
+      steps.push({
+        id: 'fallback-wait-nav',
+        action: 'wait',
+        label: 'Wait before retry',
+        params: { ms: 2000 }
+      })
+      steps.push({
+        id: 'fallback-nav-refresh',
+        action: 'evaluate',
+        label: 'Refresh the page',
+        params: { script: 'window.location.reload()' }
+      })
+      reasoning = 'Navigation error — added page refresh.'
+      break
+
+    case 'captcha':
+      steps.push({
+        id: 'fallback-wait-captcha',
+        action: 'wait',
+        label: 'Wait for captcha to load',
+        params: { ms: 3000 }
+      })
+      reasoning = 'Captcha detected — added wait. Manual captcha solving may be required.'
+      break
+
+    default:
+      steps.push({
+        id: 'fallback-generic-wait',
+        action: 'wait',
+        label: 'Wait before retry (generic recovery)',
+        params: { ms: 2000 }
+      })
+      reasoning = 'Unknown error — added generic wait before retry.'
+      break
+  }
+
+  return {
+    steps,
+    reasoning: `[Fallback] ${reasoning}`,
+    confidence: 'low'
+  }
+}
+
+/**
  * Phase 3 — Generate recovery steps for a failed automation step.
  *
  * Uses the AI model to analyze the failure context and suggest 1-3 recovery
@@ -392,6 +500,10 @@ Respond with valid JSON:
  *
  * Safety: generated steps are validated against a whitelist of safe actions
  * before being returned. Max 3 steps per call.
+ *
+ * Graceful degradation: if the LLM call fails for any reason (rate limit,
+ * network error, API key issue, parse error), falls back to rule-based
+ * recovery via generateFallbackRecovery().
  */
 export async function generateRecoverySteps(
   failedStep: AutomationStep,
@@ -399,66 +511,71 @@ export async function generateRecoverySteps(
   recentSteps?: AutomationStep[],
   maxSteps: number = 3
 ): Promise<AiRecoveryResult> {
-  checkRateLimit()
-  const client = getClient()
+  try {
+    checkRateLimit()
+    const client = getClient()
 
-  const contextSummary = [
-    `Failed step: ${JSON.stringify({ id: failedStep.id, action: failedStep.action, label: failedStep.label, params: failedStep.params })}`,
-    `Error: ${errorContext.errorMessage}`,
-    `Error category: ${errorContext.errorCategory}`,
-    errorContext.pageUrl ? `Page URL: ${errorContext.pageUrl}` : null,
-    `Attempt: ${errorContext.attempt}`,
-    recentSteps && recentSteps.length > 0
-      ? `Previous ${recentSteps.length} steps: ${JSON.stringify(recentSteps.map(s => ({ id: s.id, action: s.action, label: s.label })))}`
-      : null
-  ].filter(Boolean).join('\n')
+    const contextSummary = [
+      `Failed step: ${JSON.stringify({ id: failedStep.id, action: failedStep.action, label: failedStep.label, params: failedStep.params })}`,
+      `Error: ${errorContext.errorMessage}`,
+      `Error category: ${errorContext.errorCategory}`,
+      errorContext.pageUrl ? `Page URL: ${errorContext.pageUrl}` : null,
+      `Attempt: ${errorContext.attempt}`,
+      recentSteps && recentSteps.length > 0
+        ? `Previous ${recentSteps.length} steps: ${JSON.stringify(recentSteps.map(s => ({ id: s.id, action: s.action, label: s.label })))}`
+        : null
+    ].filter(Boolean).join('\n')
 
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 768,
-    system: RECOVERY_SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: `${contextSummary}\n\nGenerate recovery steps (max ${maxSteps}).`
-      }
-    ]
-  })
-  incrementCall()
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 768,
+      system: RECOVERY_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: `${contextSummary}\n\nGenerate recovery steps (max ${maxSteps}).`
+        }
+      ]
+    })
+    incrementCall()
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    throw new Error('AI did not return valid JSON for step recovery')
-  }
+    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('AI did not return valid JSON for step recovery')
+    }
 
-  const parsed = JSON.parse(jsonMatch[0])
+    const parsed = JSON.parse(jsonMatch[0])
 
-  // Validate and sanitize generated steps
-  const SAFE_ACTIONS = new Set([
-    'navigate', 'click', 'type', 'wait', 'waitForSelector', 'screenshot',
-    'extractText', 'scroll', 'select', 'keyPress', 'evaluate', 'hover',
-    'waitForNavigation', 'setAttribute', 'httpRequest', 'solveCaptcha'
-  ])
+    // Validate and sanitize generated steps
+    const SAFE_ACTIONS = new Set([
+      'navigate', 'click', 'type', 'wait', 'waitForSelector', 'screenshot',
+      'extractText', 'scroll', 'select', 'keyPress', 'evaluate', 'hover',
+      'waitForNavigation', 'setAttribute', 'httpRequest', 'solveCaptcha'
+    ])
 
-  const steps: AutomationStep[] = (parsed.steps ?? [])
-    .slice(0, maxSteps)
-    .filter((s: any) => s && s.action && SAFE_ACTIONS.has(s.action))
-    .map((s: any, idx: number): AutomationStep => ({
-      id: s.id ?? `recovery-${idx + 1}`,
-      action: s.action,
-      label: s.label ?? `AI recovery: ${s.action}`,
-      params: s.params ?? {}
-    }))
+    const steps: AutomationStep[] = (parsed.steps ?? [])
+      .slice(0, maxSteps)
+      .filter((s: any) => s && s.action && SAFE_ACTIONS.has(s.action))
+      .map((s: any, idx: number): AutomationStep => ({
+        id: s.id ?? `recovery-${idx + 1}`,
+        action: s.action,
+        label: s.label ?? `AI recovery: ${s.action}`,
+        params: s.params ?? {}
+      }))
 
-  if (steps.length === 0) {
-    throw new Error('AI generated no valid recovery steps')
-  }
+    if (steps.length === 0) {
+      throw new Error('AI generated no valid recovery steps')
+    }
 
-  return {
-    steps,
-    reasoning: parsed.reasoning ?? 'Recovery steps generated.',
-    confidence: ['high', 'medium', 'low'].includes(parsed.confidence) ? parsed.confidence : 'medium'
+    return {
+      steps,
+      reasoning: parsed.reasoning ?? 'Recovery steps generated.',
+      confidence: ['high', 'medium', 'low'].includes(parsed.confidence) ? parsed.confidence : 'medium'
+    }
+  } catch (error: any) {
+    console.warn('[AI] LLM recovery failed, using rule-based fallback:', error.message)
+    return generateFallbackRecovery(failedStep, errorContext)
   }
 }
 
@@ -484,44 +601,75 @@ Respond with valid JSON only:
 
 Priority 1 = most critical. Return at most 5 recommendations, ordered by priority.`
 
+/**
+ * Rule-based fallback detection advice when LLM is unavailable.
+ * Generates recommendations from failed vectors without AI.
+ */
+function generateFallbackDetectionAdvice(
+  vectors: DetectionVectorResult[],
+  overallScore: number
+): AiDetectionAdvice {
+  const failedVectors = vectors.filter(v => !v.passed)
+  const recommendations: AiRecommendation[] = failedVectors.slice(0, 5).map((v, i) => ({
+    title: `Fix: ${v.name}`,
+    explanation: `Vector "${v.name}" failed detection. Check your fingerprint configuration for this vector.`,
+    priority: (Math.min(i + 1, 3)) as 1 | 2 | 3,
+  }))
+
+  return {
+    overallSummary: overallScore >= 80
+      ? 'Good detection score. Minor improvements possible.'
+      : overallScore >= 50
+      ? `Moderate risk: ${failedVectors.length} vectors failing. Review fingerprint settings.`
+      : `High risk: ${failedVectors.length} vectors failing. Significant fingerprint configuration changes needed.`,
+    riskLevel: overallScore >= 80 ? 'low' : overallScore >= 50 ? 'medium' : 'high',
+    recommendations
+  }
+}
+
 export async function analyzeDetection(
   vectors: DetectionVectorResult[],
   overallScore: number
 ): Promise<AiDetectionAdvice> {
-  checkRateLimit()
-  const client = getClient()
+  try {
+    checkRateLimit()
+    const client = getClient()
 
-  const failedVectors = vectors.filter((v) => !v.passed)
-  const summary = `Overall score: ${overallScore}/100. ${failedVectors.length} vectors failing out of ${vectors.length}.`
+    const failedVectors = vectors.filter((v) => !v.passed)
+    const summary = `Overall score: ${overallScore}/100. ${failedVectors.length} vectors failing out of ${vectors.length}.`
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    system: DETECTION_SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: `${summary}\n\nVector results:\n${JSON.stringify(vectors, null, 2)}`
-      }
-    ]
-  })
-  incrementCall()
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: DETECTION_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: `${summary}\n\nVector results:\n${JSON.stringify(vectors, null, 2)}`
+        }
+      ]
+    })
+    incrementCall()
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error('Model did not return valid JSON for detection analysis')
+    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) throw new Error('Model did not return valid JSON for detection analysis')
 
-  const parsed = JSON.parse(jsonMatch[0])
-  return {
-    overallSummary: parsed.overallSummary ?? 'Analysis complete.',
-    riskLevel: parsed.riskLevel ?? 'medium',
-    recommendations: (parsed.recommendations ?? []).slice(0, 5).map((r: any): AiRecommendation => ({
-      title: r.title ?? 'Fix recommendation',
-      explanation: r.explanation ?? '',
-      priority: r.priority ?? 2,
-      fieldPath: r.fieldPath,
-      suggestedValue: r.suggestedValue
-    }))
+    const parsed = JSON.parse(jsonMatch[0])
+    return {
+      overallSummary: parsed.overallSummary ?? 'Analysis complete.',
+      riskLevel: parsed.riskLevel ?? 'medium',
+      recommendations: (parsed.recommendations ?? []).slice(0, 5).map((r: any): AiRecommendation => ({
+        title: r.title ?? 'Fix recommendation',
+        explanation: r.explanation ?? '',
+        priority: r.priority ?? 2,
+        fieldPath: r.fieldPath,
+        suggestedValue: r.suggestedValue
+      }))
+    }
+  } catch (error: any) {
+    console.warn('[AI] LLM detection analysis failed, using rule-based fallback:', error.message)
+    return generateFallbackDetectionAdvice(vectors, overallScore)
   }
 }
 

@@ -75,6 +75,9 @@ app.whenReady().then(async () => {
   const db = Database.getInstance()
   await db.initialize()
 
+  // Daily auto-backup
+  import('./backup').then(b => b.runDailyBackup()).catch(() => {})
+
   // Register IPC handlers
   registerIpcHandlers()
 

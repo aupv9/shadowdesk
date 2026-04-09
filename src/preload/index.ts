@@ -29,7 +29,8 @@ const api = {
     restoreVersion:     (profileId: string, versionId: string)=> ipcRenderer.invoke('profiles:restoreVersion', profileId, versionId),
     deleteVersion:      (versionId: string)                   => ipcRenderer.invoke('profiles:deleteVersion', versionId),
     // Phase 12.C.4
-    detectCollisions:   ()                                    => ipcRenderer.invoke('profiles:detectCollisions')
+    detectCollisions:   ()                                    => ipcRenderer.invoke('profiles:detectCollisions'),
+    healthScore:        (profileId: string)                   => ipcRenderer.invoke('profiles:healthScore', profileId)
   },
   cookies: {
     import:   (profileId: string, text: string, format: 'netscape' | 'json') =>
@@ -251,7 +252,7 @@ const api = {
         return () => { ipcRenderer.removeListener('automation:hook-fired', handler) }
       }
     },
-    dryRun:        (workflowId: string, variables?: Record<string, string>) => ipcRenderer.invoke('workflows:dryRun', workflowId, variables),
+    dryRun:        (workflowId: string, profileId?: string) => ipcRenderer.invoke('workflows:dryRun', workflowId, profileId),
     debug: {
       run:            (workflowId: string, profileId: string, breakpoints?: string[], variables?: Record<string, string>, pauseAtStart?: boolean) =>
                         ipcRenderer.invoke('workflows:debug:run', workflowId, profileId, breakpoints, variables, pauseAtStart),
@@ -443,6 +444,14 @@ const api = {
     status:       () => ipcRenderer.invoke('cleanup:status'),
     retryFailed:  () => ipcRenderer.invoke('cleanup:retryFailed'),
     clearFailed:  () => ipcRenderer.invoke('cleanup:clearFailed')
+  },
+
+  // Database Backup
+  backup: {
+    create:  (label?: string)      => ipcRenderer.invoke('backup:create', label),
+    list:    ()                     => ipcRenderer.invoke('backup:list'),
+    restore: (backupPath: string)   => ipcRenderer.invoke('backup:restore', backupPath),
+    delete:  (backupPath: string)   => ipcRenderer.invoke('backup:delete', backupPath),
   }
 }
 

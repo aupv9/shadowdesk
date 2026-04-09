@@ -473,6 +473,264 @@ export const FINGERPRINT_PRESETS: Record<string, FingerprintConfig> = {
     network: { connectionType: 'wifi' }
   },
 
+  // ── SEA-Specific Presets (Vietnam, Thailand, Indonesia) ────────────────────
+
+  'sea-vn-viettel-chrome120': {
+    preset: 'sea-vn-viettel-chrome120',
+    geolocation: { latitude: 21.0285, longitude: 105.8542, accuracy: 150 },
+    os: { platform: 'Linux armv8l', version: '13.0.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Linux; Android 13; SM-A546B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36',
+      platform: 'Linux armv8l',
+      vendor: 'Google Inc.',
+      version: '120',
+      languages: ['vi-VN', 'en-US', 'en']
+    },
+    screen: {
+      width: 412,
+      height: 892,
+      availWidth: 412,
+      availHeight: 860,
+      colorDepth: 24,
+      pixelRatio: 2.625
+    },
+    hardware: { deviceMemory: 4, hardwareConcurrency: 8, maxTouchPoints: 5 },
+    locale: { language: 'vi-VN', languages: ['vi-VN', 'en-US', 'en'], timezone: 'Asia/Ho_Chi_Minh' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Qualcomm',
+      renderer: 'Adreno (TM) 619',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Roboto', 'Noto Sans', 'Noto Sans Vietnamese', 'Noto Color Emoji',
+        'Droid Sans', 'Droid Serif', 'sans-serif', 'Courier New'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 2 },
+    plugins: { mode: 'realistic' },
+    speech: { mode: 'filter' },
+    network: { connectionType: '4g' }
+  },
+
+  'sea-vn-fpt-chrome121': {
+    preset: 'sea-vn-fpt-chrome121',
+    os: { platform: 'Win32', version: '10.0.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      platform: 'Win32',
+      vendor: 'Google Inc.',
+      version: '121',
+      languages: ['vi-VN', 'en-US', 'en']
+    },
+    screen: {
+      width: 1920,
+      height: 1080,
+      availWidth: 1920,
+      availHeight: 1040,
+      colorDepth: 24,
+      pixelRatio: 1
+    },
+    hardware: { deviceMemory: 8, hardwareConcurrency: 4, maxTouchPoints: 0 },
+    locale: { language: 'vi-VN', languages: ['vi-VN', 'en-US', 'en'], timezone: 'Asia/Ho_Chi_Minh' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Google Inc. (Intel)',
+      renderer: 'ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Arial', 'Times New Roman', 'Tahoma', 'Segoe UI', 'Calibri',
+        'Courier New', 'Verdana', 'Georgia', 'Trebuchet MS'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 1 },
+    plugins: { mode: 'realistic' },
+    speech: { mode: 'filter' },
+    network: { connectionType: 'wifi' }
+  },
+
+  'sea-th-true-chrome120': {
+    preset: 'sea-th-true-chrome120',
+    geolocation: { latitude: 13.7563, longitude: 100.5018, accuracy: 150 },
+    os: { platform: 'Linux armv8l', version: '13.0.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Linux; Android 13; SM-A346B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36',
+      platform: 'Linux armv8l',
+      vendor: 'Google Inc.',
+      version: '120',
+      languages: ['th-TH', 'en-US', 'en']
+    },
+    screen: {
+      width: 412,
+      height: 892,
+      availWidth: 412,
+      availHeight: 860,
+      colorDepth: 24,
+      pixelRatio: 2.625
+    },
+    hardware: { deviceMemory: 4, hardwareConcurrency: 8, maxTouchPoints: 5 },
+    locale: { language: 'th-TH', languages: ['th-TH', 'en-US', 'en'], timezone: 'Asia/Bangkok' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'ARM',
+      renderer: 'Mali-G68',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Roboto', 'Noto Sans', 'Noto Sans Thai', 'Noto Color Emoji',
+        'Droid Sans', 'Droid Serif', 'sans-serif', 'Courier New'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 2 },
+    plugins: { mode: 'realistic' },
+    speech: { mode: 'filter' },
+    network: { connectionType: '4g' }
+  },
+
+  'sea-th-desktop-chrome121': {
+    preset: 'sea-th-desktop-chrome121',
+    os: { platform: 'Win32', version: '10.0.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      platform: 'Win32',
+      vendor: 'Google Inc.',
+      version: '121',
+      languages: ['th-TH', 'en-US', 'en']
+    },
+    screen: {
+      width: 1920,
+      height: 1080,
+      availWidth: 1920,
+      availHeight: 1040,
+      colorDepth: 24,
+      pixelRatio: 1
+    },
+    hardware: { deviceMemory: 8, hardwareConcurrency: 8, maxTouchPoints: 0 },
+    locale: { language: 'th-TH', languages: ['th-TH', 'en-US', 'en'], timezone: 'Asia/Bangkok' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Google Inc. (NVIDIA)',
+      renderer: 'ANGLE (NVIDIA, NVIDIA GeForce GTX 1050 Direct3D11 vs_5_0 ps_5_0, D3D11)',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Arial', 'Times New Roman', 'Tahoma', 'Segoe UI', 'Calibri',
+        'Courier New', 'Verdana', 'Georgia', 'Leelawadee UI', 'Angsana New',
+        'Cordia New', 'Trebuchet MS'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 1 },
+    plugins: { mode: 'realistic' },
+    speech: { mode: 'filter' },
+    network: { connectionType: 'wifi' }
+  },
+
+  'sea-id-telkomsel-chrome120': {
+    preset: 'sea-id-telkomsel-chrome120',
+    geolocation: { latitude: -6.2088, longitude: 106.8456, accuracy: 150 },
+    os: { platform: 'Linux armv8l', version: '12.0.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Linux; Android 12; CPH2385) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36',
+      platform: 'Linux armv8l',
+      vendor: 'Google Inc.',
+      version: '120',
+      languages: ['id-ID', 'en-US', 'en']
+    },
+    screen: {
+      width: 360,
+      height: 806,
+      availWidth: 360,
+      availHeight: 774,
+      colorDepth: 24,
+      pixelRatio: 2
+    },
+    hardware: { deviceMemory: 4, hardwareConcurrency: 8, maxTouchPoints: 5 },
+    locale: { language: 'id-ID', languages: ['id-ID', 'en-US', 'en'], timezone: 'Asia/Jakarta' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'ARM',
+      renderer: 'Mali-G57',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Roboto', 'Noto Sans', 'Noto Color Emoji',
+        'Droid Sans', 'Droid Serif', 'sans-serif', 'Courier New'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 2 },
+    plugins: { mode: 'realistic' },
+    speech: { mode: 'filter' },
+    network: { connectionType: '4g' }
+  },
+
+  'sea-id-desktop-chrome121': {
+    preset: 'sea-id-desktop-chrome121',
+    os: { platform: 'Win32', version: '10.0.0' },
+    browser: {
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      platform: 'Win32',
+      vendor: 'Google Inc.',
+      version: '121',
+      languages: ['id-ID', 'en-US', 'en']
+    },
+    screen: {
+      width: 1366,
+      height: 768,
+      availWidth: 1366,
+      availHeight: 728,
+      colorDepth: 24,
+      pixelRatio: 1
+    },
+    hardware: { deviceMemory: 4, hardwareConcurrency: 4, maxTouchPoints: 0 },
+    locale: { language: 'id-ID', languages: ['id-ID', 'en-US', 'en'], timezone: 'Asia/Jakarta' },
+    webrtc: { enabled: false, mode: 'disabled' },
+    canvas: { mode: 'noise', noiseSeed: 0 },
+    webgl: {
+      vendor: 'Google Inc. (Intel)',
+      renderer: 'ANGLE (Intel, Intel(R) HD Graphics 620 Direct3D11 vs_5_0 ps_5_0, D3D11)',
+      noiseSeed: 0
+    },
+    audio: { mode: 'noise', noiseSeed: 0 },
+    fonts: {
+      mode: 'whitelist',
+      whitelist: [
+        'Arial', 'Times New Roman', 'Tahoma', 'Segoe UI', 'Calibri',
+        'Courier New', 'Verdana', 'Georgia', 'Trebuchet MS'
+      ]
+    },
+    media: { audioInputs: 1, audioOutputs: 1, videoInputs: 1 },
+    plugins: { mode: 'realistic' },
+    speech: { mode: 'filter' },
+    network: { connectionType: 'wifi' }
+  },
+
   // ── Phase 9: Chrome 124 Presets (fresh UA versions) ──────────────────────
 
   'win11-chrome124': {
