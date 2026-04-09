@@ -1,12 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react'
-import { Plus, Trash2, Wifi, WifiOff, Loader2, Globe, Upload, Cloud, ListFilter, Edit2, Copy, Eye, EyeOff, ArrowUpDown, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, Wifi, WifiOff, Loader2, Globe, Upload, ListFilter, Edit2, Copy, Eye, EyeOff, ArrowUpDown, ChevronDown } from 'lucide-react'
 import { useProxyStore } from '../../stores/proxyStore'
 import { useToastStore } from '../../stores/toastStore'
 import { Header } from '../Layout/Header'
 import type { CreateProxyInput, ProxyConfig, UpdateProxyInput } from '../../types'
-import { ProviderPanel } from './ProviderPanel'
 
-type ProxyTab = 'pool' | 'providers'
+type ProxyTab = 'pool'
 type SortField = 'name' | 'host' | 'latency' | 'health' | 'created'
 type SortOrder = 'asc' | 'desc'
 
@@ -561,7 +560,6 @@ function PoolView({
 
 export function ProxyManager() {
   const { proxies, testing, fetchProxies, createProxy, updateProxy, deleteProxy, deleteProxies, testProxy, testProxies } = useProxyStore()
-  const [tab, setTab] = useState<ProxyTab>('pool')
   const [showAdd, setShowAdd] = useState(false)
   const [showBulkImport, setShowBulkImport] = useState(false)
   const [search, setSearch] = useState('')
@@ -573,75 +571,40 @@ export function ProxyManager() {
       <Header
         title="Proxy Manager"
         subtitle={`${proxies.length} proxies configured`}
-        search={tab === 'pool' ? search : undefined}
-        onSearchChange={tab === 'pool' ? setSearch : undefined}
+        search={search}
+        onSearchChange={setSearch}
         actions={
-          tab === 'pool' ? (
-            <div className="flex items-center gap-2">
-              <button onClick={() => setShowBulkImport(true)} className="btn-ghost flex items-center gap-2 text-sm">
-                <Upload className="w-4 h-4" />
-                Import List
-              </button>
-              <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2 text-sm">
-                <Plus className="w-4 h-4" />
-                Add Proxy
-              </button>
-            </div>
-          ) : null
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowBulkImport(true)} className="btn-ghost flex items-center gap-2 text-sm">
+              <Upload className="w-4 h-4" />
+              Import List
+            </button>
+            <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2 text-sm">
+              <Plus className="w-4 h-4" />
+              Add Proxy
+            </button>
+          </div>
         }
       />
 
-      {/* Tab strip */}
-      <div className="border-b border-slate-800 px-6">
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setTab('pool')}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-              tab === 'pool'
-                ? 'text-white border-ghost-500'
-                : 'text-slate-400 border-transparent hover:text-slate-200'
-            }`}
-          >
-            <ListFilter className="w-4 h-4" />
-            Proxy Pool
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">{proxies.length}</span>
-          </button>
-          <button
-            onClick={() => setTab('providers')}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-              tab === 'providers'
-                ? 'text-white border-ghost-500'
-                : 'text-slate-400 border-transparent hover:text-slate-200'
-            }`}
-          >
-            <Cloud className="w-4 h-4" />
-            Provider Accounts
-          </button>
-        </div>
-      </div>
-
       <div className="flex-1 overflow-y-auto p-6">
-        {tab === 'providers' ? (
-          <ProviderPanel />
-        ) : (
-          <PoolView
-            proxies={proxies}
-            testing={testing}
-            search={search}
-            showAdd={showAdd}
-            setShowAdd={setShowAdd}
-            createProxy={createProxy}
-            updateProxy={updateProxy}
-            deleteProxy={deleteProxy}
-            deleteProxies={deleteProxies}
-            testProxy={testProxy}
-            testProxies={testProxies}
-          />
-        )}
+        <PoolView
+          proxies={proxies}
+          testing={testing}
+          search={search}
+          showAdd={showAdd}
+          setShowAdd={setShowAdd}
+          createProxy={createProxy}
+          updateProxy={updateProxy}
+          deleteProxy={deleteProxy}
+          deleteProxies={deleteProxies}
+          testProxy={testProxy}
+          testProxies={testProxies}
+        />
       </div>
 
-      {/* Bulk import modal moved to PoolView */}
-      {showBulkImport && tab === 'pool' && (
+      {/* Bulk import modal */}
+      {showBulkImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl">
             <h2 className="text-base font-semibold text-white mb-2">Import Proxy List</h2>
