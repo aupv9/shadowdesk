@@ -43,6 +43,7 @@ import { ChromiumPatchManager } from '../fingerprint/chromium-patches'
 import { WorkflowScheduler, buildScheduleRow, validateCronExpression } from '../scheduler'
 import { driftFingerprint } from '../fingerprint-drift'
 import { runWarmUp } from '../warmup'
+import { SmartWarmUpEngine } from '../smart-warmup'
 import { detectCollisions } from '../fingerprint/collision-detector'
 import { getSolver, listSolvers, type CaptchaProviderId } from '../captcha'
 import { Recorder } from '../recorder'
@@ -1599,6 +1600,46 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('profiles:warmUp', async (_event, profileId: string, sites?: string[]) => {
     const result = await runWarmUp(profileId, sites)
     return result
+  })
+
+  // ── Smart Warm-Up Engine (7-day organic ramp) ──────────────────────────
+
+  ipcMain.handle('smartWarmup:blueprint', () => {
+    return SmartWarmUpEngine.getPlanBlueprint()
+  })
+
+  ipcMain.handle('smartWarmup:list', () => {
+    return db.getAllWarmupPlans()
+  })
+
+  ipcMain.handle('smartWarmup:get', (_event, profileId: string) => {
+    const plan = db.getWarmupPlanByProfile(profileId)
+    if (!plan) return null
+    return SmartWarmUpEngine.getInstance().getProgress(plan.id)
+  })
+
+  ipcMain.handle('smartWarmup:create', (_event, input: any) => {
+    return SmartWarmUpEngine.getInstance().createPlan(input)
+  })
+
+  ipcMain.handle('smartWarmup:runNext', async (_event, profileId: string) => {
+    return SmartWarmUpEngine.getInstance().runNextSession(profileId)
+  })
+
+  ipcMain.handle('smartWarmup:pause', (_event, profileId: string) => {
+    SmartWarmUpEngine.getInstance().pausePlan(profileId)
+  })
+
+  ipcMain.handle('smartWarmup:resume', (_event, profileId: string) => {
+    SmartWarmUpEngine.getInstance().resumePlan(profileId)
+  })
+
+  ipcMain.handle('smartWarmup:cancel', (_event, profileId: string) => {
+    SmartWarmUpEngine.getInstance().cancelPlan(profileId)
+  })
+
+  ipcMain.handle('smartWarmup:applyFakeAge', (_event, profileId: string, days: number) => {
+    return SmartWarmUpEngine.getInstance().applyFakeAccountAge(profileId, days)
   })
 
   // ── Workflow Templates ──────────────────────────────────────────────

@@ -417,6 +417,53 @@ export class Database {
       );
     `)
 
+    // Smart Warm-Up Engine — 7-day organic ramp plans + per-day sessions.
+    //
+    // `warmup_plans` holds one row per profile that is being warmed up.
+    // `warmup_sessions` holds one row per day executed, capturing the
+    // stage, visited URLs, synthesized interactions, and a derived
+    // engagement score. Both cascade on profile delete.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS warmup_plans (
+        id                     TEXT PRIMARY KEY,
+        profile_id             TEXT NOT NULL,
+        region                 TEXT NOT NULL DEFAULT 'global',
+        target_platforms       TEXT NOT NULL DEFAULT '[]',
+        total_days             INTEGER NOT NULL DEFAULT 7,
+        current_day            INTEGER NOT NULL DEFAULT 0,
+        status                 TEXT NOT NULL DEFAULT 'pending',
+        fake_account_age_days  INTEGER NOT NULL DEFAULT 0,
+        notes                  TEXT DEFAULT '',
+        created_at             TEXT DEFAULT (datetime('now')),
+        started_at             TEXT,
+        completed_at           TEXT,
+        last_session_at        TEXT,
+        next_run_at            TEXT,
+        FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_warmup_plans_profile ON warmup_plans(profile_id);
+      CREATE INDEX IF NOT EXISTS idx_warmup_plans_status  ON warmup_plans(status);
+
+      CREATE TABLE IF NOT EXISTS warmup_sessions (
+        id               TEXT PRIMARY KEY,
+        plan_id          TEXT NOT NULL,
+        profile_id       TEXT NOT NULL,
+        day              INTEGER NOT NULL,
+        stage            TEXT NOT NULL,
+        visited          TEXT NOT NULL DEFAULT '[]',
+        interactions     TEXT NOT NULL DEFAULT '[]',
+        engagement_score INTEGER NOT NULL DEFAULT 0,
+        duration_ms      INTEGER NOT NULL DEFAULT 0,
+        success          INTEGER NOT NULL DEFAULT 0,
+        error            TEXT,
+        started_at       TEXT NOT NULL,
+        completed_at     TEXT,
+        FOREIGN KEY(plan_id) REFERENCES warmup_plans(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_warmup_sessions_plan    ON warmup_sessions(plan_id);
+      CREATE INDEX IF NOT EXISTS idx_warmup_sessions_profile ON warmup_sessions(profile_id);
+    `)
+
     // Phase 20 — Proxy Provider Marketplace (UI label: "Phase 17")
     // Stores user-configured residential proxy provider accounts. Credentials
     // (username/password/api key/zone) are encrypted with the same master key
@@ -602,6 +649,194 @@ export class Database {
 
   setProfileWarmedUp(id: string, warmed: boolean): void {
     this.run('UPDATE profiles SET warmed_up = ? WHERE id = ?', [warmed ? 1 : 0, id])
+  }
+
+  /**
+   * Smart Warm-Up Engine — backdate a profile's `created_at` so it appears
+   * the profile has been around for `days` days longer than it actually has.
+   * Returns the new ISO timestamp that was written.
+   */
+  backdateProfileCreatedAt(id: string, days: number): string {
+    const safeDays = Math.max(0, Math.floor(days))
+    const ms = Date.now() - safeDays * 24 * 60 * 60 * 1000
+    const iso = new Date(ms).toISOString().replace('T', ' ').replace(/\..+/, '')
+    this.run('UPDATE profiles SET created_at = ? WHERE id = ?', [iso, id])
+    return iso
+  }
+
+  // ── Smart Warm-Up Engine (plans + sessions) ──────────────────────────────
+
+  /** Insert a new warm-up plan row. All fields from the interface are required. */
+  createWarmupPlan(plan: {
+    id: string
+    profile_id: string
+    region: string
+    target_platforms: string[]
+    total_days: number
+    fake_account_age_days: number
+    notes?: string
+  }): void {
+    this.run(
+      `INSERT INTO warmup_plans
+         (id, profile_id, region, target_platforms, total_days, current_day,
+          status, fake_account_age_days, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, 0, 'pending', ?, ?, datetime('now'))`,
+      [
+        plan.id,
+        plan.profile_id,
+        plan.region,
+        JSON.stringify(plan.target_platforms ?? []),
+        plan.total_days,
+        plan.fake_account_age_days,
+        plan.notes ?? ''
+      ]
+    )
+  }
+
+  getWarmupPlan(id: string): any {
+    const row = this.queryOne('SELECT * FROM warmup_plans WHERE id = ?', [id])
+    return this.parseWarmupPlanRow(row)
+  }
+
+  getWarmupPlanByProfile(profileId: string): any {
+    const row = this.queryOne(
+      'SELECT * FROM warmup_plans WHERE profile_id = ? ORDER BY created_at DESC LIMIT 1',
+      [profileId]
+    )
+    return this.parseWarmupPlanRow(row)
+  }
+
+  getAllWarmupPlans(): any[] {
+    const rows = this.queryAll(`
+      SELECT wp.*, p.name AS profile_name
+      FROM warmup_plans wp
+      LEFT JOIN profiles p ON p.id = wp.profile_id
+      ORDER BY wp.created_at DESC
+    `)
+    return rows.map((r) => this.parseWarmupPlanRow(r)).filter((r) => r !== null)
+  }
+
+  updateWarmupPlan(
+    id: string,
+    patch: Partial<{
+      current_day: number
+      status: string
+      started_at: string | null
+      completed_at: string | null
+      last_session_at: string | null
+      next_run_at: string | null
+      notes: string
+    }>
+  ): void {
+    const fields: string[] = []
+    const params: any[] = []
+    for (const [key, value] of Object.entries(patch)) {
+      fields.push(`${key} = ?`)
+      params.push(value)
+    }
+    if (fields.length === 0) return
+    params.push(id)
+    this.run(`UPDATE warmup_plans SET ${fields.join(', ')} WHERE id = ?`, params)
+  }
+
+  deleteWarmupPlan(id: string): void {
+    // Sessions cascade on plan delete via FK.
+    this.run('DELETE FROM warmup_plans WHERE id = ?', [id])
+  }
+
+  /** Parse JSON fields + normalize types on a warmup_plans row. */
+  private parseWarmupPlanRow(row: any): any {
+    if (!row) return null
+    let targetPlatforms: string[] = []
+    try {
+      targetPlatforms = JSON.parse(row.target_platforms || '[]')
+    } catch { /* ignore */ }
+    return {
+      id: row.id,
+      profile_id: row.profile_id,
+      profile_name: row.profile_name,
+      region: row.region,
+      target_platforms: targetPlatforms,
+      total_days: row.total_days,
+      current_day: row.current_day,
+      status: row.status,
+      fake_account_age_days: row.fake_account_age_days,
+      notes: row.notes ?? '',
+      created_at: row.created_at,
+      started_at: row.started_at ?? null,
+      completed_at: row.completed_at ?? null,
+      last_session_at: row.last_session_at ?? null,
+      next_run_at: row.next_run_at ?? null
+    }
+  }
+
+  addWarmupSession(s: {
+    id: string
+    plan_id: string
+    profile_id: string
+    day: number
+    stage: string
+    visited: string[]
+    interactions: any[]
+    engagement_score: number
+    duration_ms: number
+    success: boolean
+    error?: string | null
+    started_at: string
+    completed_at: string | null
+  }): void {
+    this.run(
+      `INSERT INTO warmup_sessions
+         (id, plan_id, profile_id, day, stage, visited, interactions,
+          engagement_score, duration_ms, success, error, started_at, completed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        s.id,
+        s.plan_id,
+        s.profile_id,
+        s.day,
+        s.stage,
+        JSON.stringify(s.visited),
+        JSON.stringify(s.interactions),
+        s.engagement_score,
+        s.duration_ms,
+        s.success ? 1 : 0,
+        s.error ?? null,
+        s.started_at,
+        s.completed_at
+      ]
+    )
+  }
+
+  getWarmupSessionsByPlan(planId: string): any[] {
+    const rows = this.queryAll(
+      'SELECT * FROM warmup_sessions WHERE plan_id = ? ORDER BY day ASC, started_at ASC',
+      [planId]
+    )
+    return rows.map((r) => this.parseWarmupSessionRow(r))
+  }
+
+  private parseWarmupSessionRow(row: any): any {
+    if (!row) return null
+    let visited: string[] = []
+    let interactions: any[] = []
+    try { visited = JSON.parse(row.visited || '[]') } catch { /* ignore */ }
+    try { interactions = JSON.parse(row.interactions || '[]') } catch { /* ignore */ }
+    return {
+      id: row.id,
+      plan_id: row.plan_id,
+      profile_id: row.profile_id,
+      day: row.day,
+      stage: row.stage,
+      visited,
+      interactions,
+      engagement_score: row.engagement_score,
+      duration_ms: row.duration_ms,
+      success: !!row.success,
+      error: row.error ?? undefined,
+      started_at: row.started_at,
+      completed_at: row.completed_at ?? null
+    }
   }
 
   // ── Profile CRUD ──────────────────────────────────────────────────────────

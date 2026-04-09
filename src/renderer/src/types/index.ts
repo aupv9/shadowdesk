@@ -57,6 +57,15 @@ export type {
   WorkflowSchedule,
   ProfileExtension,
   WarmUpResult,
+  // Smart Warm-Up Engine
+  WarmUpStage,
+  WarmUpPlanStatus,
+  WarmUpRegion,
+  WarmUpPlan,
+  WarmUpInteraction,
+  WarmUpSession,
+  CreateWarmUpPlanInput,
+  WarmUpPlanProgress,
   // Phase 12.C.4
   CollisionGroup,
   CollisionReport,
@@ -117,6 +126,7 @@ export type NavSection =
   | 'marketplace'
   | 'ai'
   | 'sea-platforms'  // Phase 17 — SEA Platform Templates
+  | 'smart-warmup'   // Smart Warm-Up Engine (7-day ramp)
 
 export interface Toast {
   id: string
