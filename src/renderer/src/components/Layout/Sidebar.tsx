@@ -20,7 +20,8 @@ import {
   Flame,
   Radar,
   ChevronLeft,
-  ChevronDown
+  ChevronDown,
+  FileUp
 } from 'lucide-react'
 import type { NavSection } from '../../types'
 import type { User as UserType, LicensePlan } from '../../types'
@@ -66,8 +67,9 @@ const NAV_GROUPS: NavGroup[] = [
     key: 'workspace',
     label: 'Workspace',
     items: [
-      { key: 'profiles', icon: LayoutGrid, label: 'Profiles' },
-      { key: 'proxies',  icon: Globe,      label: 'Proxies' }
+      { key: 'profiles',       icon: LayoutGrid, label: 'Profiles' },
+      { key: 'import-history', icon: FileUp,     label: 'Import History' },
+      { key: 'proxies',        icon: Globe,      label: 'Proxies' }
     ]
   },
   {

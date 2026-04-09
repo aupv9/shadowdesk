@@ -16,6 +16,8 @@ import { Marketplace } from './components/Marketplace'
 import { AIAssistant } from './components/AIAssistant'
 import { SEAPlatforms } from './components/SEAPlatforms'
 import { SmartWarmUp } from './components/SmartWarmUp'
+import { ImportHistory } from './components/ImportHistory'
+import { ImportWizard } from './components/ImportWizard'
 import { ErrorBoundary } from './components/UI/ErrorBoundary'
 import { ToastContainer } from './components/UI/Toast'
 import { ConfirmDialog } from './components/UI/ConfirmDialog'
@@ -74,6 +76,9 @@ export default function App() {
         <ErrorBoundary section="Profiles">
           {section === 'profiles'    && <ProfileManager />}
         </ErrorBoundary>
+        <ErrorBoundary section="Import History">
+          {section === 'import-history' && <ImportHistory />}
+        </ErrorBoundary>
         <ErrorBoundary section="Proxies">
           {section === 'proxies'     && <ProxyManager />}
         </ErrorBoundary>
@@ -122,6 +127,9 @@ export default function App() {
       </main>
       <ToastContainer />
       </div>
+
+      {/* Phase 1+2 — Bulk Import Wizard */}
+      <ImportWizard />
 
       {/* Phase 13.C — Confirm dialog (mounts once, imperative API) */}
       <ConfirmDialog />

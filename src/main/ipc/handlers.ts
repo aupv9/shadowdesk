@@ -81,6 +81,13 @@ import type {
 import type { CreateNodeInput, CreateWebhookInput, TelegramConfig, MarketplaceCategory, WebhookConfig } from '../../shared/types'
 import type { AutomationStep, DetectionVectorResult, RefineOptions } from '../../shared/types'
 
+// Phase 1+2 — Bulk Import Enhancement
+import {
+  previewCSVImport, previewJSONImport, previewZIPImport,
+  executeCSVImport, executeJSONImport, executeZIPImport
+} from '../import'
+import type { ImportOptions } from '../../shared/types'
+
 // ── Phase 18: Run history export helpers ──────────────────────────────────
 
 /** Escape a single CSV field — wrap in quotes and double any embedded quotes. */
@@ -868,6 +875,58 @@ export function registerIpcHandlers(): void {
     markPendingChange()
 
     return db.getProfile(newId)
+  })
+
+  // ── Bulk Import (Phase 1+2) ───────────────────────────────────────────────
+
+  ipcMain.handle('import:previewCSV', (_event, csvText: string) => {
+    return previewCSVImport(db, csvText)
+  })
+
+  ipcMain.handle('import:previewJSON', (_event, jsonText: string) => {
+    return previewJSONImport(db, jsonText)
+  })
+
+  ipcMain.handle('import:previewZIP', (_event, zipBuffers: Buffer[]) => {
+    return previewZIPImport(db, zipBuffers)
+  })
+
+  ipcMain.handle('import:executeCSV', (_event, csvText: string, options: ImportOptions, filename: string | null) => {
+    const result = executeCSVImport(db, csvText, options, filename)
+    if (result.successCount > 0) markPendingChange()
+    return result
+  })
+
+  ipcMain.handle('import:executeJSON', (_event, jsonText: string, options: ImportOptions, filename: string | null) => {
+    const result = executeJSONImport(db, jsonText, options, filename)
+    if (result.successCount > 0) markPendingChange()
+    return result
+  })
+
+  ipcMain.handle('import:executeZIP', (_event, zipBuffers: Buffer[], options: ImportOptions, filenames: string[]) => {
+    const result = executeZIPImport(db, zipBuffers, options, filenames)
+    if (result.successCount > 0) markPendingChange()
+    return result
+  })
+
+  ipcMain.handle('import:sessions', (_event, limit?: number, offset?: number) => {
+    return db.getImportSessions(limit ?? 50, offset ?? 0)
+  })
+
+  ipcMain.handle('import:session', (_event, id: string) => {
+    return db.getImportSession(id)
+  })
+
+  ipcMain.handle('import:records', (_event, sessionId: string) => {
+    return db.getImportRecords(sessionId)
+  })
+
+  ipcMain.handle('import:deleteSession', (_event, id: string) => {
+    db.deleteImportSession(id)
+  })
+
+  ipcMain.handle('import:stats', () => {
+    return db.getImportStats()
   })
 
   // ── Proxies ───────────────────────────────────────────────────────────────
