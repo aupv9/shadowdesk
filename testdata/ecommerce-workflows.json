@@ -1,0 +1,1634 @@
+[
+  {
+    "id": "9c720183-73e0-4efa-9702-82fe5e9ff722",
+    "name": "Shopee — Search & Extract Listings",
+    "description": "Navigate to Shopee VN, search for a keyword, scroll the results page and extract the first 10 product titles + prices.",
+    "platform": "shopee",
+    "region": "VN",
+    "tags": [
+      "shopee",
+      "vietnam",
+      "search",
+      "scraping"
+    ],
+    "category": "sea-ecommerce",
+    "steps": [
+      {
+        "id": "dfeee77f-85e1-49e6-9373-7694e664be10",
+        "action": "navigate",
+        "label": "Open Shopee VN",
+        "params": {
+          "url": "https://shopee.vn",
+          "waitUntil": "networkidle2",
+          "timeout": 30000
+        }
+      },
+      {
+        "id": "d16225b9-8542-4492-aee3-29a5a88ff0fe",
+        "action": "wait",
+        "label": "Let hydration finish",
+        "params": {
+          "ms": 2500
+        }
+      },
+      {
+        "id": "79e00e8a-10b7-49d8-9825-0e82be972806",
+        "action": "waitForSelector",
+        "label": "Wait for search bar",
+        "params": {
+          "selector": "input.shopee-searchbar-input__input",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "4f10d611-e3bf-4cf2-8d8a-5be0a13e294f",
+        "action": "click",
+        "label": "Focus search bar",
+        "params": {
+          "selector": "input.shopee-searchbar-input__input"
+        }
+      },
+      {
+        "id": "74d51569-6c21-4a50-8507-5fa18cf9a3dd",
+        "action": "type",
+        "label": "Type keyword",
+        "params": {
+          "selector": "input.shopee-searchbar-input__input",
+          "text": "{keyword}",
+          "delay": 85
+        }
+      },
+      {
+        "id": "6a491fc1-6ec0-43b0-9597-39dfe48236f3",
+        "action": "keyPress",
+        "label": "Submit search",
+        "params": {
+          "key": "Enter"
+        }
+      },
+      {
+        "id": "78ba3a79-041c-4d7d-a1b4-da371dbae54a",
+        "action": "waitForNavigation",
+        "label": "Wait for results",
+        "params": {
+          "waitUntil": "networkidle2",
+          "timeout": 30000
+        }
+      },
+      {
+        "id": "604d3180-8874-4bf3-ac9d-bd04d19a66ab",
+        "action": "waitForSelector",
+        "label": "Wait for first product card",
+        "params": {
+          "selector": "div.shopee-search-item-result__item",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "c82965f1-e6f1-46e9-98e5-66557cfcf5e8",
+        "action": "loop",
+        "label": "Lazy-scroll results",
+        "params": {
+          "times": 4,
+          "steps": [
+            {
+              "id": "c514f50b-dd28-4b5f-a512-8f20e1cea407",
+              "action": "scroll",
+              "label": "Scroll down",
+              "params": {
+                "y": 900
+              }
+            },
+            {
+              "id": "2032ce21-1cde-410c-a770-24373dd2b9e0",
+              "action": "wait",
+              "label": "Human pause",
+              "params": {
+                "ms": 1200
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "5109558a-1e8e-468f-b738-a6be92ed80a8",
+        "action": "extractText",
+        "label": "Extract product titles",
+        "params": {
+          "selector": "div[data-sqe=\"name\"]",
+          "all": true,
+          "saveAs": "shopee_titles"
+        }
+      },
+      {
+        "id": "d4a10014-4c37-4fce-8d82-177347763631",
+        "action": "extractText",
+        "label": "Extract product prices",
+        "params": {
+          "selector": "div.ZEgDH9",
+          "all": true,
+          "saveAs": "shopee_prices"
+        }
+      },
+      {
+        "id": "0c49b5a2-6ce4-4058-a12d-eea3861aa17e",
+        "action": "screenshot",
+        "label": "Screenshot results",
+        "params": {
+          "fullPage": false
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "productUrl": "https://shopee.vn/iPhone-15-Pro-Max-256GB-i.123.4567890",
+      "shopee_user": "demo_user@example.com",
+      "shopee_password": "DemoPass123!"
+    },
+    "profile_ids": [
+      "b669e3da-1c4f-47ac-8957-e5e92290f4fe",
+      "cdbf3e75-027e-424f-a560-cbae8271cfb2",
+      "d1a78ef7-2a82-4913-8c8f-bc66e57b9efd"
+    ]
+  },
+  {
+    "id": "9d89358c-489c-4742-af93-23fb09719aaf",
+    "name": "Shopee — Scrape Product Page",
+    "description": "Open a Shopee product URL, extract title, price, rating, seller and stock level, save full screenshot.",
+    "platform": "shopee",
+    "region": "VN",
+    "tags": [
+      "shopee",
+      "vietnam",
+      "product",
+      "scraping"
+    ],
+    "category": "sea-ecommerce",
+    "steps": [
+      {
+        "id": "408b0aeb-dd78-45f6-bcf7-5fe3d734c032",
+        "action": "navigate",
+        "label": "Open product page",
+        "params": {
+          "url": "{productUrl}",
+          "waitUntil": "networkidle2",
+          "timeout": 30000
+        }
+      },
+      {
+        "id": "c9ddbaed-fe3f-4f3b-a89d-ad3b000001ca",
+        "action": "waitForSelector",
+        "label": "Wait for product title",
+        "params": {
+          "selector": "div._44qnta, div.vR6K3w",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "03c57d3a-c94f-470d-8a9b-5842571e9f47",
+        "action": "wait",
+        "label": "Humanise pause",
+        "params": {
+          "ms": 1500
+        }
+      },
+      {
+        "id": "9052306d-014c-4515-ab9c-201e1e5a24eb",
+        "action": "scroll",
+        "label": "Scroll to description",
+        "params": {
+          "y": 600
+        }
+      },
+      {
+        "id": "2f2aadfd-8c14-456b-80ab-2d4e80f8d511",
+        "action": "extractText",
+        "label": "Extract title",
+        "params": {
+          "selector": "div._44qnta, div.vR6K3w",
+          "saveAs": "product_title"
+        }
+      },
+      {
+        "id": "27d8a38b-b7b5-4469-972b-29b4d0cbf948",
+        "action": "extractText",
+        "label": "Extract price",
+        "params": {
+          "selector": "div.IZPeQz, div.pqTWkA",
+          "saveAs": "product_price"
+        }
+      },
+      {
+        "id": "d1c6bd67-5f57-458a-bf01-ff073f92c791",
+        "action": "extractText",
+        "label": "Extract seller",
+        "params": {
+          "selector": "div.fV3TIn",
+          "saveAs": "seller_name"
+        }
+      },
+      {
+        "id": "5ebcf7da-161b-4aa5-bd8e-698f09079865",
+        "action": "extractText",
+        "label": "Extract rating",
+        "params": {
+          "selector": "div.F9RHbS.dQEiAI.jMXp4d",
+          "saveAs": "rating"
+        }
+      },
+      {
+        "id": "30804a1d-f8a5-47cc-817b-80663bcf4f41",
+        "action": "screenshot",
+        "label": "Full product screenshot",
+        "params": {
+          "fullPage": true
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "productUrl": "https://shopee.vn/iPhone-15-Pro-Max-256GB-i.123.4567890",
+      "shopee_user": "demo_user@example.com",
+      "shopee_password": "DemoPass123!"
+    },
+    "profile_ids": [
+      "b669e3da-1c4f-47ac-8957-e5e92290f4fe",
+      "cdbf3e75-027e-424f-a560-cbae8271cfb2",
+      "d1a78ef7-2a82-4913-8c8f-bc66e57b9efd"
+    ]
+  },
+  {
+    "id": "53a1cd5a-98bd-46f5-b300-324234cdb2bf",
+    "name": "Shopee — Add Product to Cart",
+    "description": "Open a Shopee product, wait for the Add-to-Cart button, click it, and confirm the cart count updated.",
+    "platform": "shopee",
+    "region": "VN",
+    "tags": [
+      "shopee",
+      "vietnam",
+      "cart",
+      "checkout"
+    ],
+    "category": "sea-ecommerce",
+    "steps": [
+      {
+        "id": "e304123d-c30f-4f21-92a0-79a2923b895a",
+        "action": "navigate",
+        "label": "Open product page",
+        "params": {
+          "url": "{productUrl}",
+          "waitUntil": "networkidle2",
+          "timeout": 30000
+        }
+      },
+      {
+        "id": "07d2538c-2b64-4f4d-9628-46705dda92a4",
+        "action": "wait",
+        "label": "Wait for hydration",
+        "params": {
+          "ms": 2000
+        }
+      },
+      {
+        "id": "c746037a-ef21-49b1-832a-457559a5a7db",
+        "action": "scroll",
+        "label": "Scroll to buy box",
+        "params": {
+          "y": 400
+        }
+      },
+      {
+        "id": "c60319cf-e5dd-4b14-851c-2cd29e3904bc",
+        "action": "waitForSelector",
+        "label": "Wait for add-to-cart button",
+        "params": {
+          "selector": "button.btn.btn-solid-primary--oVUmB",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "96dcc8bd-14dc-41dd-b044-31534a2ed15c",
+        "action": "hover",
+        "label": "Hover on button (human)",
+        "params": {
+          "selector": "button.btn.btn-solid-primary--oVUmB"
+        }
+      },
+      {
+        "id": "0cc223dd-a0b6-40bc-9d7e-a99f187ab00a",
+        "action": "wait",
+        "label": "Pause before click",
+        "params": {
+          "ms": 600
+        }
+      },
+      {
+        "id": "aa073b74-76f0-46ae-b5bd-8a5e10ce34dc",
+        "action": "click",
+        "label": "Click add to cart",
+        "params": {
+          "selector": "button.btn.btn-solid-primary--oVUmB"
+        }
+      },
+      {
+        "id": "a5bf18d7-c245-44a7-8898-fb1eb18982ae",
+        "action": "wait",
+        "label": "Wait for cart toast",
+        "params": {
+          "ms": 2500
+        }
+      },
+      {
+        "id": "24c66c9b-24cb-49cf-9fa5-0a46317e31aa",
+        "action": "screenshot",
+        "label": "Screenshot cart state",
+        "params": {
+          "fullPage": false
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "productUrl": "https://shopee.vn/iPhone-15-Pro-Max-256GB-i.123.4567890",
+      "shopee_user": "demo_user@example.com",
+      "shopee_password": "DemoPass123!"
+    },
+    "profile_ids": [
+      "b669e3da-1c4f-47ac-8957-e5e92290f4fe",
+      "cdbf3e75-027e-424f-a560-cbae8271cfb2",
+      "d1a78ef7-2a82-4913-8c8f-bc66e57b9efd"
+    ]
+  },
+  {
+    "id": "1ad55a2b-0dfe-4147-817c-851cd58ebaf4",
+    "name": "Shopee — Login Flow",
+    "description": "Navigate to Shopee login page, fill credentials from the vault and submit. Stops at CAPTCHA if triggered.",
+    "platform": "shopee",
+    "region": "VN",
+    "tags": [
+      "shopee",
+      "login",
+      "auth"
+    ],
+    "category": "sea-ecommerce",
+    "steps": [
+      {
+        "id": "c7d16e15-0b28-4cae-b33f-73701fcf2835",
+        "action": "navigate",
+        "label": "Open login page",
+        "params": {
+          "url": "https://shopee.vn/buyer/login",
+          "waitUntil": "networkidle2"
+        }
+      },
+      {
+        "id": "1c9066d4-212e-4e7f-ae89-54b03c5f617a",
+        "action": "waitForSelector",
+        "label": "Wait for login form",
+        "params": {
+          "selector": "input[name=\"loginKey\"]",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "f2df87d3-e034-4bd2-9135-e6f0cce496de",
+        "action": "type",
+        "label": "Enter phone / email",
+        "params": {
+          "selector": "input[name=\"loginKey\"]",
+          "text": "{shopee_user}",
+          "delay": 110
+        }
+      },
+      {
+        "id": "7e173140-1a7e-4fcc-ace1-c082e094285a",
+        "action": "wait",
+        "label": "Human pause",
+        "params": {
+          "ms": 700
+        }
+      },
+      {
+        "id": "568d9812-63d6-4fbb-b6c4-2f8372b08ff2",
+        "action": "type",
+        "label": "Enter password",
+        "params": {
+          "selector": "input[name=\"password\"]",
+          "text": "{shopee_password}",
+          "delay": 120
+        }
+      },
+      {
+        "id": "e2772c2d-4cba-4f18-850d-8d9b444982ea",
+        "action": "wait",
+        "label": "Pause before submit",
+        "params": {
+          "ms": 900
+        }
+      },
+      {
+        "id": "b2e8f982-d909-4495-be94-80d9b12cfb90",
+        "action": "click",
+        "label": "Click login",
+        "params": {
+          "selector": "button.wyhvVD._1EApiB"
+        }
+      },
+      {
+        "id": "7b3e2c57-95ca-4cf3-9c69-17c2d9193f10",
+        "action": "wait",
+        "label": "Wait for redirect",
+        "params": {
+          "ms": 5000
+        }
+      },
+      {
+        "id": "c95b92ef-7b3b-4eb3-a06f-8247047e8074",
+        "action": "screenshot",
+        "label": "Screenshot post-login state",
+        "params": {
+          "fullPage": false
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "productUrl": "https://shopee.vn/iPhone-15-Pro-Max-256GB-i.123.4567890",
+      "shopee_user": "demo_user@example.com",
+      "shopee_password": "DemoPass123!"
+    },
+    "profile_ids": [
+      "b669e3da-1c4f-47ac-8957-e5e92290f4fe",
+      "cdbf3e75-027e-424f-a560-cbae8271cfb2",
+      "d1a78ef7-2a82-4913-8c8f-bc66e57b9efd"
+    ]
+  },
+  {
+    "id": "4433df8d-bc7f-4c2a-a453-9fae1a9fb60d",
+    "name": "Lazada — Search & Extract Listings",
+    "description": "Navigate to Lazada VN, search for a keyword, scroll and extract the first page of product cards.",
+    "platform": "lazada",
+    "region": "VN",
+    "tags": [
+      "lazada",
+      "search",
+      "scraping"
+    ],
+    "category": "sea-ecommerce",
+    "steps": [
+      {
+        "id": "8a5466d1-b938-49e2-9ced-6d5ba98bdc20",
+        "action": "navigate",
+        "label": "Open Lazada VN",
+        "params": {
+          "url": "https://www.lazada.vn",
+          "waitUntil": "networkidle2",
+          "timeout": 30000
+        }
+      },
+      {
+        "id": "916166f9-89ba-4a7c-94b7-3e317eafde64",
+        "action": "wait",
+        "label": "Wait for hydration",
+        "params": {
+          "ms": 3000
+        }
+      },
+      {
+        "id": "d15f01a1-16bb-45ac-b8fa-4e57a4bb35f4",
+        "action": "waitForSelector",
+        "label": "Wait for search input",
+        "params": {
+          "selector": "input[type=\"search\"]#q",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "59452589-aa3a-4653-87d8-da7e3d3c5818",
+        "action": "click",
+        "label": "Focus search",
+        "params": {
+          "selector": "input[type=\"search\"]#q"
+        }
+      },
+      {
+        "id": "f5471243-fd5f-4271-8da7-ce1f1142efd3",
+        "action": "type",
+        "label": "Type keyword",
+        "params": {
+          "selector": "input[type=\"search\"]#q",
+          "text": "{keyword}",
+          "delay": 90
+        }
+      },
+      {
+        "id": "45872353-e1d4-4a1f-8c8b-a863f601cdfa",
+        "action": "keyPress",
+        "label": "Submit search",
+        "params": {
+          "key": "Enter"
+        }
+      },
+      {
+        "id": "35a3b74b-804f-4a9b-a2c2-3a3c9d2590e9",
+        "action": "waitForNavigation",
+        "label": "Wait for results",
+        "params": {
+          "waitUntil": "networkidle2",
+          "timeout": 30000
+        }
+      },
+      {
+        "id": "93d4b964-38f1-4e8f-9c16-92088722ddb3",
+        "action": "waitForSelector",
+        "label": "Wait for first product card",
+        "params": {
+          "selector": "div[data-qa-locator=\"product-item\"]",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "9dafb65c-611e-40a5-baaf-64458406231f",
+        "action": "loop",
+        "label": "Lazy-scroll results",
+        "params": {
+          "times": 4,
+          "steps": [
+            {
+              "id": "9c5c5c74-46be-4dfd-becf-0d583c56e0ba",
+              "action": "scroll",
+              "label": "Scroll down",
+              "params": {
+                "y": 900
+              }
+            },
+            {
+              "id": "cb2e5f0f-bf07-48e9-8a0e-187b862aad26",
+              "action": "wait",
+              "label": "Pause",
+              "params": {
+                "ms": 1200
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "c0aab799-f2a3-4700-82e9-b2461a10e991",
+        "action": "extractText",
+        "label": "Extract product titles",
+        "params": {
+          "selector": "div.RfADt a",
+          "all": true,
+          "saveAs": "lazada_titles"
+        }
+      },
+      {
+        "id": "6c5597ca-e1f8-4e5f-80c1-9ec2148a71ba",
+        "action": "extractText",
+        "label": "Extract product prices",
+        "params": {
+          "selector": "div.aBrP0 span.ooOxS",
+          "all": true,
+          "saveAs": "lazada_prices"
+        }
+      },
+      {
+        "id": "944d40a3-581f-4fa9-9309-e16f07c359c7",
+        "action": "screenshot",
+        "label": "Screenshot results",
+        "params": {
+          "fullPage": false
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "productUrl": "https://www.lazada.vn/products/iphone-15-pro-max-i401234567.html"
+    },
+    "profile_ids": [
+      "9b6f2d0e-6796-48a6-84db-d31b7972ff88",
+      "54e98333-ab94-4c7d-b3e6-29fca7bd322b"
+    ]
+  },
+  {
+    "id": "5febf996-1e94-4749-bf59-fc47c2d8ddb7",
+    "name": "Lazada — Scrape Product Page",
+    "description": "Open a Lazada product page, extract title, price, discount, seller, and total reviews.",
+    "platform": "lazada",
+    "region": "VN",
+    "tags": [
+      "lazada",
+      "product",
+      "scraping"
+    ],
+    "category": "sea-ecommerce",
+    "steps": [
+      {
+        "id": "2b20790c-b696-46c6-9567-2669d76faff2",
+        "action": "navigate",
+        "label": "Open product page",
+        "params": {
+          "url": "{productUrl}",
+          "waitUntil": "networkidle2",
+          "timeout": 30000
+        }
+      },
+      {
+        "id": "e5fd045d-0c72-42b1-99ec-f8d89327a09c",
+        "action": "waitForSelector",
+        "label": "Wait for title",
+        "params": {
+          "selector": "span.pdp-mod-product-badge-title",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "9a349c5b-1f9f-4d91-ab3d-8988c20f5137",
+        "action": "wait",
+        "label": "Pause",
+        "params": {
+          "ms": 1500
+        }
+      },
+      {
+        "id": "6f51257e-6626-4bbe-bac1-10d50e19e4c5",
+        "action": "extractText",
+        "label": "Extract title",
+        "params": {
+          "selector": "span.pdp-mod-product-badge-title",
+          "saveAs": "lazada_title"
+        }
+      },
+      {
+        "id": "dfa73ea1-6dfd-44ca-bcf4-3e982bfe7f7b",
+        "action": "extractText",
+        "label": "Extract price",
+        "params": {
+          "selector": "span.pdp-price.pdp-price_type_normal",
+          "saveAs": "lazada_price"
+        }
+      },
+      {
+        "id": "5e064165-84d8-4d0d-9d8c-767d604513a2",
+        "action": "extractText",
+        "label": "Extract rating",
+        "params": {
+          "selector": "div.score-average",
+          "saveAs": "lazada_rating"
+        }
+      },
+      {
+        "id": "bdf6f679-d0c2-4138-b51b-eff9d1a951a3",
+        "action": "scroll",
+        "label": "Scroll to reviews",
+        "params": {
+          "y": 1200
+        }
+      },
+      {
+        "id": "678877a8-35ec-4d8f-a6db-b28fe91fad5d",
+        "action": "screenshot",
+        "label": "Full page screenshot",
+        "params": {
+          "fullPage": true
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "productUrl": "https://www.lazada.vn/products/iphone-15-pro-max-i401234567.html"
+    },
+    "profile_ids": [
+      "9b6f2d0e-6796-48a6-84db-d31b7972ff88",
+      "54e98333-ab94-4c7d-b3e6-29fca7bd322b"
+    ]
+  },
+  {
+    "id": "45b3408b-f318-4b52-af71-62fe2828c682",
+    "name": "Lazada — Flash Sale Tracker",
+    "description": "Visit the Lazada flash sale page, wait for items, extract current deals and timer.",
+    "platform": "lazada",
+    "region": "VN",
+    "tags": [
+      "lazada",
+      "flash-sale",
+      "monitor"
+    ],
+    "category": "sea-ecommerce",
+    "steps": [
+      {
+        "id": "bc920ec4-3340-40f0-8b03-0d266626a93e",
+        "action": "navigate",
+        "label": "Open flash sale",
+        "params": {
+          "url": "https://www.lazada.vn/shop-flash-sale",
+          "waitUntil": "networkidle2"
+        }
+      },
+      {
+        "id": "4f886c0a-d2f8-4565-b350-2d6760cb25ea",
+        "action": "wait",
+        "label": "Wait for hydration",
+        "params": {
+          "ms": 3000
+        }
+      },
+      {
+        "id": "61c92579-f9cd-45ae-9d76-71f7d680d238",
+        "action": "waitForSelector",
+        "label": "Wait for deal grid",
+        "params": {
+          "selector": "div.lzd-fs-item, div[data-tracking=\"product-card\"]",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "650e3937-c9a1-48bc-ace0-75c213986e02",
+        "action": "extractText",
+        "label": "Extract countdown",
+        "params": {
+          "selector": "div.countdown, div.lzd-countdown",
+          "saveAs": "flash_countdown"
+        }
+      },
+      {
+        "id": "190a30a2-d044-43c1-9743-3b5b747cf8e4",
+        "action": "extractText",
+        "label": "Extract deal titles",
+        "params": {
+          "selector": "div.lzd-fs-item-title",
+          "all": true,
+          "saveAs": "flash_titles"
+        }
+      },
+      {
+        "id": "47216ee7-0130-46a7-8b5a-800ec83fb4b4",
+        "action": "extractText",
+        "label": "Extract deal prices",
+        "params": {
+          "selector": "div.lzd-fs-item-price",
+          "all": true,
+          "saveAs": "flash_prices"
+        }
+      },
+      {
+        "id": "3d970579-9a5b-473c-80a4-9629fe53632c",
+        "action": "screenshot",
+        "label": "Screenshot sale page",
+        "params": {
+          "fullPage": true
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "productUrl": "https://www.lazada.vn/products/iphone-15-pro-max-i401234567.html"
+    },
+    "profile_ids": [
+      "9b6f2d0e-6796-48a6-84db-d31b7972ff88",
+      "54e98333-ab94-4c7d-b3e6-29fca7bd322b"
+    ]
+  },
+  {
+    "id": "87db58a4-d110-4f0b-8a5f-7973c26fbd61",
+    "name": "TikTok Shop — Browse Feed",
+    "description": "Open the TikTok Shop feed, wait for product cards, scroll the feed and capture trending items.",
+    "platform": "tiktok-shop",
+    "region": "VN",
+    "tags": [
+      "tiktok",
+      "live-commerce",
+      "browse"
+    ],
+    "category": "sea-ecommerce",
+    "steps": [
+      {
+        "id": "23b6ff39-9eab-4e85-83ff-0fcf64dd88db",
+        "action": "navigate",
+        "label": "Open TikTok Shop",
+        "params": {
+          "url": "https://shop.tiktok.com",
+          "waitUntil": "networkidle2",
+          "timeout": 30000
+        }
+      },
+      {
+        "id": "97f93a50-3105-47da-899a-bd96466e7174",
+        "action": "wait",
+        "label": "Wait for hydration",
+        "params": {
+          "ms": 3500
+        }
+      },
+      {
+        "id": "41a10a4c-7e42-44db-9401-5be75263e271",
+        "action": "waitForSelector",
+        "label": "Wait for product grid",
+        "params": {
+          "selector": "div[data-e2e=\"product-card\"]",
+          "visible": true,
+          "timeout": 20000
+        }
+      },
+      {
+        "id": "36c22823-7a17-4d07-8be3-9c5081ccfb5b",
+        "action": "loop",
+        "label": "Scroll feed",
+        "params": {
+          "times": 6,
+          "steps": [
+            {
+              "id": "fe796245-ebc6-48dd-bec3-bcca056f5f56",
+              "action": "scroll",
+              "label": "Scroll down",
+              "params": {
+                "y": 700
+              }
+            },
+            {
+              "id": "ca43a26f-ce19-4cbf-a4ad-63fea4b9ab21",
+              "action": "wait",
+              "label": "Humanise",
+              "params": {
+                "ms": 1800
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "ecbc6db1-9cd7-49f2-b56f-5a5298dc7312",
+        "action": "extractText",
+        "label": "Extract titles",
+        "params": {
+          "selector": "a[data-e2e=\"product-card-title\"]",
+          "all": true,
+          "saveAs": "tiktok_titles"
+        }
+      },
+      {
+        "id": "77086fd4-da4f-4642-ac63-ecef2d37b3aa",
+        "action": "extractText",
+        "label": "Extract prices",
+        "params": {
+          "selector": "span[data-e2e=\"product-card-price\"]",
+          "all": true,
+          "saveAs": "tiktok_prices"
+        }
+      },
+      {
+        "id": "980e7f75-71ea-43b8-8dd1-c66439843176",
+        "action": "screenshot",
+        "label": "Screenshot feed",
+        "params": {
+          "fullPage": false
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "liveUrl": "https://shop.tiktok.com/@demo_seller/live"
+    },
+    "profile_ids": [
+      "084f5b1c-77d6-493d-bf76-41039eb38448",
+      "1d93668d-f13e-4aa9-b383-ec7b534f60c3"
+    ]
+  },
+  {
+    "id": "6c17e674-9583-4ce6-a8b9-a79656131315",
+    "name": "TikTok Shop — Search Products",
+    "description": "Search for a product on TikTok Shop, extract result titles and prices, screenshot the first results page.",
+    "platform": "tiktok-shop",
+    "region": "VN",
+    "tags": [
+      "tiktok",
+      "search"
+    ],
+    "category": "sea-ecommerce",
+    "steps": [
+      {
+        "id": "61206f7a-eba1-4347-945a-efcb54c5498d",
+        "action": "navigate",
+        "label": "Open TikTok Shop",
+        "params": {
+          "url": "https://shop.tiktok.com",
+          "waitUntil": "networkidle2"
+        }
+      },
+      {
+        "id": "867c6046-6245-4692-b228-72f7d50d5f86",
+        "action": "wait",
+        "label": "Wait for hydration",
+        "params": {
+          "ms": 3000
+        }
+      },
+      {
+        "id": "e2b2cbb3-4750-4510-b0e0-3908ad79c6e4",
+        "action": "waitForSelector",
+        "label": "Wait for search box",
+        "params": {
+          "selector": "input[data-e2e=\"search-user-input\"]",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "b734c8b8-a453-4149-9644-3b86c695dde7",
+        "action": "click",
+        "label": "Focus search",
+        "params": {
+          "selector": "input[data-e2e=\"search-user-input\"]"
+        }
+      },
+      {
+        "id": "015a8ce0-7225-4b84-8121-d864b43db2af",
+        "action": "type",
+        "label": "Type query",
+        "params": {
+          "selector": "input[data-e2e=\"search-user-input\"]",
+          "text": "{keyword}",
+          "delay": 95
+        }
+      },
+      {
+        "id": "4cf32782-702d-4354-a933-a5461361376b",
+        "action": "keyPress",
+        "label": "Press enter",
+        "params": {
+          "key": "Enter"
+        }
+      },
+      {
+        "id": "da497356-612f-4740-b4e2-4387f30b37be",
+        "action": "wait",
+        "label": "Wait for results",
+        "params": {
+          "ms": 4000
+        }
+      },
+      {
+        "id": "c275f387-a173-4356-8600-32bbe34219fe",
+        "action": "waitForSelector",
+        "label": "Wait for result cards",
+        "params": {
+          "selector": "div[data-e2e=\"product-card\"]",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "ce5b9c40-2896-458d-8348-8776bb2add95",
+        "action": "extractText",
+        "label": "Extract titles",
+        "params": {
+          "selector": "a[data-e2e=\"product-card-title\"]",
+          "all": true,
+          "saveAs": "search_titles"
+        }
+      },
+      {
+        "id": "32c2e771-23ae-4e63-8d6b-b912acdb22c6",
+        "action": "screenshot",
+        "label": "Screenshot results",
+        "params": {
+          "fullPage": false
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "liveUrl": "https://shop.tiktok.com/@demo_seller/live"
+    },
+    "profile_ids": [
+      "084f5b1c-77d6-493d-bf76-41039eb38448",
+      "1d93668d-f13e-4aa9-b383-ec7b534f60c3"
+    ]
+  },
+  {
+    "id": "2282a78f-280b-4d0a-b31a-93653556306b",
+    "name": "TikTok Shop — Live Stream Scraper",
+    "description": "Open a TikTok live-commerce stream URL, extract viewer count + product pins, loop for 30s of snapshots.",
+    "platform": "tiktok-shop",
+    "region": "VN",
+    "tags": [
+      "tiktok",
+      "live",
+      "monitor"
+    ],
+    "category": "sea-social",
+    "steps": [
+      {
+        "id": "c1b597cd-27a6-40c2-a600-6963a5c69155",
+        "action": "navigate",
+        "label": "Open live stream",
+        "params": {
+          "url": "{liveUrl}",
+          "waitUntil": "networkidle2",
+          "timeout": 30000
+        }
+      },
+      {
+        "id": "92e1c30b-09d5-4708-8191-0ad92ede3d43",
+        "action": "wait",
+        "label": "Buffer start",
+        "params": {
+          "ms": 4000
+        }
+      },
+      {
+        "id": "cce68c62-c0f5-439c-9fe3-6470e51e0f8a",
+        "action": "waitForSelector",
+        "label": "Wait for live card",
+        "params": {
+          "selector": "div[data-e2e=\"live-card\"], div.live-room",
+          "visible": true,
+          "timeout": 20000
+        }
+      },
+      {
+        "id": "24600f64-98e7-4898-b292-f9b02860972e",
+        "action": "loop",
+        "label": "Snapshot viewers + pins x5",
+        "params": {
+          "times": 5,
+          "steps": [
+            {
+              "id": "7b7f4c2c-3788-419f-9dda-6ae8822d45e4",
+              "action": "extractText",
+              "label": "Viewer count",
+              "params": {
+                "selector": "div[data-e2e=\"live-people-count\"]",
+                "saveAs": "viewer_count"
+              }
+            },
+            {
+              "id": "a4337bdd-6181-41d5-b1ac-a5264336600d",
+              "action": "extractText",
+              "label": "Pinned product",
+              "params": {
+                "selector": "div[data-e2e=\"live-pinned-goods\"]",
+                "saveAs": "pinned_product"
+              }
+            },
+            {
+              "id": "66263fd3-3e7c-4099-97fb-34bbd973d06f",
+              "action": "screenshot",
+              "label": "Stream snapshot",
+              "params": {
+                "fullPage": false
+              }
+            },
+            {
+              "id": "16f68261-20e6-4985-b40a-fb4f0d42cb03",
+              "action": "wait",
+              "label": "Inter-snapshot",
+              "params": {
+                "ms": 6000
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "liveUrl": "https://shop.tiktok.com/@demo_seller/live"
+    },
+    "profile_ids": [
+      "084f5b1c-77d6-493d-bf76-41039eb38448",
+      "1d93668d-f13e-4aa9-b383-ec7b534f60c3"
+    ]
+  },
+  {
+    "id": "f98cd39e-08e8-4d80-a579-cc27742f341b",
+    "name": "Tiki — Search Products",
+    "description": "Search Tiki (Vietnam marketplace) for a keyword and extract first-page product titles + prices.",
+    "platform": "tiki",
+    "region": "VN",
+    "tags": [
+      "tiki",
+      "vietnam",
+      "search"
+    ],
+    "category": "sea-ecommerce",
+    "steps": [
+      {
+        "id": "2af9bc6b-79f4-4333-94d7-1b1f681552a0",
+        "action": "navigate",
+        "label": "Open Tiki",
+        "params": {
+          "url": "https://tiki.vn",
+          "waitUntil": "networkidle2"
+        }
+      },
+      {
+        "id": "6b7e2e3e-9dd9-499b-beb8-f69b2b2f7ae8",
+        "action": "wait",
+        "label": "Wait for hydration",
+        "params": {
+          "ms": 2000
+        }
+      },
+      {
+        "id": "097031b0-4931-4b2f-8ca4-af296e39cae8",
+        "action": "waitForSelector",
+        "label": "Wait for search input",
+        "params": {
+          "selector": "input[data-view-id=\"main_search_form_input\"]",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "17861757-330d-457d-8ba3-728dfb9e9d8f",
+        "action": "click",
+        "label": "Focus search",
+        "params": {
+          "selector": "input[data-view-id=\"main_search_form_input\"]"
+        }
+      },
+      {
+        "id": "089dada6-4543-4eda-8550-cdfe30f532f6",
+        "action": "type",
+        "label": "Type keyword",
+        "params": {
+          "selector": "input[data-view-id=\"main_search_form_input\"]",
+          "text": "{keyword}",
+          "delay": 85
+        }
+      },
+      {
+        "id": "5dfbf7b9-df4a-4e12-af83-a07c120a4cd8",
+        "action": "keyPress",
+        "label": "Submit",
+        "params": {
+          "key": "Enter"
+        }
+      },
+      {
+        "id": "07548a5d-c096-49f6-bfd9-68b7cbf3c659",
+        "action": "waitForNavigation",
+        "label": "Wait for results",
+        "params": {
+          "waitUntil": "networkidle2"
+        }
+      },
+      {
+        "id": "33935b5f-a60d-4838-b3e8-6f1d5f53a11c",
+        "action": "waitForSelector",
+        "label": "Wait for product card",
+        "params": {
+          "selector": "a.product-item",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "0c39e701-3455-4247-91d2-9de331de3972",
+        "action": "extractText",
+        "label": "Extract titles",
+        "params": {
+          "selector": "div.name h3",
+          "all": true,
+          "saveAs": "tiki_titles"
+        }
+      },
+      {
+        "id": "fc29fb84-d44c-4a2f-8c10-6c3d079c57c7",
+        "action": "extractText",
+        "label": "Extract prices",
+        "params": {
+          "selector": "div.price-discount__price",
+          "all": true,
+          "saveAs": "tiki_prices"
+        }
+      },
+      {
+        "id": "8c43b172-521e-4a6d-80a4-3da741f80397",
+        "action": "screenshot",
+        "label": "Screenshot results",
+        "params": {
+          "fullPage": false
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "productUrl": "https://tiki.vn/iphone-15-pro-max-256gb-p270123456.html"
+    },
+    "profile_ids": [
+      "d3399683-f844-4a21-8735-92ae42634cd9",
+      "e7658915-d82f-4be5-9893-6b16ade45976"
+    ]
+  },
+  {
+    "id": "a39bc34a-955f-4487-9fb0-59d04098f95f",
+    "name": "Tiki — Flash Deal Monitor",
+    "description": "Visit Tiki flash deal page, extract ongoing deals and their remaining stock indicators.",
+    "platform": "tiki",
+    "region": "VN",
+    "tags": [
+      "tiki",
+      "flash-deal",
+      "monitor"
+    ],
+    "category": "sea-ecommerce",
+    "steps": [
+      {
+        "id": "564ba68b-8d7a-4003-86b8-9f346aa6f150",
+        "action": "navigate",
+        "label": "Open flash deals",
+        "params": {
+          "url": "https://tiki.vn/khuyen-mai-hot",
+          "waitUntil": "networkidle2"
+        }
+      },
+      {
+        "id": "0f1c365c-4148-4395-aed7-bfcbb89a5515",
+        "action": "wait",
+        "label": "Hydration pause",
+        "params": {
+          "ms": 2500
+        }
+      },
+      {
+        "id": "20b2c1b6-c941-488b-9398-c35206d986a5",
+        "action": "scroll",
+        "label": "Scroll to deals",
+        "params": {
+          "y": 600
+        }
+      },
+      {
+        "id": "05f744b4-dcde-4405-aca3-7266c8961d9f",
+        "action": "extractText",
+        "label": "Deal titles",
+        "params": {
+          "selector": "div.name",
+          "all": true,
+          "saveAs": "flash_titles"
+        }
+      },
+      {
+        "id": "875efc85-dbfe-461c-b06b-70a833a24e44",
+        "action": "extractText",
+        "label": "Stock badges",
+        "params": {
+          "selector": "div.progress-text, span.stock",
+          "all": true,
+          "saveAs": "stock_levels"
+        }
+      },
+      {
+        "id": "f24eff15-e9c0-4327-97fc-4daace90623f",
+        "action": "screenshot",
+        "label": "Screenshot deals",
+        "params": {
+          "fullPage": true
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "productUrl": "https://tiki.vn/iphone-15-pro-max-256gb-p270123456.html"
+    },
+    "profile_ids": [
+      "d3399683-f844-4a21-8735-92ae42634cd9",
+      "e7658915-d82f-4be5-9893-6b16ade45976"
+    ]
+  },
+  {
+    "id": "71cfc6a9-bcd2-4d8a-a00c-ddb41ee18f60",
+    "name": "VNPay — Sandbox Checkout",
+    "description": "Drive the VNPay SANDBOX checkout form: pick test bank, enter test card, submit. Safe for QA only.",
+    "platform": "vnpay",
+    "region": "VN",
+    "tags": [
+      "vnpay",
+      "payment",
+      "sandbox",
+      "checkout"
+    ],
+    "category": "sea-payments",
+    "steps": [
+      {
+        "id": "208d2d6b-56a6-46a4-9181-c31513485d34",
+        "action": "navigate",
+        "label": "Open sandbox gateway",
+        "params": {
+          "url": "{vnpayCheckoutUrl}",
+          "waitUntil": "networkidle2",
+          "timeout": 30000
+        }
+      },
+      {
+        "id": "b572d33d-897f-4f8d-91ad-7f6db6d30fb8",
+        "action": "wait",
+        "label": "Wait for gateway",
+        "params": {
+          "ms": 2500
+        }
+      },
+      {
+        "id": "16b21300-b352-4c29-9b46-87d49e556c9d",
+        "action": "waitForSelector",
+        "label": "Wait for bank grid",
+        "params": {
+          "selector": "div.bank-list, div.list-bank",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "87dbd867-730e-4835-83a1-07b14a1c1a37",
+        "action": "click",
+        "label": "Pick test bank (NCB)",
+        "params": {
+          "selector": "div[data-bank-code=\"NCB\"], div.bank-item.NCB"
+        }
+      },
+      {
+        "id": "12aa1092-6ab7-4c2f-8a08-3bad03d1d903",
+        "action": "wait",
+        "label": "Wait for card form",
+        "params": {
+          "ms": 2000
+        }
+      },
+      {
+        "id": "499a59ea-e315-4461-aabc-69e8e2250121",
+        "action": "waitForSelector",
+        "label": "Wait for card number field",
+        "params": {
+          "selector": "input[name=\"cardNumber\"]",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "ea3c67d6-341a-4fd7-91b6-6c5862e3c602",
+        "action": "type",
+        "label": "Card number",
+        "params": {
+          "selector": "input[name=\"cardNumber\"]",
+          "text": "9704198526191432198",
+          "delay": 60
+        }
+      },
+      {
+        "id": "6be5a954-64d7-4d89-97b8-1d4753436e7f",
+        "action": "type",
+        "label": "Card holder",
+        "params": {
+          "selector": "input[name=\"cardHolder\"]",
+          "text": "NGUYEN VAN A",
+          "delay": 60
+        }
+      },
+      {
+        "id": "435425c7-70dd-427e-b7d6-f7de9897ee03",
+        "action": "type",
+        "label": "Issue date",
+        "params": {
+          "selector": "input[name=\"issueDate\"]",
+          "text": "07/15",
+          "delay": 60
+        }
+      },
+      {
+        "id": "cb22e38f-722f-438e-a864-f093fe874dab",
+        "action": "click",
+        "label": "Submit card",
+        "params": {
+          "selector": "button.btn-pay"
+        }
+      },
+      {
+        "id": "1f3a3d85-648b-4295-9d3e-a2c4b579be6d",
+        "action": "wait",
+        "label": "Wait for OTP screen",
+        "params": {
+          "ms": 3000
+        }
+      },
+      {
+        "id": "30eda295-bdb2-4cd8-ba9b-ff9f1093088e",
+        "action": "screenshot",
+        "label": "OTP step screenshot",
+        "params": {
+          "fullPage": false
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "vnpayCheckoutUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?demo=1",
+      "vnpayRedirectUrl": "https://sandbox.vnpayment.vn/Bank/bank_redirect?demo=1"
+    },
+    "profile_ids": []
+  },
+  {
+    "id": "a6738055-5a4d-4a88-bc4a-5d78c946fdee",
+    "name": "VNPay — Bank Redirect Flow",
+    "description": "Open a VNPay-initiated redirect URL, follow the bank page and extract the transaction reference.",
+    "platform": "vnpay",
+    "region": "VN",
+    "tags": [
+      "vnpay",
+      "payment",
+      "redirect"
+    ],
+    "category": "sea-payments",
+    "steps": [
+      {
+        "id": "a64e5467-1e4e-4931-b47a-320b9de3909e",
+        "action": "navigate",
+        "label": "Open VNPay redirect",
+        "params": {
+          "url": "{vnpayRedirectUrl}",
+          "waitUntil": "networkidle2"
+        }
+      },
+      {
+        "id": "61c898be-aa35-451e-a036-2e076c43174f",
+        "action": "wait",
+        "label": "Wait for bank screen",
+        "params": {
+          "ms": 3000
+        }
+      },
+      {
+        "id": "70b54fc8-bc22-4d12-b9e2-9cad259673b5",
+        "action": "extractText",
+        "label": "Extract transaction ref",
+        "params": {
+          "selector": "span.transaction-ref, div.txn-ref",
+          "saveAs": "vnpay_txn_ref"
+        }
+      },
+      {
+        "id": "5f5c7f29-d68f-4205-a199-6224a80fb15f",
+        "action": "extractText",
+        "label": "Extract amount",
+        "params": {
+          "selector": "span.amount, div.txn-amount",
+          "saveAs": "vnpay_amount"
+        }
+      },
+      {
+        "id": "7dd08abc-a042-4fe7-85ef-355f229b5a5d",
+        "action": "screenshot",
+        "label": "Redirect screenshot",
+        "params": {
+          "fullPage": true
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "vnpayCheckoutUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?demo=1",
+      "vnpayRedirectUrl": "https://sandbox.vnpayment.vn/Bank/bank_redirect?demo=1"
+    },
+    "profile_ids": []
+  },
+  {
+    "id": "14c5926c-82c5-47bf-a4a9-15ef6776336d",
+    "name": "Grab Food — Browse Restaurants",
+    "description": "Open GrabFood Vietnam, set a Ho Chi Minh City delivery address and scrape nearby restaurant cards.",
+    "platform": "grab",
+    "region": "VN",
+    "tags": [
+      "grab",
+      "food",
+      "delivery",
+      "browse"
+    ],
+    "category": "sea-ecommerce",
+    "steps": [
+      {
+        "id": "6d4e9584-659a-4074-93f5-4f2fb3465c9d",
+        "action": "navigate",
+        "label": "Open GrabFood VN",
+        "params": {
+          "url": "https://food.grab.com/vn/vi",
+          "waitUntil": "networkidle2",
+          "timeout": 30000
+        }
+      },
+      {
+        "id": "3c2364ca-a1d5-466b-b64a-e3f8bbb448a5",
+        "action": "wait",
+        "label": "Hydration",
+        "params": {
+          "ms": 3000
+        }
+      },
+      {
+        "id": "d590184a-5d55-42ea-bdfb-cf1a22070436",
+        "action": "waitForSelector",
+        "label": "Wait for address input",
+        "params": {
+          "selector": "input[placeholder*=\"delivery address\"], input[placeholder*=\"địa chỉ\"]",
+          "visible": true,
+          "timeout": 15000
+        }
+      },
+      {
+        "id": "8a37467b-12e1-452f-bc7c-bbe0bbf61bc4",
+        "action": "click",
+        "label": "Focus address input",
+        "params": {
+          "selector": "input[placeholder*=\"delivery address\"], input[placeholder*=\"địa chỉ\"]"
+        }
+      },
+      {
+        "id": "f5b5edc7-1098-4c22-b44f-524f5d190e64",
+        "action": "type",
+        "label": "Enter address",
+        "params": {
+          "selector": "input[placeholder*=\"delivery address\"], input[placeholder*=\"địa chỉ\"]",
+          "text": "{deliveryAddress}",
+          "delay": 95
+        }
+      },
+      {
+        "id": "e636c8f4-67a1-4b2f-95e5-a9ea2c7e5e9b",
+        "action": "wait",
+        "label": "Wait for suggestions",
+        "params": {
+          "ms": 2000
+        }
+      },
+      {
+        "id": "5a54286b-c5f6-40ea-9dcf-89ace0e4dbab",
+        "action": "keyPress",
+        "label": "Arrow down",
+        "params": {
+          "key": "ArrowDown"
+        }
+      },
+      {
+        "id": "ab54cdd8-1e31-4192-b1f6-0e3094b3409c",
+        "action": "keyPress",
+        "label": "Select first suggestion",
+        "params": {
+          "key": "Enter"
+        }
+      },
+      {
+        "id": "cd137001-2657-4ae9-a6c2-7ed3a7f786e2",
+        "action": "wait",
+        "label": "Wait for restaurants",
+        "params": {
+          "ms": 4000
+        }
+      },
+      {
+        "id": "0c826036-020f-4540-b9c0-6cdc37978340",
+        "action": "waitForSelector",
+        "label": "Wait for restaurant card",
+        "params": {
+          "selector": "a[data-testid=\"restaurant-card\"]",
+          "visible": true,
+          "timeout": 20000
+        }
+      },
+      {
+        "id": "a3bfee83-a893-4259-a6cf-68077ef81bf9",
+        "action": "extractText",
+        "label": "Extract restaurant names",
+        "params": {
+          "selector": "a[data-testid=\"restaurant-card\"] h6",
+          "all": true,
+          "saveAs": "restaurant_names"
+        }
+      },
+      {
+        "id": "a1bb33aa-ee64-40b9-8187-cc4242a18e78",
+        "action": "screenshot",
+        "label": "Screenshot restaurant list",
+        "params": {
+          "fullPage": false
+        }
+      }
+    ],
+    "variables": {
+      "keyword": "iphone 15 pro max",
+      "deliveryAddress": "Nguyen Hue Walking Street, Ho Chi Minh City"
+    },
+    "profile_ids": [
+      "9e98deaf-aa02-4a3a-a5e0-ed6ef177dda2"
+    ]
+  }
+]

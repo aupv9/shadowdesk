@@ -7,6 +7,80 @@ Full-flow testing harness for the **E-Commerce Operations** pillar of Ghost Brow
 3. **Inventory scraping** — in-stock / low-stock / out-of-stock state machine
 4. **Bulk account management** — profile rotation, session isolation, rate-limit handling
 
+## See it running in the real app (hands-on walkthrough)
+
+The offline suite exercises the 4 pillars in Vitest. If you want to **see the
+actual interaction on the application** — open Ghost Browser and click Run on
+a real workflow attached to a real profile — seed the demo data first:
+
+```bash
+npm run test:ecommerce:seed      # generate fixtures + write them to app DB
+npm run dev                      # launch Electron app
+```
+
+After seeding you'll see in the app UI:
+
+| Section         | What's there                                             |
+|-----------------|----------------------------------------------------------|
+| **Proxies**     | 6 SEA residential proxies (VN / TH / ID / MY / PH / SG)  |
+| **Profiles**    | 10 profiles grouped under "E-Commerce Operations":       |
+|                 |   • 3x Shopee shoppers (VN / TH / ID — Android presets)  |
+|                 |   • 2x Lazada buyers (VN desktop / MY Android)           |
+|                 |   • 2x TikTok Shop (VN live scraper / ID feed browser)   |
+|                 |   • 2x Tiki (Windows 11 / macOS Sonoma)                  |
+|                 |   • 1x GrabFood (Samsung Android)                        |
+| **Automation**  | 15 SEA workflows, ready to run, with default variables   |
+|                 |   pre-filled (keyword = "iphone 15 pro max", productUrl, |
+|                 |   etc.) and recommended profile IDs pre-wired            |
+
+### How to run a workflow end-to-end in the app
+
+1. Go to **Profiles** → launch any profile (e.g. "Shopee VN — Shopper 01").
+   Chromium opens with the right fingerprint + proxy applied.
+2. Go to **Automation** → pick a workflow (e.g. "Shopee — Search & Extract
+   Listings") → click Run → select the profile you launched.
+3. Watch the Chromium window as the automation engine drives it through the
+   workflow steps. Extracted titles/prices land in the run result under
+   `shopee_titles` / `shopee_prices`.
+
+### Important notes about the seeded data
+
+- **Proxies are demo hosts.** They use the shape `103.x.y.z` so the UI shows
+  populated proxy rows, but they are NOT real credentials. Replace the
+  username / password / host before running against real marketplaces,
+  otherwise the Chromium connection will fail.
+- **Profile IDs are deterministic.** Re-running `test:ecommerce:seed` updates
+  the existing rows in place (via `INSERT OR REPLACE`) — it does not create
+  duplicates.
+- **Fingerprints mirror production presets.** Each profile uses
+  `resolveFingerprint()`-compatible JSON with `canvas/webgl/audio` noise seeds
+  derived from the profile ID — so the same profile produces the same
+  fingerprint across runs, matching the app's anti-detect guarantees.
+- **Workflows respect the Phase 17.H pre-flight validator.** TikTok Shop
+  profiles are pinned to mobile presets (Android Pixel / Samsung) because the
+  validator blocks desktop fingerprints on `shop.tiktok.com`.
+
+### Where the data lives
+
+The seeder writes to the Electron app's `app.getPath('userData')` directory:
+
+| OS      | Path                                              |
+|---------|---------------------------------------------------|
+| Linux   | `~/.config/ghost-browser/ghost-browser.db`        |
+| macOS   | `~/Library/Application Support/ghost-browser/ghost-browser.db` |
+| Windows | `%APPDATA%\ghost-browser\ghost-browser.db`        |
+
+Override via `GHOST_BROWSER_USERDATA=/custom/path npm run test:ecommerce:seed:db`.
+
+### Resetting
+
+To start fresh, delete the DB file and re-seed:
+
+```bash
+rm ~/.config/ghost-browser/ghost-browser.db      # or the OS-specific path
+npm run test:ecommerce:seed
+```
+
 ## Architecture
 
 ```
