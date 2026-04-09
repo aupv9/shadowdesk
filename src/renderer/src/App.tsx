@@ -15,6 +15,7 @@ import { PatchManager } from './components/PatchManager'
 import { Marketplace } from './components/Marketplace'
 import { AIAssistant } from './components/AIAssistant'
 import { SEAPlatforms } from './components/SEAPlatforms'
+import { SmartWarmUp } from './components/SmartWarmUp'
 import { ErrorBoundary } from './components/UI/ErrorBoundary'
 import { ToastContainer } from './components/UI/Toast'
 import { ConfirmDialog } from './components/UI/ConfirmDialog'
@@ -114,6 +115,9 @@ export default function App() {
         </ErrorBoundary>
         <ErrorBoundary section="SEA Platforms">
           {section === 'sea-platforms' && <SEAPlatforms onNavigate={setSection} />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Smart Warm-Up">
+          {section === 'smart-warmup' && <SmartWarmUp />}
         </ErrorBoundary>
       </main>
       <ToastContainer />

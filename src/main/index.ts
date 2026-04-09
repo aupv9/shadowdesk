@@ -9,6 +9,7 @@ import { ApiServer } from './api-server'
 import { getSettings } from './settings'
 import { resolveFingerprint } from './fingerprint/presets'
 import { WorkflowScheduler } from './scheduler'
+import { SmartWarmUpScheduler } from './smart-warmup'
 import { CleanupWorker } from './cleanup-worker'
 
 const isDev = process.env.NODE_ENV === 'development'
@@ -92,6 +93,9 @@ app.whenReady().then(async () => {
   // Phase 10.2 — start the workflow scheduler poller
   WorkflowScheduler.getInstance().start()
 
+  // Smart Warm-Up Engine — poll every 10 minutes for due 7-day ramp sessions
+  SmartWarmUpScheduler.getInstance().start()
+
   // Phase 2.3 — start the cleanup worker for async profile cleanup
   const cleanupWorker = CleanupWorker.getInstance()
   cleanupWorker.init(mainWindow)
@@ -132,6 +136,7 @@ app.on('window-all-closed', () => {
 // Clean up API server + scheduler + cleanup worker on quit
 app.on('before-quit', async () => {
   WorkflowScheduler.getInstance().stop()
+  SmartWarmUpScheduler.getInstance().stop()
   CleanupWorker.getInstance().stop()
   await ApiServer.getInstance().stop()
 })

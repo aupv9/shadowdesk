@@ -369,6 +369,119 @@ export interface WarmUpResult {
   durationMs: number
 }
 
+// ── Smart Warm-Up Engine (7-day organic ramp) ──────────────────────────────
+//
+// The Smart Warm-Up Engine graduates a fresh profile from "cold" to
+// "ready for automation" over a 7-day schedule. Each day runs one warm-up
+// session with a distinct **stage**:
+//
+//   1. benign           — neutral browsing (search engines, news, wiki)
+//   2. benign           — same, slightly more dwell + scrolling
+//   3. interests        — topical content (youtube, reddit) tuned to the target region
+//   4. interests        — light engagement (hovers, category clicks)
+//   5. platform-adjacent— navigate the actual SEA platform *without* logging in
+//   6. platform-active  — deeper platform navigation (search, scroll, product views)
+//   7. ready            — final dry-run session mirroring the real automation flow
+//
+// The plan's `fake_account_age_days` backdates the profile's `created_at`
+// column so it looks like the profile has existed for N days before the
+// warm-up started — a useful vector against platforms that throttle
+// "newly-seen" browsers.
+
+export type WarmUpStage =
+  | 'benign'
+  | 'interests'
+  | 'platform-adjacent'
+  | 'platform-active'
+  | 'ready'
+
+export type WarmUpPlanStatus =
+  | 'pending'    // created, day 1 not yet run
+  | 'running'    // at least one session executed, plan in progress
+  | 'completed'  // all 7 days finished
+  | 'paused'     // user paused
+  | 'failed'     // terminal failure (too many failed sessions)
+  | 'cancelled'  // user cancelled
+
+export type WarmUpRegion = 'VN' | 'TH' | 'ID' | 'MY' | 'PH' | 'SG' | 'global'
+
+export interface WarmUpPlan {
+  id: string
+  profile_id: string
+  profile_name?: string
+  region: WarmUpRegion
+  /** Platform ids (ids from sea-platforms.ts) this plan ramps toward. */
+  target_platforms: string[]
+  total_days: number          // almost always 7, configurable
+  current_day: number         // 0 = not started; 1..total_days = day completed
+  status: WarmUpPlanStatus
+  /** Fake account-age backdating — this many days are subtracted from created_at. */
+  fake_account_age_days: number
+  /** The ISO date the plan was created (real, not backdated). */
+  created_at: string
+  started_at: string | null
+  completed_at: string | null
+  last_session_at: string | null
+  next_run_at: string | null
+  /** Free-form notes. */
+  notes?: string
+}
+
+export interface WarmUpInteraction {
+  type:
+    | 'navigate'
+    | 'scroll'
+    | 'mouse-move'
+    | 'hover'
+    | 'click'
+    | 'search'
+    | 'dwell'
+    | 'type'
+  target?: string     // URL / selector / query
+  ms: number          // how long it took
+  ok: boolean
+  error?: string
+}
+
+export interface WarmUpSession {
+  id: string
+  plan_id: string
+  profile_id: string
+  day: number            // 1..total_days
+  stage: WarmUpStage
+  /** URLs the session visited, in order. */
+  visited: string[]
+  /** Organic interactions synthesized during the session. */
+  interactions: WarmUpInteraction[]
+  /** Net engagement score 0..100 computed from interactions. */
+  engagement_score: number
+  duration_ms: number
+  /** Whether the session was considered successful (used to advance the plan). */
+  success: boolean
+  error?: string
+  started_at: string
+  completed_at: string | null
+}
+
+export interface CreateWarmUpPlanInput {
+  profile_id: string
+  region?: WarmUpRegion
+  target_platforms?: string[]
+  total_days?: number
+  fake_account_age_days?: number
+  /** If true, apply fake account-age backdating immediately to the profile row. */
+  apply_fake_age_now?: boolean
+}
+
+export interface WarmUpPlanProgress {
+  plan: WarmUpPlan
+  sessions: WarmUpSession[]
+  /** Day index 1..total_days the engine will run next (or null if complete). */
+  next_day: number | null
+  /** Whether the next session is due right now (based on schedule spacing). */
+  next_due: boolean
+}
+
 export interface ProfileGroup {
   id: string
   name: string

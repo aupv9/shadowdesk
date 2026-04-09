@@ -114,6 +114,25 @@ const api = {
   warmup: {
     run: (profileId: string, sites?: string[]) => ipcRenderer.invoke('profiles:warmUp', profileId, sites)
   },
+  // Smart Warm-Up Engine — 7-day organic ramp, fake account-age, interaction synthesis
+  smartWarmup: {
+    blueprint:    ()                                                    => ipcRenderer.invoke('smartWarmup:blueprint'),
+    list:         ()                                                    => ipcRenderer.invoke('smartWarmup:list'),
+    get:          (profileId: string)                                   => ipcRenderer.invoke('smartWarmup:get', profileId),
+    create:       (input: {
+      profile_id: string
+      region?: string
+      target_platforms?: string[]
+      total_days?: number
+      fake_account_age_days?: number
+      apply_fake_age_now?: boolean
+    })                                                                  => ipcRenderer.invoke('smartWarmup:create', input),
+    runNext:      (profileId: string)                                   => ipcRenderer.invoke('smartWarmup:runNext', profileId),
+    pause:        (profileId: string)                                   => ipcRenderer.invoke('smartWarmup:pause', profileId),
+    resume:       (profileId: string)                                   => ipcRenderer.invoke('smartWarmup:resume', profileId),
+    cancel:       (profileId: string)                                   => ipcRenderer.invoke('smartWarmup:cancel', profileId),
+    applyFakeAge: (profileId: string, days: number)                     => ipcRenderer.invoke('smartWarmup:applyFakeAge', profileId, days)
+  },
   drift: {
     setEnabled: (profileId: string, enabled: boolean) => ipcRenderer.invoke('profiles:setDrift', profileId, enabled),
     apply:      (profileId: string)                   => ipcRenderer.invoke('profiles:applyDrift', profileId)
