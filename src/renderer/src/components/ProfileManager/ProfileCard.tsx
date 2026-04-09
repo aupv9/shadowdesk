@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState } from 'react'
 import {
   Play, Square, Trash2, Monitor, Globe,
   Clock, Loader2, MoreVertical, Pencil, Copy,
@@ -6,6 +6,7 @@ import {
   Puzzle, Sparkles, Wand2, Database, CloudOff, Cloud
 } from 'lucide-react'
 import type { Profile } from '../../types'
+import { DropdownMenu } from '../UI/DropdownMenu'
 
 interface Props {
   profile:     Profile
@@ -58,19 +59,7 @@ export function ProfileCard({
     : 'Never'
 
   const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  // Close menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [menuOpen])
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   const menuItem = (icon: React.ReactNode, label: string, action: () => void, danger = false) => (
     <button
@@ -100,8 +89,9 @@ export function ProfileCard({
       )}
 
       {/* Overflow menu */}
-      <div className="absolute top-2.5 right-2.5" ref={menuRef}>
+      <div className="absolute top-2.5 right-2.5">
         <button
+          ref={triggerRef}
           onClick={() => setMenuOpen((v) => !v)}
           className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-700/50 hover:text-slate-300 transition-all duration-200 hover:shadow-md"
           aria-label="More options"
@@ -110,33 +100,31 @@ export function ProfileCard({
           <MoreVertical className="w-3.5 h-3.5" />
         </button>
 
-        {menuOpen && (
-          <div className="absolute right-0 top-8 z-20 w-44 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl shadow-black/50 p-1 animate-in fade-in zoom-in-95 duration-200">
-            {menuItem(<Pencil    className="w-3.5 h-3.5" />, 'Edit',           onEdit)}
-            {menuItem(<Copy      className="w-3.5 h-3.5" />, 'Clone',          onClone)}
-            {menuItem(<Cookie    className="w-3.5 h-3.5" />, 'Cookies...',     onImportCookies)}
-            {menuItem(<FolderOpen className="w-3.5 h-3.5" />, 'Export Cookies', onExportCookies)}
-            {menuItem(<Database  className="w-3.5 h-3.5" />, 'Storage...',     onStorage)}
-            <div className="divider-subtle my-1" />
-            {menuItem(<Puzzle    className="w-3.5 h-3.5" />, 'Extensions...',  onExtensions)}
-            {menuItem(<Sparkles  className="w-3.5 h-3.5" />, 'Warm Up...',     onWarmUp)}
-            {menuItem(<Wand2     className="w-3.5 h-3.5" />, 'Apply Drift',    onApplyDrift)}
-            <div className="divider-subtle my-1" />
-            {menuItem(<Download  className="w-3.5 h-3.5" />, 'Export Bundle',  onExportBundle)}
-            {menuItem(<Upload    className="w-3.5 h-3.5" />, 'Import Bundle',  onImportBundle)}
-            {menuItem(<History   className="w-3.5 h-3.5" />, 'Version History', onHistory)}
-            <div className="divider-subtle my-1" />
-            {menuItem(
-              syncExcluded
-                ? <Cloud    className="w-3.5 h-3.5" />
-                : <CloudOff className="w-3.5 h-3.5" />,
-              syncExcluded ? 'Include in Cloud Sync' : 'Exclude from Cloud Sync',
-              onToggleSyncExcluded
-            )}
-            <div className="border-t border-slate-700 my-1" />
-            {menuItem(<Trash2    className="w-3.5 h-3.5" />, 'Delete',         onDelete, true)}
-          </div>
-        )}
+        <DropdownMenu open={menuOpen} triggerRef={triggerRef} onClose={() => setMenuOpen(false)}>
+          {menuItem(<Pencil    className="w-3.5 h-3.5" />, 'Edit',           onEdit)}
+          {menuItem(<Copy      className="w-3.5 h-3.5" />, 'Clone',          onClone)}
+          {menuItem(<Cookie    className="w-3.5 h-3.5" />, 'Cookies...',     onImportCookies)}
+          {menuItem(<FolderOpen className="w-3.5 h-3.5" />, 'Export Cookies', onExportCookies)}
+          {menuItem(<Database  className="w-3.5 h-3.5" />, 'Storage...',     onStorage)}
+          <div className="divider-subtle my-1" />
+          {menuItem(<Puzzle    className="w-3.5 h-3.5" />, 'Extensions...',  onExtensions)}
+          {menuItem(<Sparkles  className="w-3.5 h-3.5" />, 'Warm Up...',     onWarmUp)}
+          {menuItem(<Wand2     className="w-3.5 h-3.5" />, 'Apply Drift',    onApplyDrift)}
+          <div className="divider-subtle my-1" />
+          {menuItem(<Download  className="w-3.5 h-3.5" />, 'Export Bundle',  onExportBundle)}
+          {menuItem(<Upload    className="w-3.5 h-3.5" />, 'Import Bundle',  onImportBundle)}
+          {menuItem(<History   className="w-3.5 h-3.5" />, 'Version History', onHistory)}
+          <div className="divider-subtle my-1" />
+          {menuItem(
+            syncExcluded
+              ? <Cloud    className="w-3.5 h-3.5" />
+              : <CloudOff className="w-3.5 h-3.5" />,
+            syncExcluded ? 'Include in Cloud Sync' : 'Exclude from Cloud Sync',
+            onToggleSyncExcluded
+          )}
+          <div className="border-t border-slate-700 my-1" />
+          {menuItem(<Trash2    className="w-3.5 h-3.5" />, 'Delete',         onDelete, true)}
+        </DropdownMenu>
       </div>
 
       {/* Header */}
