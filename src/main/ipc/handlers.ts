@@ -1289,7 +1289,8 @@ export function registerIpcHandlers(): void {
   const hydrateWorkflow = (row: any) => ({
     ...row,
     steps: JSON.parse(row.steps),
-    variables: row.variables ? JSON.parse(row.variables) : {}
+    variables: row.variables ? JSON.parse(row.variables) : {},
+    variableDefinitions: row.variable_definitions ? JSON.parse(row.variable_definitions) : undefined
   })
 
   ipcMain.handle('workflows:list', () => {
@@ -1310,7 +1311,8 @@ export function registerIpcHandlers(): void {
       name: input.name,
       description: input.description,
       steps: input.steps,
-      variables: input.variables
+      variables: input.variables,
+      variableDefinitions: input.variableDefinitions
     })
     return hydrateWorkflow(db.getWorkflow(id))
   })
@@ -1326,6 +1328,7 @@ export function registerIpcHandlers(): void {
         description: existing.description ?? '',
         steps: JSON.parse(existing.steps),
         variables: existing.variables ? JSON.parse(existing.variables) : undefined,
+        variableDefinitions: existing.variable_definitions ? JSON.parse(existing.variable_definitions) : undefined,
         label: `Auto-save ${new Date().toLocaleTimeString()}`
       })
     }
@@ -1436,6 +1439,7 @@ export function registerIpcHandlers(): void {
       description: row.description ?? '',
       steps: JSON.parse(row.steps),
       variables: row.variables ? JSON.parse(row.variables) : undefined,
+      variableDefinitions: row.variable_definitions ? JSON.parse(row.variable_definitions) : undefined,
       label: label ?? `Manual save ${new Date().toLocaleTimeString()}`
     })
     return db.getWorkflowVersion(id)
@@ -1454,12 +1458,14 @@ export function registerIpcHandlers(): void {
         description: current.description ?? '',
         steps: JSON.parse(current.steps),
         variables: current.variables ? JSON.parse(current.variables) : undefined,
+        variableDefinitions: current.variable_definitions ? JSON.parse(current.variable_definitions) : undefined,
         label: `Before restore ${new Date().toLocaleTimeString()}`
       })
     }
     db.updateWorkflow(version.workflow_id, {
       steps: version.steps,
-      variables: version.variables
+      variables: version.variables,
+      variableDefinitions: version.variableDefinitions
     })
     return hydrateWorkflow(db.getWorkflow(version.workflow_id))
   })

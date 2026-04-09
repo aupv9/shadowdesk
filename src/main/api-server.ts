@@ -166,7 +166,12 @@ export class ApiServer {
     // ── Workflows ──────────────────────────────────────────────────────
     if (path === '/api/workflows' && method === 'GET') {
       const rows = db.getAllWorkflows()
-      this.sendJson(res, 200, rows.map((r: any) => ({ ...r, steps: JSON.parse(r.steps) })))
+      this.sendJson(res, 200, rows.map((r: any) => ({
+        ...r,
+        steps: JSON.parse(r.steps),
+        variables: r.variables ? JSON.parse(r.variables) : {},
+        variableDefinitions: r.variable_definitions ? JSON.parse(r.variable_definitions) : undefined
+      })))
       return
     }
 
@@ -174,7 +179,12 @@ export class ApiServer {
     if (workflowMatch && method === 'GET') {
       const row = db.getWorkflow(workflowMatch[1])
       if (!row) { this.sendJson(res, 404, { error: 'Workflow not found' }); return }
-      this.sendJson(res, 200, { ...row, steps: JSON.parse(row.steps) })
+      this.sendJson(res, 200, {
+        ...row,
+        steps: JSON.parse(row.steps),
+        variables: row.variables ? JSON.parse(row.variables) : {},
+        variableDefinitions: row.variable_definitions ? JSON.parse(row.variable_definitions) : undefined
+      })
       return
     }
 

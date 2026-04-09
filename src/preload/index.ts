@@ -217,8 +217,8 @@ const api = {
   workflows: {
     list:      ()                                                     => ipcRenderer.invoke('workflows:list'),
     get:       (id: string)                                           => ipcRenderer.invoke('workflows:get', id),
-    create:    (input: { name: string; description?: string; steps: any[] }) => ipcRenderer.invoke('workflows:create', input),
-    update:    (id: string, data: { name?: string; description?: string; steps?: any[] }) => ipcRenderer.invoke('workflows:update', id, data),
+    create:    (input: { name: string; description?: string; steps: any[]; variables?: Record<string, string>; variableDefinitions?: any[] }) => ipcRenderer.invoke('workflows:create', input),
+    update:    (id: string, data: { name?: string; description?: string; steps?: any[]; variables?: Record<string, string>; variableDefinitions?: any[] }) => ipcRenderer.invoke('workflows:update', id, data),
     delete:    (id: string)                                           => ipcRenderer.invoke('workflows:delete', id),
     run:       (workflowId: string, profileId: string, variables?: Record<string, string>, opts?: { maxDurationMs?: number; screenshotOnFailureDir?: string }) => ipcRenderer.invoke('workflows:run', workflowId, profileId, variables, opts),
     runParallel: (workflowId: string, profileIds: string[], variables?: Record<string, string>, concurrency?: number) => ipcRenderer.invoke('workflows:runParallel', workflowId, profileIds, variables, concurrency),
