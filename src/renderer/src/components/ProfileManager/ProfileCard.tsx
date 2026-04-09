@@ -87,7 +87,7 @@ export function ProfileCard({
   )
 
   return (
-    <div className={`card group relative hover:border-slate-600 transition-all ${isActive ? 'border-ghost-600/50' : ''}`}>
+    <div className={`card group relative hover:border-slate-600 hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5 transition-all ${isActive ? 'border-ghost-600/50 bg-gradient-to-br from-slate-800 to-slate-800/60' : ''}`}>
       {/* Active indicator */}
       {isActive && (
         <div className="absolute top-3 right-10 flex items-center gap-1.5">
@@ -179,12 +179,13 @@ export function ProfileCard({
 
       {/* Meta */}
       <div className="flex items-center gap-4 text-xs text-slate-500 mb-4 flex-wrap">
-        {profile.proxy_label && (
-          <span className="flex items-center gap-1">
-            <Globe className="w-3 h-3" />
-            {profile.proxy_label}
-          </span>
-        )}
+        <span
+          className={`flex items-center gap-1 ${profile.proxy_label ? '' : 'text-orange-400/70'}`}
+          title={profile.proxy_label ? `Proxy: ${profile.proxy_label}` : 'No proxy assigned'}
+        >
+          <Globe className="w-3 h-3" />
+          {profile.proxy_label || 'No proxy'}
+        </span>
         <span className="flex items-center gap-1">
           <Monitor className="w-3 h-3" />
           {fp?.screen?.width}×{fp?.screen?.height}
