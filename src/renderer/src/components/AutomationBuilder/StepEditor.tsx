@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   ChevronDown,
   ChevronUp,
@@ -84,6 +84,19 @@ interface StepEditorProps {
   onDrop?: (e: React.DragEvent<HTMLDivElement>, targetIndex: number) => void
   /** Action type of the preceding step — used for smart suggestions in ActionBrowser */
   previousActionType?: AutomationActionType
+  /**
+   * Force-expand or collapse the step from the parent.
+   * When provided, user clicks still toggle locally but a change in this
+   * prop overrides the internal state — used by the Expand All / Collapse
+   * All toolbar buttons.
+   */
+  forceExpanded?: boolean
+  /**
+   * A monotonically increasing counter that re-applies `forceExpanded` even
+   * when its value hasn't changed. Lets the user bulk-collapse, manually
+   * reopen a few steps, then bulk-collapse again.
+   */
+  forceExpandTick?: number
 }
 
 function getDefaultParams(action: AutomationActionType): Record<string, any> {
@@ -167,9 +180,22 @@ export function StepEditor({
   onDragOver,
   onDragLeave,
   onDrop,
-  previousActionType
+  previousActionType,
+  forceExpanded,
+  forceExpandTick
 }: StepEditorProps) {
   const [expanded, setExpanded] = useState(false)
+
+  // Honor parent-driven expand/collapse (the Expand All / Collapse All toolbar
+  // buttons). We still let the user toggle individual steps locally after
+  // the parent has pushed an initial state. The tick dep re-applies the same
+  // value so back-to-back bulk actions still override manual toggles.
+  useEffect(() => {
+    if (forceExpanded !== undefined) {
+      setExpanded(forceExpanded)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceExpanded, forceExpandTick])
   const [showRetry, setShowRetry] = useState(false)
   const [showActionBrowser, setShowActionBrowser] = useState(false)
   const [showSelectorHelper, setShowSelectorHelper] = useState(false)
