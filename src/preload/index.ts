@@ -299,7 +299,30 @@ const api = {
       const handler = (_event: any, data: any) => cb(data)
       ipcRenderer.on('automation:step-progress', handler)
       return () => { ipcRenderer.removeListener('automation:step-progress', handler) }
+    },
+    /** Subscribe to pre-flight validator results emitted just before a
+     *  workflow starts executing. Phase 17.H. */
+    onPreFlight: (cb: (result: any) => void): (() => void) => {
+      const handler = (_event: any, data: any) => cb(data)
+      ipcRenderer.on('automation:pre-flight', handler)
+      return () => { ipcRenderer.removeListener('automation:pre-flight', handler) }
+    },
+    /** Subscribe to live-adjustment events emitted when a runtime signal
+     *  indicates the target is challenging the session. Phase 17.H. */
+    onLiveAdjustment: (cb: (event: any) => void): (() => void) => {
+      const handler = (_event: any, data: any) => cb(data)
+      ipcRenderer.on('automation:live-adjustment', handler)
+      return () => { ipcRenderer.removeListener('automation:live-adjustment', handler) }
     }
+  },
+  // Phase 17.H — Platform-Specific Detection Hardening
+  hardener: {
+    validate:        (workflowId: string, profileId: string)    => ipcRenderer.invoke('hardener:validate', workflowId, profileId),
+    detectPlatform:  (url: string)                               => ipcRenderer.invoke('hardener:detectPlatform', url),
+    tuningHints:     ()                                          => ipcRenderer.invoke('hardener:tuningHints'),
+    tuningHint:      (platformId: string)                        => ipcRenderer.invoke('hardener:tuningHint', platformId),
+    applyFix:        (profileId: string, fix: unknown)           => ipcRenderer.invoke('hardener:applyFix', profileId, fix),
+    analyzeSignal:   (signal: unknown)                           => ipcRenderer.invoke('hardener:analyzeSignal', signal)
   },
   apiServer: {
     status: ()                                                         => ipcRenderer.invoke('apiServer:status'),
@@ -383,6 +406,18 @@ const api = {
     // 16.D — Behaviour Pattern Library
     behaviorArchetypes:  ()                                                                => ipcRenderer.invoke('ai:behaviorArchetypes'),
     behaviorArchetype:   (id: string)                                                      => ipcRenderer.invoke('ai:behaviorArchetype', id)
+  },
+
+  // Phase 21 — Behavior Correlation Detector
+  correlation: {
+    scan:          (options?: { threshold?: number; profileIds?: string[]; persist?: boolean }) =>
+      ipcRenderer.invoke('correlation:scan', options),
+    history:       (limit?: number)             => ipcRenderer.invoke('correlation:history', limit),
+    get:           (id: string)                 => ipcRenderer.invoke('correlation:get', id),
+    delete:        (id: string)                 => ipcRenderer.invoke('correlation:delete', id),
+    recordSample:  (profileId: string, sample: Record<string, any>, sessionId?: string) =>
+      ipcRenderer.invoke('correlation:recordSample', profileId, sample, sessionId),
+    clearSamples:  (profileId: string)          => ipcRenderer.invoke('correlation:clearSamples', profileId),
   },
 
   // Phase 2.3 — Cleanup Worker

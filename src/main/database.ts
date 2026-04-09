@@ -490,6 +490,127 @@ export class Database {
       );
       CREATE INDEX IF NOT EXISTS idx_proxy_provider_accounts_type ON proxy_provider_accounts(type);
     `)
+
+    // Phase 21 — Behavior Correlation Detector
+    //
+    // Two tables:
+    //   behavior_samples — raw typing/mouse/scroll sample rows collected from
+    //                      live sessions (P3 session-tracker integration).
+    //   behavior_correlation_reports — persisted scan results shown in the
+    //                      Behavior Correlation dashboard so users can review
+    //                      historical alerts and track trends over time.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS behavior_samples (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        session_id TEXT,
+        recorded_at TEXT DEFAULT (datetime('now')),
+        sample_json TEXT NOT NULL,
+        FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_behavior_samples_profile ON behavior_samples(profile_id);
+      CREATE INDEX IF NOT EXISTS idx_behavior_samples_recorded ON behavior_samples(recorded_at);
+
+      CREATE TABLE IF NOT EXISTS behavior_correlation_reports (
+        id TEXT PRIMARY KEY,
+        scanned_at TEXT DEFAULT (datetime('now')),
+        threshold REAL NOT NULL DEFAULT 0.85,
+        profile_count INTEGER NOT NULL DEFAULT 0,
+        pairs_evaluated INTEGER NOT NULL DEFAULT 0,
+        high_risk_count INTEGER NOT NULL DEFAULT 0,
+        medium_risk_count INTEGER NOT NULL DEFAULT 0,
+        report_json TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_behavior_correlation_scanned
+        ON behavior_correlation_reports(scanned_at);
+    `)
+  }
+
+  // ── Behavior Correlation Detector (Phase 21) ─────────────────────────────
+
+  /** Insert a raw behavior sample captured from a live session. */
+  addBehaviorSample(s: {
+    id: string
+    profile_id: string
+    session_id?: string | null
+    sample_json: string
+  }): void {
+    this.run(
+      `INSERT INTO behavior_samples (id, profile_id, session_id, sample_json)
+       VALUES (?, ?, ?, ?)`,
+      [s.id, s.profile_id, s.session_id ?? null, s.sample_json]
+    )
+  }
+
+  /**
+   * Return the most recent behavior samples for a single profile, newest
+   * first. Used by the correlation detector to build the profile centroid.
+   */
+  getBehaviorSamples(profileId: string, limit: number = 20): any[] {
+    return this.queryAll(
+      `SELECT * FROM behavior_samples
+       WHERE profile_id = ?
+       ORDER BY recorded_at DESC
+       LIMIT ?`,
+      [profileId, limit]
+    )
+  }
+
+  /** Clear all samples for a profile — used when the user rotates behaviour. */
+  clearBehaviorSamples(profileId: string): void {
+    this.run('DELETE FROM behavior_samples WHERE profile_id = ?', [profileId])
+  }
+
+  /** Persist a correlation scan report so the UI can show history. */
+  addBehaviorCorrelationReport(r: {
+    id: string
+    threshold: number
+    profile_count: number
+    pairs_evaluated: number
+    high_risk_count: number
+    medium_risk_count: number
+    report_json: string
+  }): void {
+    this.run(
+      `INSERT INTO behavior_correlation_reports
+         (id, threshold, profile_count, pairs_evaluated,
+          high_risk_count, medium_risk_count, report_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        r.id,
+        r.threshold,
+        r.profile_count,
+        r.pairs_evaluated,
+        r.high_risk_count,
+        r.medium_risk_count,
+        r.report_json,
+      ]
+    )
+  }
+
+  /** List the most recent N correlation reports for the history view. */
+  listBehaviorCorrelationReports(limit: number = 25): any[] {
+    return this.queryAll(
+      `SELECT id, scanned_at, threshold, profile_count, pairs_evaluated,
+              high_risk_count, medium_risk_count
+       FROM behavior_correlation_reports
+       ORDER BY scanned_at DESC
+       LIMIT ?`,
+      [limit]
+    )
+  }
+
+  /** Fetch the full persisted JSON of a single correlation report. */
+  getBehaviorCorrelationReport(id: string): any {
+    return this.queryOne(
+      `SELECT * FROM behavior_correlation_reports WHERE id = ?`,
+      [id]
+    )
+  }
+
+  /** Delete a stored correlation report. */
+  deleteBehaviorCorrelationReport(id: string): void {
+    this.run('DELETE FROM behavior_correlation_reports WHERE id = ?', [id])
   }
 
   // ── Vault meta (Phase 12.C.3) ────────────────────────────────────────────

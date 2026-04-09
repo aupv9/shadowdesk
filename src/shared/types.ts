@@ -974,10 +974,106 @@ export type WorkflowHookEvent =
   | 'before-workflow'
   | 'after-workflow'
   | 'step-error'
+  // Phase 17.H — Platform-Specific Detection Hardening
+  | 'pre-flight-validation'
+  | 'live-adjustment'
 
 export interface WorkflowHook {
   event: WorkflowHookEvent
   handler: (data: any) => void | Promise<void>
+}
+
+// ─── Phase 17.H — Platform-Specific Detection Hardening ────────────────────
+//
+// The pre-flight validator inspects a workflow + profile BEFORE execution and
+// surfaces platform-specific tuning recommendations. When a challenge is
+// encountered during execution (CAPTCHA, rate-limit, slider), the live
+// adjustment engine can emit updated tuning hints so the UI can react.
+
+export type HardenerSeverity = 'info' | 'warning' | 'critical'
+
+export interface HardenerIssue {
+  /** Stable id — `missing-behavior`, `preset-mismatch`, `timing-weak`, etc. */
+  code: string
+  severity: HardenerSeverity
+  /** One-line human-readable message shown in the pre-flight card */
+  message: string
+  /** Optional longer explanation + rationale for the recommendation */
+  detail?: string
+  /** When present, the renderer shows a "Fix it" button that applies the
+   *  recommended config patch (merged into the profile fingerprint). */
+  suggestedFix?: HardenerFix
+}
+
+export interface HardenerFix {
+  /** Human-readable summary of what the fix will change */
+  label: string
+  /** BehaviorConfig fields to merge into profile.fingerprint.behavior */
+  behavior?: Partial<BehaviorConfig>
+  /** TimingConfig fields to merge into profile.fingerprint.timing */
+  timing?: Partial<TimingConfig>
+  /** Apply a full behavior preset by id — takes precedence over partials */
+  applyPreset?: BehaviorPresetId
+  /** Switch the profile to a fingerprint preset (e.g. 'android-pixel-chrome121') */
+  applyFingerprintPreset?: string
+}
+
+/** A tuning hint tailored for a specific SEA platform. */
+export interface PlatformTuningHint {
+  /** Platform id from SEA_PLATFORMS catalog, or `generic` if unknown */
+  platformId: string
+  platformName: string
+  /** When the target URL matched a regional URL, the ISO-3166 country code */
+  detectedRegion?: string
+  /** Short rationale shown at the top of the validator card */
+  summary: string
+  /** Recommended behavior preset id the profile should use */
+  recommendedBehaviorPreset: BehaviorPresetId
+  /** Ideal behavior config values (mouse jitter, scroll inertia, typing) */
+  recommendedBehavior: BehaviorConfig
+  /** Ideal timing config values (rAF jitter, date precision, etc.) */
+  recommendedTiming: TimingConfig
+  /** Recommended fingerprint preset keys for this platform */
+  recommendedFingerprintPresets: string[]
+  /** Free-form tuning tips shown as bullet points in the UI */
+  tips: string[]
+}
+
+/** Full result of the pre-flight validation. */
+export interface PreFlightValidationResult {
+  workflowId: string
+  profileId: string
+  profileName: string
+  /** ISO timestamp when the validation ran */
+  validatedAt: string
+  /** Detected platform (or null when none matched) */
+  platform: PlatformTuningHint | null
+  /** Extracted target URL used for platform detection, if any */
+  targetUrl?: string
+  /** Overall verdict — "ready" = no warnings, "warn" = at least one
+   *  warning, "block" = a critical issue must be fixed before running */
+  verdict: 'ready' | 'warn' | 'block'
+  /** All issues found, sorted by severity (critical → warning → info) */
+  issues: HardenerIssue[]
+  /** Snapshot of the profile's current behavior/timing config, for diffing */
+  currentBehavior?: BehaviorConfig
+  currentTiming?: TimingConfig
+}
+
+/** Payload emitted by the live-adjustment engine while a workflow runs. */
+export interface LiveAdjustmentEvent {
+  workflowId: string
+  profileId: string
+  /** ISO timestamp when the challenge was observed */
+  observedAt: string
+  /** `captcha`, `slider`, `rate-limit`, `step-error`, `selector-miss`… */
+  challengeKind: string
+  /** Short human-readable description of what was detected */
+  description: string
+  /** Recommended fix the renderer can apply in one click */
+  suggestedFix: HardenerFix
+  /** Whether the fix has already been auto-applied by the engine */
+  autoApplied: boolean
 }
 
 export type AssertType =
@@ -1470,4 +1566,120 @@ export interface CleanupWorkerStatus {
   processing: number
   failed: number
   total: number
+}
+
+// ─── Phase 21 — Behavior Correlation Detector ────────────────────────────────
+//
+// Identifies when two or more profiles share a behavioral fingerprint so
+// similar that a sophisticated detector could cluster them as the same
+// operator. Uses typing cadence (WPM + variance), mouse velocity/jitter,
+// scroll speed/pause timing and composite features to compute pairwise
+// similarity between profiles. Similarities above a configurable threshold
+// surface as alerts with remediation recommendations.
+
+/**
+ * A single behavioral fingerprint sample for one profile.
+ * Samples are aggregated across sessions into a profile-level centroid.
+ */
+export interface BehaviorSample {
+  /** Typing speed (words per minute). */
+  typingWpm: number
+  /** Std-dev % between keystrokes (0-100, higher = more human). */
+  typingVariance: number
+  /** Gaussian sigma applied to pointer jitter (px). */
+  mouseJitterSigma: number
+  /** Avg pointer velocity in px/ms. */
+  mouseVelocityAvg: number
+  /** Direction reversals per 100 pointer events. */
+  mouseDirectionChanges: number
+  /** Avg scroll speed in px/ms. */
+  scrollSpeedAvg: number
+  /** Scroll inertia decay multiplier (0.7 – 0.98). */
+  scrollDecay: number
+  /** Pauses per 100 scroll events. */
+  scrollPauseRate: number
+  /** Archetype id (if archetype was applied). */
+  archetypeId?: string | null
+}
+
+/**
+ * Per-profile aggregated behavior fingerprint. Derived from the profile's
+ * BehaviorConfig + any collected session metrics. This is what we use to
+ * compute pairwise similarity — it is NOT stored per-session.
+ */
+export interface ProfileBehaviorFingerprint {
+  profileId: string
+  profileName: string
+  archetypeId?: string | null
+  archetypeName?: string | null
+  /** ISO timestamp when the centroid was last recomputed. */
+  computedAt: string
+  sample: BehaviorSample
+  /** Number of samples that went into the centroid. */
+  sampleCount: number
+}
+
+/**
+ * A single correlation between two profiles. Stored in the
+ * `behavior_correlations` table so users can review history.
+ */
+export interface BehaviorCorrelationPair {
+  id: string
+  profileAId: string
+  profileAName: string
+  profileBId: string
+  profileBName: string
+  /** 0.0 – 1.0, where 1.0 = identical behavioral fingerprint. */
+  similarity: number
+  /** Percentage form (0 – 100) for display convenience. */
+  similarityPercent: number
+  /** Risk bucket based on similarity (low / medium / high). */
+  risk: 'low' | 'medium' | 'high'
+  /** Per-feature contributions so the UI can explain "why". */
+  featureContributions: {
+    typing: number
+    mouse: number
+    scroll: number
+  }
+  /** Actionable suggestions for the user. */
+  recommendations: string[]
+  /** When this correlation was computed. */
+  computedAt: string
+}
+
+/**
+ * Report returned from the detector — includes the full list of pairs,
+ * aggregate statistics and the threshold that was applied.
+ */
+export interface BehaviorCorrelationReport {
+  /** ISO timestamp when the scan ran. */
+  scannedAt: string
+  /** Similarity threshold used for the "alert" cut-off (0.0 – 1.0). */
+  threshold: number
+  /** Number of profiles included in the scan. */
+  profileCount: number
+  /** Total pairs evaluated (n * (n - 1) / 2). */
+  pairsEvaluated: number
+  /** All pairs above the threshold, sorted by similarity desc. */
+  alerts: BehaviorCorrelationPair[]
+  /** Count of high-risk alerts (similarity >= 0.90). */
+  highRiskCount: number
+  /** Count of medium-risk alerts (0.85 <= similarity < 0.90). */
+  mediumRiskCount: number
+  /** Global recommendations covering the whole pool. */
+  globalRecommendations: string[]
+  /** Archetype usage histogram — key is archetype id or "none". */
+  archetypeUsage: Record<string, number>
+  /** Profile fingerprints that were scored (for diagnostics in the UI). */
+  fingerprints: ProfileBehaviorFingerprint[]
+}
+
+/** Options accepted by the detector when running a scan. */
+export interface BehaviorCorrelationOptions {
+  /** Similarity threshold below which pairs are ignored (default 0.85). */
+  threshold?: number
+  /** If set, only these profile ids are scanned. */
+  profileIds?: string[]
+  /** If true, persists the report to the database (default true). */
+  persist?: boolean
 }

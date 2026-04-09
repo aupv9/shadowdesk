@@ -104,7 +104,20 @@ export type {
   ProxyProviderUsage,
   ProxyProviderTestResult,
   ProxyGenerationOptions,
-  GeneratedProxy
+  GeneratedProxy,
+  // Phase 17.H — Platform-Specific Detection Hardening
+  HardenerSeverity,
+  HardenerIssue,
+  HardenerFix,
+  PlatformTuningHint,
+  PreFlightValidationResult,
+  LiveAdjustmentEvent,
+  // Phase 21 — Behavior Correlation Detector
+  BehaviorSample,
+  ProfileBehaviorFingerprint,
+  BehaviorCorrelationPair,
+  BehaviorCorrelationReport,
+  BehaviorCorrelationOptions
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
@@ -127,6 +140,7 @@ export type NavSection =
   | 'ai'
   | 'sea-platforms'  // Phase 17 — SEA Platform Templates
   | 'smart-warmup'   // Smart Warm-Up Engine (7-day ramp)
+  | 'correlation'    // Phase 21 — Behavior Correlation Detector
 
 export interface Toast {
   id: string

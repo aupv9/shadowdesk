@@ -12,6 +12,8 @@ import { resolveFingerprint, FINGERPRINT_PRESETS } from '../fingerprint/presets'
 import { getBehaviorPresets } from '../fingerprint/behavior-presets'
 import { getTemplates, getTemplate } from '../workflow-templates'
 import { getSeaPlatforms, getSeaPlatform, getSeaPlatformTemplates, getSeaRegions } from '../sea-platforms'
+// Phase 17.H — Platform-Specific Detection Hardening (pre-flight validator)
+import * as platformHardener from '../platform-hardener'
 import { getSettings, updateSettings } from '../settings'
 import { downloadUpdate, installUpdate } from '../auto-updater'
 import {
@@ -57,6 +59,16 @@ import {
   analyzeDetection, healSelector,
   getBehaviorArchetypes, getBehaviorArchetype
 } from '../ai-assistant'
+// Phase 21 — Behavior Correlation Detector
+import {
+  runCorrelationScan,
+  listCorrelationReports,
+  getCorrelationReport,
+  deleteCorrelationReport,
+  recordBehaviorSample,
+  clearBehaviorSamplesForProfile,
+} from '../behavior-correlation-service'
+import type { BehaviorCorrelationOptions, BehaviorSample } from '../../shared/types'
 import { ScriptAnalyzer } from '../script-analyzer'
 import { RecordingRefiner } from '../recording-refiner'
 import { getProxyProviderManager } from '../proxy-providers/provider-manager'
@@ -1507,6 +1519,46 @@ export function registerIpcHandlers(): void {
     return { subscribed: true, event }
   })
 
+  // ── Phase 17.H: Platform-Specific Detection Hardening ──────────────────
+
+  ipcMain.handle('hardener:validate', (_event, workflowId: string, profileId: string) => {
+    return platformHardener.validatePreFlightById(workflowId, profileId)
+  })
+
+  ipcMain.handle('hardener:detectPlatform', (_event, url: string) => {
+    return platformHardener.detectPlatformFromUrl(url)
+  })
+
+  ipcMain.handle('hardener:tuningHints', () => {
+    return platformHardener.getAllTuningHints()
+  })
+
+  ipcMain.handle('hardener:tuningHint', (_event, platformId: string) => {
+    return platformHardener.buildTuningHint(platformId)
+  })
+
+  /** Merge a HardenerFix into the profile's fingerprint and persist via
+   *  the existing profiles:update pipeline. The renderer uses this from
+   *  the pre-flight validator card's "Apply fix" buttons so a single
+   *  round-trip mutates the profile and returns the updated row. */
+  ipcMain.handle('hardener:applyFix', (_event, profileId: string, fix: unknown) => {
+    const row: any = db.getProfile(profileId)
+    if (!row) throw new NotFoundError(`Profile ${profileId} not found`)
+    const currentFp = typeof row.fingerprint === 'string'
+      ? JSON.parse(row.fingerprint)
+      : row.fingerprint
+    const patched = platformHardener.applyFix(currentFp, fix as any)
+    db.updateProfile(profileId, { fingerprint: JSON.stringify(patched) })
+    markPendingChange()
+    return db.getProfile(profileId)
+  })
+
+  /** Analyze an ad-hoc runtime signal (used from the renderer when a
+   *  user-triggered CAPTCHA page is detected via the DOM inspector). */
+  ipcMain.handle('hardener:analyzeSignal', (_event, signal: unknown) => {
+    return platformHardener.analyzeRuntimeSignal(signal as any)
+  })
+
   // ── Schedules (Phase 10.2) ────────────────────────────────────────────────
 
   const scheduler = WorkflowScheduler.getInstance()
@@ -1886,6 +1938,40 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ai:behaviorArchetypes', () => getBehaviorArchetypes())
 
   ipcMain.handle('ai:behaviorArchetype', (_e, id: string) => getBehaviorArchetype(id))
+
+  // ── Phase 21 — Behavior Correlation Detector ──────────────────────────────
+
+  ipcMain.handle('correlation:scan', (_e, options?: BehaviorCorrelationOptions) =>
+    runCorrelationScan(options ?? {})
+  )
+
+  ipcMain.handle('correlation:history', (_e, limit?: number) =>
+    listCorrelationReports(limit ?? 25)
+  )
+
+  ipcMain.handle('correlation:get', (_e, id: string) => {
+    const report = getCorrelationReport(id)
+    if (!report) throw new Error(`Correlation report ${id} not found`)
+    return report
+  })
+
+  ipcMain.handle('correlation:delete', (_e, id: string) => {
+    deleteCorrelationReport(id)
+    return { success: true }
+  })
+
+  ipcMain.handle(
+    'correlation:recordSample',
+    (_e, profileId: string, sample: BehaviorSample, sessionId?: string) => {
+      recordBehaviorSample(profileId, sample, sessionId)
+      return { success: true }
+    }
+  )
+
+  ipcMain.handle('correlation:clearSamples', (_e, profileId: string) => {
+    clearBehaviorSamplesForProfile(profileId)
+    return { success: true }
+  })
 
   // ── Phase 17 — Script-to-Workflow (Recording Analysis & Refinement) ────────
 
