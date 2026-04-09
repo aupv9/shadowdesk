@@ -731,6 +731,28 @@ export interface SyncDiff {
   remote_count: number
 }
 
+// ─── Typed Variables (Phase 1 — Workflow Gaps) ──────────────────────────────
+
+/** Supported variable types for the automation engine typed-variable system. */
+export type VariableType = 'string' | 'number' | 'boolean' | 'array' | 'object'
+
+/** Declaration for a workflow variable — defines its name, type, and default. */
+export interface VariableDefinition {
+  name: string
+  type: VariableType
+  description?: string
+  default?: any
+  required?: boolean
+}
+
+/** A runtime typed variable holding a value and its type metadata. */
+export interface TypedVariable {
+  value: any
+  type: VariableType
+  /** The step ID that last wrote this variable. */
+  sourceStep?: string
+}
+
 // ─── Automation / RPA Types ─────────────────────────────────────────────────
 
 export type AutomationActionType =
@@ -832,6 +854,9 @@ export interface AutomationStep {
   /** Tier 7: Per-step timeout (ms). When set, the action is racing against
    *  this timer and will be marked failed if it exceeds. */
   timeoutMs?: number
+  /** Phase 1 Typed Variables: Explicitly declare the output type of saveAs.
+   *  When omitted, the engine infers the type from the action & value. */
+  saveAsType?: VariableType
   // For conditional: { conditionType?, selector, expected?, script?, thenSteps, elseSteps }
   // For loop: { times: number, steps: AutomationStep[] }
   // For tryCatch: { tryBlock: AutomationStep[], catchBlock: AutomationStep[], finallyBlock?: AutomationStep[], errorPrefix?: string }
@@ -847,7 +872,10 @@ export interface AutomationWorkflow {
   name: string
   description?: string
   steps: AutomationStep[]
+  /** Legacy string-only variables (backward compatible). */
   variables?: Record<string, string>
+  /** Phase 1 Typed Variables: optional declarations for variable names, types, defaults. */
+  variableDefinitions?: VariableDefinition[]
   created_at: string
   updated_at: string
 }
@@ -859,6 +887,8 @@ export interface AutomationStepResult {
   duration_ms: number
   output?: any
   error?: string
+  /** Phase 1 Typed Variables: variables written by this step with their types. */
+  savedVariables?: Record<string, { value: any; type: VariableType }>
 }
 
 export interface AutomationRunResult {
@@ -876,6 +906,7 @@ export interface CreateWorkflowInput {
   description?: string
   steps: AutomationStep[]
   variables?: Record<string, string>
+  variableDefinitions?: VariableDefinition[]
 }
 
 export interface UpdateWorkflowInput {
@@ -883,6 +914,7 @@ export interface UpdateWorkflowInput {
   description?: string
   steps?: AutomationStep[]
   variables?: Record<string, string>
+  variableDefinitions?: VariableDefinition[]
 }
 
 // ─── Automation API Server Types ───────────────────────────────────────────

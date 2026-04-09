@@ -11,7 +11,10 @@ import type {
   AutomationWorkflow,
   AssertResult,
   AssertType,
-  PreFlightValidationResult
+  PreFlightValidationResult,
+  VariableType,
+  VariableDefinition,
+  TypedVariable
 } from '../shared/types'
 import { validatePreFlight, analyzeRuntimeSignal } from './platform-hardener'
 import type { Page, ElementHandle } from 'puppeteer-core'
@@ -150,6 +153,218 @@ function interpolateParams(
   return JSON.parse(
     JSON.stringify(params).replace(/\{([\w.]+)\}/g, (_, k) => vars[k] ?? `{${k}}`)
   )
+}
+
+// ─── Phase 1 Typed Variables — Runtime Utilities ─────────────────────────────
+
+/**
+ * Infer the VariableType from a raw JavaScript value.
+ * Used as fallback when no explicit saveAsType or VariableDefinition exists.
+ */
+export function inferVariableType(value: any): VariableType {
+  if (value === null || value === undefined) return 'string'
+  if (typeof value === 'boolean') return 'boolean'
+  if (typeof value === 'number' && Number.isFinite(value)) return 'number'
+  if (Array.isArray(value)) return 'array'
+  if (typeof value === 'object') return 'object'
+  // For strings: try to detect JSON arrays/objects
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if ((trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+        (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) return 'array'
+        if (typeof parsed === 'object' && parsed !== null) return 'object'
+      } catch { /* not valid JSON */ }
+    }
+    // Detect numbers stored as strings (from extractText, etc.)
+    if (/^-?\d+(\.\d+)?$/.test(trimmed) && trimmed.length > 0) return 'number'
+  }
+  return 'string'
+}
+
+/**
+ * Coerce a value to the target VariableType. Returns the coerced value.
+ * Throws only if coercion is impossible (e.g. non-numeric string → number).
+ */
+export function coerceVariable(value: any, targetType: VariableType): any {
+  if (value === null || value === undefined) {
+    switch (targetType) {
+      case 'string': return ''
+      case 'number': return 0
+      case 'boolean': return false
+      case 'array': return []
+      case 'object': return {}
+    }
+  }
+
+  switch (targetType) {
+    case 'string':
+      if (typeof value === 'string') return value
+      if (typeof value === 'object') return JSON.stringify(value)
+      return String(value)
+
+    case 'number': {
+      if (typeof value === 'number') return value
+      const n = Number(value)
+      if (Number.isFinite(n)) return n
+      // Try parsing from JSON string
+      if (typeof value === 'string') {
+        const trimmed = value.trim()
+        const parsed = Number(trimmed)
+        if (Number.isFinite(parsed)) return parsed
+      }
+      return 0  // safe fallback — no throw so workflows don't break
+    }
+
+    case 'boolean':
+      if (typeof value === 'boolean') return value
+      if (typeof value === 'string') {
+        const lower = value.toLowerCase().trim()
+        return lower === 'true' || lower === '1' || lower === 'yes'
+      }
+      return !!value
+
+    case 'array':
+      if (Array.isArray(value)) return value
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value)
+          if (Array.isArray(parsed)) return parsed
+        } catch { /* fall through */ }
+        return [value]  // wrap scalar in array
+      }
+      return [value]
+
+    case 'object':
+      if (typeof value === 'object' && !Array.isArray(value)) return value
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value)
+          if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) return parsed
+        } catch { /* fall through */ }
+      }
+      return { value }  // wrap in object
+
+    default:
+      return value
+  }
+}
+
+/**
+ * Convert a TypedVariable map to the legacy Record<string, string> format.
+ * All values are stringified for backward compatibility with interpolateParams.
+ */
+export function typedVarsToStringMap(typedVars: Map<string, TypedVariable>): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const [key, tv] of typedVars) {
+    if (tv.value === null || tv.value === undefined) {
+      result[key] = ''
+    } else if (typeof tv.value === 'string') {
+      result[key] = tv.value
+    } else {
+      result[key] = JSON.stringify(tv.value)
+    }
+  }
+  return result
+}
+
+/**
+ * Initialize typed variables from workflow definitions, legacy variables, and runtime overrides.
+ * Returns both the TypedVariable map and the string map for interpolation.
+ */
+export function initializeTypedVariables(
+  definitions: VariableDefinition[] | undefined,
+  legacyVars: Record<string, string> | undefined,
+  runtimeVars: Record<string, string> | undefined,
+  builtIns: Record<string, string>
+): { typedVars: Map<string, TypedVariable>; stringVars: Record<string, string> } {
+  const typedVars = new Map<string, TypedVariable>()
+
+  // 1. Apply defaults from definitions
+  if (definitions) {
+    for (const def of definitions) {
+      if (def.default !== undefined) {
+        typedVars.set(def.name, {
+          value: coerceVariable(def.default, def.type),
+          type: def.type
+        })
+      } else if (def.required) {
+        // Set type-appropriate empty default for required vars
+        typedVars.set(def.name, {
+          value: coerceVariable(null, def.type),
+          type: def.type
+        })
+      }
+    }
+  }
+
+  // 2. Override with legacy string variables (backward compatible)
+  if (legacyVars) {
+    for (const [key, val] of Object.entries(legacyVars)) {
+      const def = definitions?.find(d => d.name === key)
+      const type = def?.type ?? 'string'
+      typedVars.set(key, {
+        value: def ? coerceVariable(val, type) : val,
+        type
+      })
+    }
+  }
+
+  // 3. Override with runtime variables
+  if (runtimeVars) {
+    for (const [key, val] of Object.entries(runtimeVars)) {
+      const def = definitions?.find(d => d.name === key)
+      const type = def?.type ?? 'string'
+      typedVars.set(key, {
+        value: def ? coerceVariable(val, type) : val,
+        type
+      })
+    }
+  }
+
+  // 4. Add built-in variables (always string type)
+  for (const [key, val] of Object.entries(builtIns)) {
+    if (!typedVars.has(key)) {
+      typedVars.set(key, { value: val, type: 'string' })
+    }
+  }
+
+  // Generate the string map for interpolation
+  const stringVars = typedVarsToStringMap(typedVars)
+
+  return { typedVars, stringVars }
+}
+
+/**
+ * Set a typed variable from a step's saveAs output. Infers type from the value
+ * and step's saveAsType hint, or falls back to the workflow's VariableDefinition.
+ */
+export function setTypedVariable(
+  typedVars: Map<string, TypedVariable>,
+  stringVars: Record<string, string>,
+  name: string,
+  value: any,
+  stepId: string,
+  saveAsType?: VariableType,
+  definitions?: VariableDefinition[]
+): void {
+  // Determine the target type: explicit saveAsType > definition > inferred
+  const def = definitions?.find(d => d.name === name)
+  const targetType = saveAsType ?? def?.type ?? inferVariableType(value)
+
+  const coerced = coerceVariable(value, targetType)
+  typedVars.set(name, { value: coerced, type: targetType, sourceStep: stepId })
+
+  // Update string map for interpolation backward compatibility
+  if (coerced === null || coerced === undefined) {
+    stringVars[name] = ''
+  } else if (typeof coerced === 'string') {
+    stringVars[name] = coerced
+  } else {
+    stringVars[name] = JSON.stringify(coerced)
+  }
 }
 
 /**
@@ -463,7 +678,8 @@ export class AutomationEngine {
     const workflow: AutomationWorkflow = {
       ...workflowRow,
       steps: JSON.parse(workflowRow.steps),
-      variables: workflowRow.variables ? JSON.parse(workflowRow.variables) : undefined
+      variables: workflowRow.variables ? JSON.parse(workflowRow.variables) : undefined,
+      variableDefinitions: workflowRow.variable_definitions ? JSON.parse(workflowRow.variable_definitions) : undefined
     }
 
     // Phase 18.1: Pre-flight validation of regex patterns
@@ -516,16 +732,19 @@ export class AutomationEngine {
       }
     }
 
-    // Merge stored variables with runtime overrides, then inject built-in variables
-    const variables: Record<string, string> = {
-      ...(workflow.variables ?? {}),
-      ...(runtimeVars ?? {}),
-      // Built-in read-only variables (user-defined vars override these if same key)
+    // Phase 1 Typed Variables: Initialize with definitions, legacy vars, runtime overrides, and built-ins
+    const builtIns: Record<string, string> = {
       timestamp: new Date().toISOString(),
       runId: `${workflowId}:${profileId}`,
       random: Math.random().toString(36).slice(2),
       profileName
     }
+    const { typedVars, stringVars: variables } = initializeTypedVariables(
+      workflow.variableDefinitions,
+      workflow.variables,
+      runtimeVars,
+      builtIns
+    )
 
     if (!bm.isRunning(profileId)) {
       throw new Error('Profile must be launched before running automation')
@@ -579,7 +798,7 @@ export class AutomationEngine {
       // Variables are interpolated lazily per-step (not upfront), so actions
       // like `solveCaptcha` can write into the map and have subsequent steps
       // pick up the new values via {captchaToken}-style placeholders.
-      const result = await this.executeSteps(page, workflow.steps, control, stepResults, variables, webContents, workflowId, profileId, runKey)
+      const result = await this.executeSteps(page, workflow.steps, control, stepResults, variables, webContents, workflowId, profileId, runKey, typedVars, workflow.variableDefinitions)
       if (result === 'stopped') status = 'stopped'
       else if (result === 'failed') {
         status = 'failed'
@@ -762,13 +981,29 @@ export class AutomationEngine {
 
     const steps: AutomationStep[] = JSON.parse(row.steps)
     const storedVars: Record<string, string> = row.variables ? JSON.parse(row.variables) : {}
+    const varDefs: VariableDefinition[] = row.variable_definitions ? JSON.parse(row.variable_definitions) : []
     const knownVars = new Set([
       ...Object.keys(storedVars),
       ...Object.keys(runtimeVars ?? {}),
+      ...varDefs.map(d => d.name),
       'timestamp', 'runId', 'random', 'profileName'
     ])
 
     const issues: { stepId?: string; severity: 'error' | 'warning'; message: string }[] = []
+
+    // Phase 1 Typed Variables: Validate variable definitions
+    const validTypes = new Set<string>(['string', 'number', 'boolean', 'array', 'object'])
+    for (const def of varDefs) {
+      if (!def.name || typeof def.name !== 'string') {
+        issues.push({ severity: 'error', message: `Variable definition missing name` })
+      }
+      if (!validTypes.has(def.type)) {
+        issues.push({ severity: 'error', message: `Variable "${def.name}" has invalid type "${def.type}"` })
+      }
+      if (def.required && def.default === undefined && !storedVars[def.name]) {
+        issues.push({ severity: 'warning', message: `Required variable "${def.name}" (${def.type}) has no default — must be provided at runtime` })
+      }
+    }
 
     // Required params per action type — keep tight: only the must-haves.
     const REQUIRED: Record<string, string[]> = {
@@ -959,7 +1194,9 @@ export class AutomationEngine {
     webContents?: WebContents,
     workflowId?: string,
     profileId?: string,
-    runKey?: string
+    runKey?: string,
+    typedVars?: Map<string, TypedVariable>,
+    variableDefinitions?: VariableDefinition[]
   ): Promise<'completed' | 'failed' | 'stopped'> {
     // Index-based iteration so `jumpToStep` can change the cursor.
     let i = 0
@@ -1019,7 +1256,7 @@ export class AutomationEngine {
       }).catch(() => { /* non-fatal */ })
       }
 
-      const result = await this.executeStep(page, liveStep, control, stepResults, variables, profileId)
+      const result = await this.executeStep(page, liveStep, control, stepResults, variables, profileId, typedVars, variableDefinitions)
       stepResults.push(result)
 
       // Tier 5: emit after-step hook (even on failure)
@@ -1206,7 +1443,9 @@ export class AutomationEngine {
     control: DebugControl | { abort: boolean },
     allResults: AutomationStepResult[],
     variables: Record<string, string>,
-    profileId?: string
+    profileId?: string,
+    typedVars?: Map<string, TypedVariable>,
+    variableDefinitions?: VariableDefinition[]
   ): Promise<AutomationStepResult> {
     const start = Date.now()
     const maxAttempts = Math.max(1, (step.retries ?? 0) + 1)
@@ -1239,7 +1478,7 @@ export class AutomationEngine {
       }
       try {
         // Tier 7: per-step timeout — race the action against a timer.
-        const actionPromise = this.runAction(page, step, control, allResults, variables, profileId)
+        const actionPromise = this.runAction(page, step, control, allResults, variables, profileId, typedVars, variableDefinitions)
         const output = step.timeoutMs && step.timeoutMs > 0
           ? await Promise.race([
               actionPromise,
@@ -1249,12 +1488,25 @@ export class AutomationEngine {
               ))
             ])
           : await actionPromise
+
+        // Phase 1 Typed Variables: after a successful action, track any
+        // saveAs variable in the typed-variable map so downstream steps
+        // get type-aware values.
+        const savedVariables: Record<string, { value: any; type: VariableType }> = {}
+        if (params.saveAs && typedVars) {
+          const rawValue = variables[params.saveAs]
+          setTypedVariable(typedVars, variables, params.saveAs, rawValue, step.id, step.saveAsType, variableDefinitions)
+          const tv = typedVars.get(params.saveAs)
+          if (tv) savedVariables[params.saveAs] = { value: tv.value, type: tv.type }
+        }
+
         return {
           stepId: step.id,
           action: step.action,
           success: true,
           duration_ms: Date.now() - start,
-          output: attempt > 0 ? { ...(output as any), retriedAfter: attempt } : output
+          output: attempt > 0 ? { ...(output as any), retriedAfter: attempt } : output,
+          ...(Object.keys(savedVariables).length > 0 ? { savedVariables } : {})
         }
       } catch (err: any) {
         lastError = err.message ?? String(err)
@@ -1297,7 +1549,9 @@ export class AutomationEngine {
     control: DebugControl | { abort: boolean },
     allResults: AutomationStepResult[],
     variables: Record<string, string>,
-    profileId?: string
+    profileId?: string,
+    typedVars?: Map<string, TypedVariable>,
+    variableDefinitions?: VariableDefinition[]
   ): Promise<any> {
     // Tier 4: switchTab may have changed the active page — always resolve here
     const page: Page = (profileId ? this.currentPages.get(profileId) : undefined) ?? _page
@@ -1478,7 +1732,7 @@ export class AutomationEngine {
 
         const branch = matched ? (params.thenSteps ?? []) : (params.elseSteps ?? [])
         if (branch.length > 0) {
-          const branchStatus = await this.executeSteps(page, branch, control, allResults, variables)
+          const branchStatus = await this.executeSteps(page, branch, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
           if (branchStatus === 'stopped') throw new Error('Workflow stopped')
           if (branchStatus === 'failed') throw new Error('Conditional branch failed')
         }
@@ -1491,7 +1745,7 @@ export class AutomationEngine {
         let iterations = 0
         for (let i = 0; i < times; i++) {
           if (control.abort) throw new Error('Workflow stopped')
-          const loopStatus = await this.executeSteps(page, loopSteps, control, allResults, variables)
+          const loopStatus = await this.executeSteps(page, loopSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
           if (loopStatus === 'stopped') throw new Error('Workflow stopped')
           if (loopStatus === 'failed') throw new Error(`Loop iteration ${i + 1} failed`)
           iterations++
@@ -1519,7 +1773,7 @@ export class AutomationEngine {
         let tryStatus: 'completed' | 'failed' | 'stopped' = 'completed'
 
         try {
-          tryStatus = await this.executeSteps(page, tryBlock, control, allResults, variables)
+          tryStatus = await this.executeSteps(page, tryBlock, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
           if (tryStatus === 'stopped') throw new Error('Workflow stopped')
           if (tryStatus === 'failed') {
             // Pull the most recent failed result from the try-block window
@@ -1540,7 +1794,7 @@ export class AutomationEngine {
           variables[`${prefix}.message`] = caught
           variables[`${prefix}.caughtAt`] = new Date().toISOString()
           try {
-            const catchStatus = await this.executeSteps(page, catchBlock, control, allResults, variables)
+            const catchStatus = await this.executeSteps(page, catchBlock, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
             if (catchStatus === 'stopped') throw new Error('Workflow stopped')
             // If the catch block ALSO fails, we re-throw — uncaught.
             if (catchStatus === 'failed') {
@@ -1555,7 +1809,7 @@ export class AutomationEngine {
         }
 
         if (finallyBlock.length > 0) {
-          const finallyStatus = await this.executeSteps(page, finallyBlock, control, allResults, variables)
+          const finallyStatus = await this.executeSteps(page, finallyBlock, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
           if (finallyStatus === 'stopped') throw new Error('Workflow stopped')
           if (finallyStatus === 'failed') {
             const failedInFinally = allResults.findLast((r) => !r.success)
@@ -1812,7 +2066,7 @@ export class AutomationEngine {
           injected.push(`${prefix}._index`, `${prefix}._total`)
 
           try {
-            const status = await this.executeSteps(page, innerSteps, control, allResults, variables)
+            const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
             if (status === 'stopped') throw new Error('Workflow stopped')
             if (status === 'failed') throw new Error(`Iteration ${idx + 1} failed`)
             completed++
@@ -2126,8 +2380,11 @@ export class AutomationEngine {
         }
 
         const childResults: AutomationStepResult[] = []
+        // Phase 1: Child workflows inherit parent typed vars + child definitions
+        const childRow = row.variable_definitions ? JSON.parse(row.variable_definitions) : undefined
         const childStatus = await this.executeSteps(
-          page, subSteps, control, childResults, childVars
+          page, subSteps, control, childResults, childVars,
+          undefined, undefined, undefined, undefined, typedVars, childRow ?? variableDefinitions
         )
 
         // Merge selected outputs back into parent variables under a prefix.
@@ -2172,7 +2429,7 @@ export class AutomationEngine {
               ...s,
               params: interpolateParams(s.params, variables)
             }
-            return this.executeStep(page, liveStep, control, allResults, variables, profileId)
+            return this.executeStep(page, liveStep, control, allResults, variables, profileId, typedVars, variableDefinitions)
           })
         )
 
@@ -3018,7 +3275,7 @@ export class AutomationEngine {
             set('selector', `[${tagAttr}="${idx}"]`)
 
             try {
-              const status = await this.executeSteps(page, innerSteps, control, allResults, variables)
+              const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
               if (status === 'stopped') throw new Error('Workflow stopped')
               if (status === 'failed') throw new Error(`Iteration ${idx} failed`)
               completed++
@@ -3127,7 +3384,7 @@ export class AutomationEngine {
           const shouldRun = await checkCondition()
           if (!shouldRun) break
 
-          const status = await this.executeSteps(page, innerSteps, control, allResults, variables)
+          const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
           if (status === 'stopped') throw new Error('Workflow stopped')
           if (status === 'failed') throw new Error(`whileLoop: iteration ${iterations + 1} failed`)
           iterations++
@@ -3255,7 +3512,7 @@ export class AutomationEngine {
           variables['pg.index'] = String(pagesVisited)
           variables['pg.count'] = String(pagesVisited + 1)
           try {
-            const status = await this.executeSteps(page, innerSteps, control, allResults, variables)
+            const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
             if (status === 'stopped') throw new Error('Workflow stopped')
             if (status === 'failed') throw new Error(`paginate: page ${pagesVisited + 1} steps failed`)
           } finally {

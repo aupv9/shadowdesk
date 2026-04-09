@@ -318,6 +318,17 @@ export class Database {
       this.db.exec(`ALTER TABLE workflows ADD COLUMN variables TEXT`)
     } catch { /* exists */ }
 
+    // Phase 1 Typed Variables: JSON array of VariableDefinition objects.
+    // Each definition declares a variable name, type, optional default, and description.
+    try {
+      this.db.exec(`ALTER TABLE workflows ADD COLUMN variable_definitions TEXT`)
+    } catch { /* exists */ }
+
+    // Phase 1 Typed Variables: variable definitions for workflow versions
+    try {
+      this.db.exec(`ALTER TABLE workflow_versions ADD COLUMN variable_definitions TEXT`)
+    } catch { /* exists */ }
+
     // Sync history error_message column (Account C3)
     try {
       this.db.exec(`ALTER TABLE sync_log ADD COLUMN error_message TEXT`)
@@ -1832,22 +1843,23 @@ export class Database {
     return this.queryOne('SELECT * FROM workflows WHERE id = ?', [id])
   }
 
-  createWorkflow(workflow: { id: string; name: string; description?: string; steps: any[]; variables?: Record<string, string> }): void {
+  createWorkflow(workflow: { id: string; name: string; description?: string; steps: any[]; variables?: Record<string, string>; variableDefinitions?: import('../shared/types').VariableDefinition[] }): void {
     this.run(
-      'INSERT INTO workflows (id, name, description, steps, variables) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO workflows (id, name, description, steps, variables, variable_definitions) VALUES (?, ?, ?, ?, ?, ?)',
       [
         workflow.id,
         workflow.name,
         workflow.description ?? '',
         JSON.stringify(workflow.steps),
-        workflow.variables ? JSON.stringify(workflow.variables) : null
+        workflow.variables ? JSON.stringify(workflow.variables) : null,
+        workflow.variableDefinitions ? JSON.stringify(workflow.variableDefinitions) : null
       ]
     )
   }
 
   updateWorkflow(
     id: string,
-    data: { name?: string; description?: string; steps?: any[]; variables?: Record<string, string> }
+    data: { name?: string; description?: string; steps?: any[]; variables?: Record<string, string>; variableDefinitions?: import('../shared/types').VariableDefinition[] }
   ): void {
     const sets: string[] = []
     const vals: any[] = []
@@ -1855,6 +1867,7 @@ export class Database {
     if (data.description !== undefined) { sets.push('description = ?'); vals.push(data.description) }
     if (data.steps !== undefined) { sets.push('steps = ?'); vals.push(JSON.stringify(data.steps)) }
     if (data.variables !== undefined) { sets.push('variables = ?'); vals.push(JSON.stringify(data.variables)) }
+    if (data.variableDefinitions !== undefined) { sets.push('variable_definitions = ?'); vals.push(JSON.stringify(data.variableDefinitions)) }
     if (sets.length === 0) return
     sets.push("updated_at = datetime('now')")
     this.run(`UPDATE workflows SET ${sets.join(', ')} WHERE id = ?`, [...vals, id])
@@ -2334,11 +2347,12 @@ export class Database {
     description: string
     steps: any[]
     variables?: Record<string, string>
+    variableDefinitions?: import('../shared/types').VariableDefinition[]
     label: string
   }): void {
     this.run(
-      `INSERT INTO workflow_versions (id, workflow_id, name, description, steps, variables, label)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO workflow_versions (id, workflow_id, name, description, steps, variables, variable_definitions, label)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         version.id,
         version.workflowId,
@@ -2346,6 +2360,7 @@ export class Database {
         version.description,
         JSON.stringify(version.steps),
         version.variables ? JSON.stringify(version.variables) : null,
+        version.variableDefinitions ? JSON.stringify(version.variableDefinitions) : null,
         version.label
       ]
     )
@@ -2370,14 +2385,15 @@ export class Database {
     ).map((r) => ({
       ...r,
       steps: JSON.parse(r.steps),
-      variables: r.variables ? JSON.parse(r.variables) : {}
+      variables: r.variables ? JSON.parse(r.variables) : {},
+      variableDefinitions: r.variable_definitions ? JSON.parse(r.variable_definitions) : undefined
     }))
   }
 
   getWorkflowVersion(versionId: string): any {
     const row = this.queryOne(`SELECT * FROM workflow_versions WHERE id = ?`, [versionId])
     if (!row) return null
-    return { ...row, steps: JSON.parse(row.steps), variables: row.variables ? JSON.parse(row.variables) : {} }
+    return { ...row, steps: JSON.parse(row.steps), variables: row.variables ? JSON.parse(row.variables) : {}, variableDefinitions: row.variable_definitions ? JSON.parse(row.variable_definitions) : undefined }
   }
 
   deleteWorkflowVersion(versionId: string): void {
