@@ -75,10 +75,10 @@ export function ProfileCard({
   const menuItem = (icon: React.ReactNode, label: string, action: () => void, danger = false) => (
     <button
       onClick={() => { action(); setMenuOpen(false) }}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors rounded-lg
+      className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-all duration-200 rounded-lg
         ${danger
-          ? 'text-red-400 hover:bg-red-600/20'
-          : 'text-slate-300 hover:bg-slate-700'
+          ? 'text-red-300 hover:bg-red-600/30 hover:text-red-200'
+          : 'text-slate-300 hover:bg-slate-700/50 hover:text-slate-100'
         }`}
     >
       {icon}
@@ -87,7 +87,7 @@ export function ProfileCard({
   )
 
   return (
-    <div className={`card group relative hover:border-slate-600 hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5 transition-all ${isActive ? 'border-ghost-600/50 bg-gradient-to-br from-slate-800 to-slate-800/60' : ''}`}>
+    <div className={`card-interactive group relative transition-all duration-300 ${isActive ? 'border-ghost-600/40 bg-gradient-to-br from-slate-800 to-slate-800/60 shadow-lg shadow-ghost-600/20' : ''}`}>
       {/* Active indicator */}
       {isActive && (
         <div className="absolute top-3 right-10 flex items-center gap-1.5">
@@ -103,27 +103,29 @@ export function ProfileCard({
       <div className="absolute top-2.5 right-2.5" ref={menuRef}>
         <button
           onClick={() => setMenuOpen((v) => !v)}
-          className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-700 hover:text-slate-300 transition-colors"
+          className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-700/50 hover:text-slate-300 transition-all duration-200 hover:shadow-md"
+          aria-label="More options"
+          aria-expanded={menuOpen}
         >
           <MoreVertical className="w-3.5 h-3.5" />
         </button>
 
         {menuOpen && (
-          <div className="absolute right-0 top-8 z-20 w-44 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-1">
+          <div className="absolute right-0 top-8 z-20 w-44 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl shadow-black/50 p-1 animate-in fade-in zoom-in-95 duration-200">
             {menuItem(<Pencil    className="w-3.5 h-3.5" />, 'Edit',           onEdit)}
             {menuItem(<Copy      className="w-3.5 h-3.5" />, 'Clone',          onClone)}
             {menuItem(<Cookie    className="w-3.5 h-3.5" />, 'Cookies...',     onImportCookies)}
             {menuItem(<FolderOpen className="w-3.5 h-3.5" />, 'Export Cookies', onExportCookies)}
             {menuItem(<Database  className="w-3.5 h-3.5" />, 'Storage...',     onStorage)}
-            <div className="border-t border-slate-700 my-1" />
+            <div className="divider-subtle my-1" />
             {menuItem(<Puzzle    className="w-3.5 h-3.5" />, 'Extensions...',  onExtensions)}
             {menuItem(<Sparkles  className="w-3.5 h-3.5" />, 'Warm Up...',     onWarmUp)}
             {menuItem(<Wand2     className="w-3.5 h-3.5" />, 'Apply Drift',    onApplyDrift)}
-            <div className="border-t border-slate-700 my-1" />
+            <div className="divider-subtle my-1" />
             {menuItem(<Download  className="w-3.5 h-3.5" />, 'Export Bundle',  onExportBundle)}
             {menuItem(<Upload    className="w-3.5 h-3.5" />, 'Import Bundle',  onImportBundle)}
             {menuItem(<History   className="w-3.5 h-3.5" />, 'Version History', onHistory)}
-            <div className="border-t border-slate-700 my-1" />
+            <div className="divider-subtle my-1" />
             {menuItem(
               syncExcluded
                 ? <Cloud    className="w-3.5 h-3.5" />
@@ -202,7 +204,9 @@ export function ProfileCard({
           <button
             onClick={onClose}
             className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg
-                       bg-red-600/20 hover:bg-red-600/30 text-red-400 text-xs font-medium transition-colors"
+                       bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs font-medium transition-all duration-200
+                       hover:shadow-lg hover:shadow-red-600/20 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+            aria-label={`Close session for profile ${profile.name}`}
           >
             <Square className="w-3.5 h-3.5" />
             Close
@@ -212,8 +216,10 @@ export function ProfileCard({
             onClick={onLaunch}
             disabled={isLaunching}
             className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg
-                       bg-ghost-600/20 hover:bg-ghost-600/30 text-ghost-400 text-xs font-medium transition-colors
-                       disabled:opacity-50 disabled:cursor-not-allowed"
+                       bg-ghost-600/20 hover:bg-ghost-600/30 text-ghost-300 text-xs font-medium transition-all duration-200
+                       hover:shadow-lg hover:shadow-ghost-600/20 disabled:opacity-50 disabled:cursor-not-allowed
+                       focus:outline-none focus:ring-2 focus:ring-ghost-500/50"
+            aria-label={`Launch profile ${profile.name}`}
           >
             {isLaunching ? (
               <><Loader2 className="w-3.5 h-3.5 animate-spin" />Launching...</>
