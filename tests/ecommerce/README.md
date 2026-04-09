@@ -11,12 +11,42 @@ Full-flow testing harness for the **E-Commerce Operations** pillar of Ghost Brow
 
 The offline suite exercises the 4 pillars in Vitest. If you want to **see the
 actual interaction on the application** — open Ghost Browser and click Run on
-a real workflow attached to a real profile — seed the demo data first:
+a real workflow attached to a real profile — seed the demo data first.
+
+**Recommended first run (no proxy, Chromium connects direct):**
 
 ```bash
-npm run test:ecommerce:seed      # generate fixtures + write them to app DB
-npm run dev                      # launch Electron app
+npm run test:ecommerce:seed:no-proxy   # generate fixtures + seed DB, profiles unbound
+npm run dev                             # launch Electron app
 ```
+
+Use this if you just want to smoke-test the flow locally. Profiles are
+created without a proxy binding so Chromium goes direct — no risk of
+`ERR_TIMEOUT` from the demo proxy hosts.
+
+**Full seed (demo proxies attached — for proxy/UI inspection only):**
+
+```bash
+npm run test:ecommerce:seed            # generate fixtures + seed DB with proxies
+npm run dev
+```
+
+Use this when you want to see the Proxy Manager fully populated and the
+profile→proxy wiring in the Profile editor. **But** the seeded proxies are
+fake hosts (`103.x.y.z`), so launching a profile against real marketplaces
+will `ERR_TIMEOUT`. Fix with one of:
+
+- **Quick fix (keep proxies visible, detach from profiles):**
+  ```bash
+  npm run test:ecommerce:unbind-proxies
+  ```
+- **Nuke proxies too:**
+  ```bash
+  npx tsx scripts/seed-ecommerce-db.ts --skip-proxies
+  ```
+- **Use real credentials:** Edit each proxy row in the Proxy Manager UI,
+  replace host/username/password with your residential provider's details,
+  then re-attach via the Profile editor.
 
 After seeding you'll see in the app UI:
 
@@ -78,8 +108,34 @@ To start fresh, delete the DB file and re-seed:
 
 ```bash
 rm ~/.config/ghost-browser/ghost-browser.db      # or the OS-specific path
-npm run test:ecommerce:seed
+npm run test:ecommerce:seed:no-proxy             # recommended: no demo-proxy headaches
 ```
+
+### Troubleshooting
+
+**`ERR_TIMEOUT` / `ERR_PROXY_CONNECTION_FAILED` on shopee.vn (or any site)**
+
+Root cause: the seeded profiles are bound to demo proxies whose hosts are
+fake placeholders (`103.145.58.21:30000` etc.). Chromium tries to tunnel
+every request through those non-existent hosts → timeout.
+
+Fix — pick one:
+
+```bash
+npm run test:ecommerce:unbind-proxies     # keep proxies in UI, detach from profiles
+# or
+npm run test:ecommerce:seed:no-proxy      # re-seed profiles without proxy binding
+# or edit each proxy in the Proxy Manager UI with real credentials
+```
+
+Then restart `npm run dev` and relaunch the profile — the page loads
+immediately because Chromium now connects direct.
+
+**Launch a profile without a proxy**
+
+Even on a seeded profile, you can always override the proxy at launch time
+via the profile editor's "Proxy" dropdown in the Profile Manager — set it
+to "No proxy" before clicking Launch.
 
 ## Architecture
 

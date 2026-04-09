@@ -246,11 +246,13 @@ function seedGroup(db: SqlDatabase, group: GroupFixture): void {
 function seedProfiles(
   db: SqlDatabase,
   profiles: ProfileFixture[],
-  userDataDir: string
+  userDataDir: string,
+  opts: { noProxy: boolean }
 ): number {
   let count = 0
   for (const p of profiles) {
     const userDataPath = path.join(userDataDir, 'profiles', p.id)
+    const proxyId = opts.noProxy ? null : p.proxy_id
     db.run(
       `INSERT OR REPLACE INTO profiles
        (id, name, group_id, fingerprint, proxy_id, notes, status, rotation_mode, user_data_path, cookies, cookies_encryption_version)
@@ -260,7 +262,7 @@ function seedProfiles(
         p.name,
         p.group_id,
         JSON.stringify(p.fingerprint),
-        p.proxy_id,
+        proxyId,
         p.notes,
         p.status,
         p.rotation_mode,
@@ -293,13 +295,53 @@ function seedWorkflows(db: SqlDatabase, workflows: WorkflowFixture[]): number {
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
+interface CliOptions {
+  noProxy: boolean
+  skipProxies: boolean
+}
+
+function parseArgs(argv: string[]): CliOptions {
+  const opts: CliOptions = { noProxy: false, skipProxies: false }
+  for (const arg of argv) {
+    if (arg === '--no-proxy') {
+      opts.noProxy = true
+    } else if (arg === '--skip-proxies') {
+      // Don't even write proxy rows — useful when user wants a totally
+      // clean Proxy Manager UI.
+      opts.skipProxies = true
+      opts.noProxy = true
+    } else if (arg === '--help' || arg === '-h') {
+      console.log('Usage: npx tsx scripts/seed-ecommerce-db.ts [options]')
+      console.log('')
+      console.log('Options:')
+      console.log('  --no-proxy        Insert proxies into the Proxy Manager BUT leave')
+      console.log('                    every profile\'s proxy_id NULL so Chromium')
+      console.log('                    connects direct. Use this when the demo proxies')
+      console.log('                    (fake 103.x.y.z hosts) would cause ERR_TIMEOUT.')
+      console.log('  --skip-proxies    Don\'t insert proxies at all, and leave profiles')
+      console.log('                    without a proxy binding. Cleanest "first run".')
+      console.log('  --help            Show this message')
+      process.exit(0)
+    }
+  }
+  return opts
+}
+
 async function main(): Promise<void> {
+  const opts = parseArgs(process.argv.slice(2))
+  const proxyMode = opts.skipProxies
+    ? 'none (--skip-proxies)'
+    : opts.noProxy
+      ? 'unbound (--no-proxy)'
+      : 'bound'
+
   console.log('Ghost Browser — E-Commerce Operations DB seeder\n')
 
   const userDataDir = resolveUserDataDir()
   const dbPath = path.join(userDataDir, 'ghost-browser.db')
   console.log(`App userData:  ${userDataDir}`)
   console.log(`Database:      ${dbPath}`)
+  console.log(`Proxy mode:    ${proxyMode}`)
 
   if (!fs.existsSync(userDataDir)) {
     fs.mkdirSync(userDataDir, { recursive: true })
@@ -330,8 +372,10 @@ async function main(): Promise<void> {
 
   console.log('Seeding rows...')
   seedGroup(db, fixtures.group)
-  const proxyCount = seedProxies(db, fixtures.proxies)
-  const profileCount = seedProfiles(db, fixtures.profiles, userDataDir)
+  const proxyCount = opts.skipProxies ? 0 : seedProxies(db, fixtures.proxies)
+  const profileCount = seedProfiles(db, fixtures.profiles, userDataDir, {
+    noProxy: opts.noProxy
+  })
   const workflowCount = seedWorkflows(db, fixtures.workflows)
 
   const data = db.export()
@@ -342,15 +386,25 @@ async function main(): Promise<void> {
   console.log('')
   console.log(`Seeded ${existingMsg}:`)
   console.log(`  proxies    ${proxyCount}`)
-  console.log(`  profiles   ${profileCount}`)
+  console.log(`  profiles   ${profileCount} (proxy: ${proxyMode})`)
   console.log(`  workflows  ${workflowCount}`)
   console.log('')
   console.log('Next step:')
   console.log('  1. Start the app:           npm run dev')
   console.log(`  2. Open "Profiles" tab      — you should see ${profileCount} E-Commerce Ops profiles`)
-  console.log(`  3. Open "Proxies" tab       — you should see ${proxyCount} SEA proxies`)
-  console.log(`  4. Open "Automation" tab    — you should see ${workflowCount} SEA workflows`)
-  console.log('  5. Click Run on any workflow to watch it drive a real Chromium window')
+  if (!opts.skipProxies) {
+    console.log(`  3. Open "Proxies" tab       — you should see ${proxyCount} SEA proxies`)
+  }
+  console.log(`  ${opts.skipProxies ? '3' : '4'}. Open "Automation" tab    — you should see ${workflowCount} SEA workflows`)
+  console.log(`  ${opts.skipProxies ? '4' : '5'}. Click Run on any workflow to watch it drive a real Chromium window`)
+  if (!opts.noProxy) {
+    console.log('')
+    console.log('WARNING: profiles are bound to demo proxies (fake 103.x.y.z hosts).')
+    console.log('         Chromium will ERR_TIMEOUT on real sites until you either:')
+    console.log('           a) edit each proxy in the UI with real credentials, OR')
+    console.log('           b) re-run with --no-proxy:')
+    console.log('                npm run test:ecommerce:seed:no-proxy')
+  }
 }
 
 main().catch((err) => {
