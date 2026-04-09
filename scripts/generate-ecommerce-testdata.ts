@@ -306,15 +306,43 @@ function defaultVariables(platform: string | undefined): Record<string, string> 
   }
 }
 
+/**
+ * Recursively rewrite step IDs using a stable index path so fixture diffs
+ * don't churn on every regeneration. The real template IDs come from
+ * `crypto.randomUUID()` at module load which changes every run — but since
+ * the structure of each template is fixed, an index path (e.g. "3.steps.1")
+ * is both unique and deterministic.
+ */
+function restampStepIds(steps: any[], tplId: string, prefix: string): any[] {
+  return steps.map((s: any, idx: number) => {
+    const path = `${prefix}${idx}`
+    const next: any = {
+      ...s,
+      id: stableUuid(`ecommerce-step-${tplId}-${path}`)
+    }
+    // Rewrite nested step containers (loop.steps, conditional.thenSteps/elseSteps,
+    // tryCatch.tryBlock/catchBlock/finallyBlock, parallelSteps.steps, ...)
+    if (next.params && typeof next.params === 'object') {
+      const p = { ...next.params }
+      if (Array.isArray(p.steps)) p.steps = restampStepIds(p.steps, tplId, `${path}.s.`)
+      if (Array.isArray(p.thenSteps)) p.thenSteps = restampStepIds(p.thenSteps, tplId, `${path}.t.`)
+      if (Array.isArray(p.elseSteps)) p.elseSteps = restampStepIds(p.elseSteps, tplId, `${path}.e.`)
+      if (Array.isArray(p.tryBlock)) p.tryBlock = restampStepIds(p.tryBlock, tplId, `${path}.try.`)
+      if (Array.isArray(p.catchBlock)) p.catchBlock = restampStepIds(p.catchBlock, tplId, `${path}.catch.`)
+      if (Array.isArray(p.finallyBlock)) p.finallyBlock = restampStepIds(p.finallyBlock, tplId, `${path}.finally.`)
+      next.params = p
+    }
+    return next
+  })
+}
+
 const WORKFLOWS: WorkflowFixture[] = WORKFLOW_TEMPLATES
   .filter((tpl) => typeof tpl.category === 'string' && (tpl.category as string).startsWith('sea-'))
   .map((tpl) => {
     const id = stableUuid(`ecommerce-workflow-${tpl.id}`)
-    // Deep-clone steps + assign fresh UUIDs (marketplace.ts install pattern)
-    const steps = JSON.parse(JSON.stringify(tpl.steps)).map((s: any) => ({
-      ...s,
-      id: stableUuid(`ecommerce-step-${tpl.id}-${s.id}`)
-    }))
+    // Deep-clone steps and re-stamp their IDs with a stable index path.
+    const cloned = JSON.parse(JSON.stringify(tpl.steps))
+    const steps = restampStepIds(cloned, tpl.id, '')
     return {
       id,
       name: tpl.name,

@@ -20,6 +20,8 @@
     "test:ecommerce:seed:generate": "npx tsx scripts/generate-ecommerce-testdata.ts",
     "test:ecommerce:seed:db": "npx tsx scripts/seed-ecommerce-db.ts",
     "test:ecommerce:seed": "npm run test:ecommerce:seed:generate && npm run test:ecommerce:seed:db",
+    "test:ecommerce:seed:no-proxy": "npm run test:ecommerce:seed:generate && npx tsx scripts/seed-ecommerce-db.ts --no-proxy",
+    "test:ecommerce:unbind-proxies": "npx tsx scripts/unbind-ecommerce-proxies.ts",
     "test:ecommerce:smoke:dry": "npx tsx tests/smoke/ecommerce-live-smoke.ts",
     "test:ecommerce:smoke:live": "npx tsx tests/smoke/ecommerce-live-smoke.ts --live",
     "test:multilogin:generate": "npx tsx scripts/generate-multilogin-testdata.ts",
