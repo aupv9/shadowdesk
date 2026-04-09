@@ -5,6 +5,132 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0] — 2026-04-09 · Phase 16+ Complete - Production Ready
+
+### ✅ Release Summary
+Ghost Browser reaches **production-ready status** with comprehensive anti-detect browser platform, automation engine, AI assistance, and enterprise-grade features. Targets undetectability of **97%** across 45+ detection vectors.
+
+### Core Features
+
+#### 🔐 Fingerprint Engine — 25 Device Presets + 22 Injection Scripts
+- **Desktop Presets** (5): Windows 10/11, macOS Ventura/Sonoma, Ubuntu 22.04
+- **Mobile Presets** (3): Android Samsung A54, Pixel 7, OPPO Reno; iOS iPhone 14/15, iPad
+- **Extended Browsers** (14): Chrome 120-124, Firefox 124, Edge 124, Brave 124 variants
+- **22 Injection Vectors**: navigator, canvas, webgl, audio, fonts, iframe, intl, keyboard, native-tostring, network, permissions, plugins, speech, storage, timing, useragentdata, webgpu, webrtc, worker, behavior, clientrects, performance
+
+#### 🤖 AI-Assisted Automation (Phase 16)
+- **16.A - NL Workflow Builder**: Generate workflows from English description using Claude Sonnet 4.6
+- **16.B - Detection Advisor**: Analyze detection failures and suggest fixes (Haiku 4.5)
+- **16.C - Smart Selector Healing**: Auto-recover from broken CSS selectors when page structure changes
+- **16.D - Behavior Archetypes**: 5+ patterns (casual-browser, speed-typer, mobile-user, power-user, etc.) with customizable typing speed, mouse speed, scroll behavior
+
+#### 🔧 Automation Engine — 28 Action Types
+- Navigation, DOM interaction (click, type, select, hover, scroll)
+- Wait strategies (selector, navigation, response, request intercept)
+- Data extraction (text, JSON, regex with transform pipeline)
+- HTTP requests with JSONPath body extraction
+- Flow control (if/else, loops, while loops, pagination)
+- File operations (upload, download, screenshot)
+- Captcha solving (2captcha, Anticaptcha, CapMonster integration)
+- JavaScript evaluation in page context
+- Typed variables system with secure vault integration
+- Advanced error recovery with AI-powered step healing
+
+#### 🎯 Detection Testing — 45 Vectors + Scoring
+- Automation detection (webdriver, chrome.runtime, CDP variables, Selenium artifacts)
+- Browser APIs (Chrome extensions, plugins, permissions, headless signals)
+- Fingerprinting (Canvas, WebGL, Audio, Font enumeration)
+- Locale/Language (Timezone, Intl consistency, UACH brands)
+- Timing (Date.now precision, RAF jitter, Navigation timing)
+- Network (WebRTC, Connection API)
+- Hardware (Screen, Device pixel ratio, Touch points)
+- Overall score: 0-100 (≥90 pass, ≥70 warning, <70 fail)
+
+#### 👥 Team Collaboration & Sharing
+- RBAC: admin, editor (CRUD), viewer (read-only)
+- Profile sharing with granular permissions
+- Team invitations with email workflow
+- Comprehensive audit log (profile actions, team events, timestamp tracking)
+- Shared workspace with member management
+
+#### 🌐 Proxy Management
+- 4 provider integrations (Smartproxy, Brightdata, Oxylabs, Custom)
+- Rotation modes: none, random, round-robin
+- Health checking with latency tracking
+- Country labels and bulk import
+- Encrypted credential storage
+
+#### ☁️ Cloud Sync — E2E Encrypted
+- AES-256-GCM encryption per profile
+- Scrypt key derivation (32-byte keys)
+- Zero-knowledge architecture (password not persisted)
+- Conflict detection with diff preview
+- Background 5-minute sync interval
+- Selective per-profile opt-out
+
+#### 🔌 Local API Server
+- 12+ HTTP endpoints (profiles, proxies, workflows, detection, patches)
+- Webhook triggers for async workflow execution
+- Polling API for result retrieval
+- Bearer token auth (optional)
+- CORS enabled for local tools
+
+#### 🎨 Feature Completeness
+- **Profile Management**: CRUD, clone, version history (20 snapshots), grouping, lifecycle management
+- **License Management**: 4 tiers (Free/Starter/Pro/Enterprise) with machine fingerprinting and grace periods
+- **Settings**: Theme (light/dark), multi-language (English, Vietnamese, Thai, Indonesian), auto-launch, vault timeout
+- **Database**: 13+ tables with sql.js (WASM), encryption at rest, migration system
+- **CI/CD**: electron-updater for auto-updates
+- **Visual Recording**: Record user actions → convert to workflow steps with smart selector generation
+- **Batch Processing**: Multi-profile execution with concurrency limits, result export (CSV/JSON)
+- **Captcha Solving**: Account balance check, result caching, 3-provider support
+- **Workflow Templates**: 6 pre-built (Login, Scraper, Form Fill, Price Monitor, Health Check, Feed Scroll)
+- **Workflow Scheduling**: Cron expressions, per-profile assignment, enabled/disabled toggle
+- **Profile Warm-up**: Site lists with dwell time simulation, completion tracking
+- **Custom Extensions**: Load unpacked Chrome extensions per profile
+
+### Technical Highlights
+
+#### Security
+- Field-level AES-256-GCM encryption for sensitive data (cookies, credentials, variables)
+- Machine-derived master key (prevents data theft on disk)
+- No password persistence (zero-knowledge cloud sync)
+- Per-user salt for key derivation (scrypt)
+- Encrypted credential storage for proxies, API keys, captcha accounts
+
+#### Architecture
+- Electron 31 + React 18 + TypeScript
+- Singleton pattern for core services (BrowserManager, Database, AutomationEngine)
+- IPC layer separating renderer from main process
+- Zustand for React state management
+- Puppeteer-core for Chromium automation
+- sql.js (WASM SQLite) for offline-capable database
+
+#### Quality & Reliability
+- Circuit breaker pattern in automation engine
+- Deterministic fingerprint noise (same profile = same fingerprint)
+- Error context stacking for debugging
+- Retry logic with exponential backoff
+- Step-by-step execution history with failure screenshots
+- Comprehensive TypeScript type safety
+
+### Breaking Changes
+None — this is the initial 1.0.0 production release.
+
+### Known Limitations
+- Profile count limited by license tier
+- API server is local-only (127.0.0.1:9222)
+- Proxy sticky mode not available (random/round-robin only)
+- Custom Chromium patches require forked build
+
+### Deprecations
+None.
+
+### Migration Guide
+No migration needed. Upgrade directly from 0.8.0.
+
+---
+
 ## [0.8.0] — 2026-04-07 · Phase 8: Chromium Patch Catalog & Advanced Detection
 
 ### Added — Fingerprint Engine (Layer 4)
