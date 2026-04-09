@@ -389,6 +389,18 @@ const api = {
     behaviorArchetype:   (id: string)                                                      => ipcRenderer.invoke('ai:behaviorArchetype', id)
   },
 
+  // Phase 21 — Behavior Correlation Detector
+  correlation: {
+    scan:          (options?: { threshold?: number; profileIds?: string[]; persist?: boolean }) =>
+      ipcRenderer.invoke('correlation:scan', options),
+    history:       (limit?: number)             => ipcRenderer.invoke('correlation:history', limit),
+    get:           (id: string)                 => ipcRenderer.invoke('correlation:get', id),
+    delete:        (id: string)                 => ipcRenderer.invoke('correlation:delete', id),
+    recordSample:  (profileId: string, sample: Record<string, any>, sessionId?: string) =>
+      ipcRenderer.invoke('correlation:recordSample', profileId, sample, sessionId),
+    clearSamples:  (profileId: string)          => ipcRenderer.invoke('correlation:clearSamples', profileId),
+  },
+
   // Phase 2.3 — Cleanup Worker
   cleanup: {
     status:       () => ipcRenderer.invoke('cleanup:status'),

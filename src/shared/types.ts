@@ -1454,3 +1454,119 @@ export interface CleanupWorkerStatus {
   failed: number
   total: number
 }
+
+// ─── Phase 21 — Behavior Correlation Detector ────────────────────────────────
+//
+// Identifies when two or more profiles share a behavioral fingerprint so
+// similar that a sophisticated detector could cluster them as the same
+// operator. Uses typing cadence (WPM + variance), mouse velocity/jitter,
+// scroll speed/pause timing and composite features to compute pairwise
+// similarity between profiles. Similarities above a configurable threshold
+// surface as alerts with remediation recommendations.
+
+/**
+ * A single behavioral fingerprint sample for one profile.
+ * Samples are aggregated across sessions into a profile-level centroid.
+ */
+export interface BehaviorSample {
+  /** Typing speed (words per minute). */
+  typingWpm: number
+  /** Std-dev % between keystrokes (0-100, higher = more human). */
+  typingVariance: number
+  /** Gaussian sigma applied to pointer jitter (px). */
+  mouseJitterSigma: number
+  /** Avg pointer velocity in px/ms. */
+  mouseVelocityAvg: number
+  /** Direction reversals per 100 pointer events. */
+  mouseDirectionChanges: number
+  /** Avg scroll speed in px/ms. */
+  scrollSpeedAvg: number
+  /** Scroll inertia decay multiplier (0.7 – 0.98). */
+  scrollDecay: number
+  /** Pauses per 100 scroll events. */
+  scrollPauseRate: number
+  /** Archetype id (if archetype was applied). */
+  archetypeId?: string | null
+}
+
+/**
+ * Per-profile aggregated behavior fingerprint. Derived from the profile's
+ * BehaviorConfig + any collected session metrics. This is what we use to
+ * compute pairwise similarity — it is NOT stored per-session.
+ */
+export interface ProfileBehaviorFingerprint {
+  profileId: string
+  profileName: string
+  archetypeId?: string | null
+  archetypeName?: string | null
+  /** ISO timestamp when the centroid was last recomputed. */
+  computedAt: string
+  sample: BehaviorSample
+  /** Number of samples that went into the centroid. */
+  sampleCount: number
+}
+
+/**
+ * A single correlation between two profiles. Stored in the
+ * `behavior_correlations` table so users can review history.
+ */
+export interface BehaviorCorrelationPair {
+  id: string
+  profileAId: string
+  profileAName: string
+  profileBId: string
+  profileBName: string
+  /** 0.0 – 1.0, where 1.0 = identical behavioral fingerprint. */
+  similarity: number
+  /** Percentage form (0 – 100) for display convenience. */
+  similarityPercent: number
+  /** Risk bucket based on similarity (low / medium / high). */
+  risk: 'low' | 'medium' | 'high'
+  /** Per-feature contributions so the UI can explain "why". */
+  featureContributions: {
+    typing: number
+    mouse: number
+    scroll: number
+  }
+  /** Actionable suggestions for the user. */
+  recommendations: string[]
+  /** When this correlation was computed. */
+  computedAt: string
+}
+
+/**
+ * Report returned from the detector — includes the full list of pairs,
+ * aggregate statistics and the threshold that was applied.
+ */
+export interface BehaviorCorrelationReport {
+  /** ISO timestamp when the scan ran. */
+  scannedAt: string
+  /** Similarity threshold used for the "alert" cut-off (0.0 – 1.0). */
+  threshold: number
+  /** Number of profiles included in the scan. */
+  profileCount: number
+  /** Total pairs evaluated (n * (n - 1) / 2). */
+  pairsEvaluated: number
+  /** All pairs above the threshold, sorted by similarity desc. */
+  alerts: BehaviorCorrelationPair[]
+  /** Count of high-risk alerts (similarity >= 0.90). */
+  highRiskCount: number
+  /** Count of medium-risk alerts (0.85 <= similarity < 0.90). */
+  mediumRiskCount: number
+  /** Global recommendations covering the whole pool. */
+  globalRecommendations: string[]
+  /** Archetype usage histogram — key is archetype id or "none". */
+  archetypeUsage: Record<string, number>
+  /** Profile fingerprints that were scored (for diagnostics in the UI). */
+  fingerprints: ProfileBehaviorFingerprint[]
+}
+
+/** Options accepted by the detector when running a scan. */
+export interface BehaviorCorrelationOptions {
+  /** Similarity threshold below which pairs are ignored (default 0.85). */
+  threshold?: number
+  /** If set, only these profile ids are scanned. */
+  profileIds?: string[]
+  /** If true, persists the report to the database (default true). */
+  persist?: boolean
+}

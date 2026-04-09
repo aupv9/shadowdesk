@@ -102,7 +102,13 @@ export type {
   HardenerFix,
   PlatformTuningHint,
   PreFlightValidationResult,
-  LiveAdjustmentEvent
+  LiveAdjustmentEvent,
+  // Phase 21 — Behavior Correlation Detector
+  BehaviorSample,
+  ProfileBehaviorFingerprint,
+  BehaviorCorrelationPair,
+  BehaviorCorrelationReport,
+  BehaviorCorrelationOptions
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
@@ -124,6 +130,7 @@ export type NavSection =
   | 'marketplace'
   | 'ai'
   | 'sea-platforms'  // Phase 17 — SEA Platform Templates
+  | 'correlation'    // Phase 21 — Behavior Correlation Detector
 
 export interface Toast {
   id: string
