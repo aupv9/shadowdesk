@@ -843,6 +843,10 @@ export interface AutomationStep {
   retryDelay?: number
   /** Tier 7: Backoff strategy between retries. Default 'fixed'. */
   retryBackoff?: 'fixed' | 'linear' | 'exponential'
+  /** Phase 2: Add jitter to retry delays to avoid thundering herd. Default false. */
+  retryJitter?: boolean
+  /** Phase 2: Maximum delay cap in ms for exponential backoff. Default 30000. */
+  retryMaxDelay?: number
   /** Tier 7: Only retry when error message matches one of these substrings/regex.
    *  If absent, retries on any error. */
   retryOn?: string[]
@@ -876,6 +880,10 @@ export interface AutomationWorkflow {
   variables?: Record<string, string>
   /** Phase 1 Typed Variables: optional declarations for variable names, types, defaults. */
   variableDefinitions?: VariableDefinition[]
+  /** Phase 2: Circuit breaker configuration for this workflow. When set, the
+   *  engine monitors consecutive failures and can trip the circuit to prevent
+   *  further execution until a cooldown period passes. */
+  circuitBreaker?: CircuitBreakerConfig
   created_at: string
   updated_at: string
 }
@@ -889,6 +897,12 @@ export interface AutomationStepResult {
   error?: string
   /** Phase 1 Typed Variables: variables written by this step with their types. */
   savedVariables?: Record<string, { value: any; type: VariableType }>
+  /** Phase 2 Error Handling: categorized error type for smarter recovery. */
+  errorCategory?: ErrorCategory
+  /** Phase 2 Error Handling: full error context stack for debugging. */
+  errorContext?: ErrorContext[]
+  /** Phase 2 Error Handling: which retry attempt succeeded (0 = first try). */
+  retryAttempt?: number
 }
 
 export interface AutomationRunResult {
@@ -899,6 +913,8 @@ export interface AutomationRunResult {
   completedAt: string
   stepResults: AutomationStepResult[]
   error?: string
+  /** Phase 2: Aggregated run metrics (retries, circuit breaker, error stack). */
+  metrics?: AutomationRunMetrics
 }
 
 export interface CreateWorkflowInput {
@@ -907,6 +923,7 @@ export interface CreateWorkflowInput {
   steps: AutomationStep[]
   variables?: Record<string, string>
   variableDefinitions?: VariableDefinition[]
+  circuitBreaker?: CircuitBreakerConfig
 }
 
 export interface UpdateWorkflowInput {
@@ -915,6 +932,72 @@ export interface UpdateWorkflowInput {
   steps?: AutomationStep[]
   variables?: Record<string, string>
   variableDefinitions?: VariableDefinition[]
+  circuitBreaker?: CircuitBreakerConfig
+}
+
+// ─── Phase 2: Circuit Breaker & Error Handling Types ─────────────────────────
+
+/** Categorized error types for smarter retry/recovery decisions. */
+export type ErrorCategory =
+  | 'timeout'      // waitForSelector, page.goto, step timeout
+  | 'network'      // net::ERR_*, httpRequest failures, proxy errors
+  | 'selector'     // element not found, selector mismatch
+  | 'validation'   // assertion failures, type mismatches
+  | 'navigation'   // page navigation errors, redirect loops
+  | 'captcha'      // captcha solving failures
+  | 'permission'   // file access denied, CDP permission errors
+  | 'unknown'      // unclassified errors
+
+/** Snapshot of execution context at the point of failure. */
+export interface ErrorContext {
+  stepId: string
+  action: AutomationActionType
+  errorMessage: string
+  errorCategory: ErrorCategory
+  timestamp: string
+  /** Attempt number (1-based) when this error occurred. */
+  attempt: number
+  /** URL of the page when the error happened. */
+  pageUrl?: string
+  /** Screenshot path captured on failure (if enabled). */
+  screenshotPath?: string
+  /** Snapshot of variables at the moment of failure. */
+  variableSnapshot?: Record<string, string>
+}
+
+/** Configuration for the per-workflow circuit breaker. */
+export interface CircuitBreakerConfig {
+  /** Number of consecutive failures before the circuit opens. Default 5. */
+  failureThreshold: number
+  /** Number of consecutive successes in HALF_OPEN to close the circuit. Default 2. */
+  successThreshold: number
+  /** How long (ms) to wait in OPEN state before transitioning to HALF_OPEN. Default 30000. */
+  resetTimeoutMs: number
+  /** Max requests allowed in HALF_OPEN state before deciding. Default 3. */
+  halfOpenMaxAttempts?: number
+}
+
+/** Runtime state of a circuit breaker instance. */
+export interface CircuitBreakerState {
+  status: 'CLOSED' | 'OPEN' | 'HALF_OPEN'
+  failureCount: number
+  successCount: number
+  lastFailureTime?: string
+  nextAttemptTime?: string
+  /** Total times this breaker has tripped OPEN during the run. */
+  tripCount: number
+}
+
+/** Extended run result with circuit breaker and error context info. */
+export interface AutomationRunMetrics {
+  /** Total steps executed (including retries). */
+  totalAttempts: number
+  /** Steps that required retries. */
+  retriedSteps: number
+  /** Circuit breaker final state (if enabled). */
+  circuitBreakerState?: CircuitBreakerState
+  /** Aggregated error context stack from all failed steps. */
+  errorStack: ErrorContext[]
 }
 
 // ─── Automation API Server Types ───────────────────────────────────────────

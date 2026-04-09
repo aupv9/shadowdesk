@@ -329,6 +329,11 @@ export class Database {
       this.db.exec(`ALTER TABLE workflow_versions ADD COLUMN variable_definitions TEXT`)
     } catch { /* exists */ }
 
+    // Phase 2: Circuit breaker config for workflows (JSON of CircuitBreakerConfig)
+    try {
+      this.db.exec(`ALTER TABLE workflows ADD COLUMN circuit_breaker TEXT`)
+    } catch { /* exists */ }
+
     // Sync history error_message column (Account C3)
     try {
       this.db.exec(`ALTER TABLE sync_log ADD COLUMN error_message TEXT`)
@@ -1843,23 +1848,24 @@ export class Database {
     return this.queryOne('SELECT * FROM workflows WHERE id = ?', [id])
   }
 
-  createWorkflow(workflow: { id: string; name: string; description?: string; steps: any[]; variables?: Record<string, string>; variableDefinitions?: import('../shared/types').VariableDefinition[] }): void {
+  createWorkflow(workflow: { id: string; name: string; description?: string; steps: any[]; variables?: Record<string, string>; variableDefinitions?: import('../shared/types').VariableDefinition[]; circuitBreaker?: import('../shared/types').CircuitBreakerConfig }): void {
     this.run(
-      'INSERT INTO workflows (id, name, description, steps, variables, variable_definitions) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO workflows (id, name, description, steps, variables, variable_definitions, circuit_breaker) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
         workflow.id,
         workflow.name,
         workflow.description ?? '',
         JSON.stringify(workflow.steps),
         workflow.variables ? JSON.stringify(workflow.variables) : null,
-        workflow.variableDefinitions ? JSON.stringify(workflow.variableDefinitions) : null
+        workflow.variableDefinitions ? JSON.stringify(workflow.variableDefinitions) : null,
+        workflow.circuitBreaker ? JSON.stringify(workflow.circuitBreaker) : null
       ]
     )
   }
 
   updateWorkflow(
     id: string,
-    data: { name?: string; description?: string; steps?: any[]; variables?: Record<string, string>; variableDefinitions?: import('../shared/types').VariableDefinition[] }
+    data: { name?: string; description?: string; steps?: any[]; variables?: Record<string, string>; variableDefinitions?: import('../shared/types').VariableDefinition[]; circuitBreaker?: import('../shared/types').CircuitBreakerConfig | null }
   ): void {
     const sets: string[] = []
     const vals: any[] = []
@@ -1868,6 +1874,7 @@ export class Database {
     if (data.steps !== undefined) { sets.push('steps = ?'); vals.push(JSON.stringify(data.steps)) }
     if (data.variables !== undefined) { sets.push('variables = ?'); vals.push(JSON.stringify(data.variables)) }
     if (data.variableDefinitions !== undefined) { sets.push('variable_definitions = ?'); vals.push(JSON.stringify(data.variableDefinitions)) }
+    if (data.circuitBreaker !== undefined) { sets.push('circuit_breaker = ?'); vals.push(data.circuitBreaker ? JSON.stringify(data.circuitBreaker) : null) }
     if (sets.length === 0) return
     sets.push("updated_at = datetime('now')")
     this.run(`UPDATE workflows SET ${sets.join(', ')} WHERE id = ?`, [...vals, id])

@@ -1290,7 +1290,8 @@ export function registerIpcHandlers(): void {
     ...row,
     steps: JSON.parse(row.steps),
     variables: row.variables ? JSON.parse(row.variables) : {},
-    variableDefinitions: row.variable_definitions ? JSON.parse(row.variable_definitions) : undefined
+    variableDefinitions: row.variable_definitions ? JSON.parse(row.variable_definitions) : undefined,
+    circuitBreaker: row.circuit_breaker ? JSON.parse(row.circuit_breaker) : undefined
   })
 
   ipcMain.handle('workflows:list', () => {
@@ -1312,7 +1313,8 @@ export function registerIpcHandlers(): void {
       description: input.description,
       steps: input.steps,
       variables: input.variables,
-      variableDefinitions: input.variableDefinitions
+      variableDefinitions: input.variableDefinitions,
+      circuitBreaker: input.circuitBreaker
     })
     return hydrateWorkflow(db.getWorkflow(id))
   })
