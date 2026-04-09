@@ -19,9 +19,12 @@ import type {
   ErrorContext,
   CircuitBreakerConfig,
   CircuitBreakerState,
-  AutomationRunMetrics
+  AutomationRunMetrics,
+  AiRecoveryConfig,
+  AiRecoveryIntervention
 } from '../shared/types'
 import { validatePreFlight, analyzeRuntimeSignal } from './platform-hardener'
+import { generateRecoverySteps } from './ai-assistant'
 import type { Page, ElementHandle } from 'puppeteer-core'
 import type { WebContents } from 'electron'
 import { app } from 'electron'
@@ -776,6 +779,10 @@ export class AutomationEngine {
   private circuitBreakers = new Map<string, CircuitBreaker>()
   /** Phase 2: Per-run error context stacks. Keyed by runKey. */
   private errorStacks = new Map<string, ErrorContext[]>()
+  /** Phase 3: Per-run AI recovery interventions. Keyed by runKey. */
+  private aiInterventions = new Map<string, AiRecoveryIntervention[]>()
+  /** Phase 3: Per-run AI recovery attempt counter. Keyed by runKey. */
+  private aiRecoveryCount = new Map<string, number>()
 
   static getInstance(): AutomationEngine {
     if (!AutomationEngine.instance) {
@@ -897,7 +904,8 @@ export class AutomationEngine {
       steps: JSON.parse(workflowRow.steps),
       variables: workflowRow.variables ? JSON.parse(workflowRow.variables) : undefined,
       variableDefinitions: workflowRow.variable_definitions ? JSON.parse(workflowRow.variable_definitions) : undefined,
-      circuitBreaker: workflowRow.circuit_breaker ? JSON.parse(workflowRow.circuit_breaker) : undefined
+      circuitBreaker: workflowRow.circuit_breaker ? JSON.parse(workflowRow.circuit_breaker) : undefined,
+      aiRecovery: workflowRow.ai_recovery ? JSON.parse(workflowRow.ai_recovery) : undefined
     }
 
     // Phase 18.1: Pre-flight validation of regex patterns
@@ -990,6 +998,11 @@ export class AutomationEngine {
     }
     // Phase 2: Initialize error context stack for this run
     this.errorStacks.set(runKey, [])
+    // Phase 3: Initialize AI recovery tracking for this run
+    if (workflow.aiRecovery?.enabled) {
+      this.aiInterventions.set(runKey, [])
+      this.aiRecoveryCount.set(runKey, 0)
+    }
 
     const startedAt = new Date().toISOString()
     const startedAtMs = Date.now()
@@ -1023,7 +1036,7 @@ export class AutomationEngine {
       // Variables are interpolated lazily per-step (not upfront), so actions
       // like `solveCaptcha` can write into the map and have subsequent steps
       // pick up the new values via {captchaToken}-style placeholders.
-      const result = await this.executeSteps(page, workflow.steps, control, stepResults, variables, webContents, workflowId, profileId, runKey, typedVars, workflow.variableDefinitions)
+      const result = await this.executeSteps(page, workflow.steps, control, stepResults, variables, webContents, workflowId, profileId, runKey, typedVars, workflow.variableDefinitions, workflow.aiRecovery)
       if (result === 'stopped') status = 'stopped'
       else if (result === 'failed') {
         status = 'failed'
@@ -1063,6 +1076,7 @@ export class AutomationEngine {
     // Phase 2: Collect run metrics before cleaning up
     const errorStack = this.errorStacks.get(runKey) ?? []
     const cb = this.circuitBreakers.get(runKey)
+    const interventions = this.aiInterventions.get(runKey)
     const metrics: AutomationRunMetrics = {
       totalAttempts: stepResults.reduce((sum, r) => {
         const retried = r.output?.retriedAfter ?? 0
@@ -1070,12 +1084,15 @@ export class AutomationEngine {
       }, 0),
       retriedSteps: stepResults.filter(r => r.retryAttempt && r.retryAttempt > 0).length,
       circuitBreakerState: cb?.getState(),
-      errorStack
+      errorStack,
+      aiInterventions: interventions && interventions.length > 0 ? interventions : undefined
     }
 
-    // Phase 2: Cleanup circuit breaker and error stack
+    // Phase 2 + 3: Cleanup run-scoped state
     this.circuitBreakers.delete(runKey)
     this.errorStacks.delete(runKey)
+    this.aiInterventions.delete(runKey)
+    this.aiRecoveryCount.delete(runKey)
 
     const runResult: AutomationRunResult = {
       workflowId,
@@ -1441,7 +1458,8 @@ export class AutomationEngine {
     profileId?: string,
     runKey?: string,
     typedVars?: Map<string, TypedVariable>,
-    variableDefinitions?: VariableDefinition[]
+    variableDefinitions?: VariableDefinition[],
+    aiRecovery?: AiRecoveryConfig
   ): Promise<'completed' | 'failed' | 'stopped'> {
     // Index-based iteration so `jumpToStep` can change the cursor.
     let i = 0
@@ -1623,6 +1641,100 @@ export class AutomationEngine {
           }
           // Target not found — fall through to normal failure
         }
+
+        // ── Phase 3: AI Step Recovery ──────────────────────────────────────
+        // When aiRecovery is enabled and the error is recoverable, ask the
+        // AI to generate recovery steps and inject them. If recovery succeeds,
+        // the workflow continues from the next step after the failed one.
+        if (aiRecovery?.enabled && runKey && result.errorCategory) {
+          const excluded = new Set(aiRecovery.excludeCategories ?? [])
+          const maxPerRun = aiRecovery.maxRecoveriesPerRun ?? 5
+          const currentCount = this.aiRecoveryCount.get(runKey) ?? 0
+
+          if (!excluded.has(result.errorCategory) && currentCount < maxPerRun) {
+            const recoveryStart = Date.now()
+            try {
+              // Build error context for the AI
+              const errCtx: ErrorContext = result.errorContext?.[result.errorContext.length - 1] ?? {
+                stepId: step.id,
+                action: step.action,
+                errorMessage: result.error ?? 'Unknown error',
+                errorCategory: result.errorCategory,
+                timestamp: new Date().toISOString(),
+                attempt: 1
+              }
+
+              // Collect recent steps for context (last 3)
+              const recentIdx = Math.max(0, i - 3)
+              const recentSteps = steps.slice(recentIdx, i)
+
+              const aiResult = await generateRecoverySteps(
+                step,
+                errCtx,
+                recentSteps,
+                aiRecovery.maxSteps ?? 3
+              )
+
+              // Notify the renderer of the AI intervention
+              if (webContents && !webContents.isDestroyed()) {
+                try {
+                  webContents.send('automation:ai-recovery', {
+                    workflowId, profileId,
+                    failedStep: step.id,
+                    recoverySteps: aiResult.steps.length,
+                    reasoning: aiResult.reasoning,
+                    confidence: aiResult.confidence
+                  })
+                } catch { /* non-fatal */ }
+              }
+
+              // Execute the recovery steps
+              const recoveryResults: AutomationStepResult[] = []
+              const recoveryStatus = await this.executeSteps(
+                page, aiResult.steps, control, recoveryResults, variables,
+                undefined, undefined, undefined, undefined, typedVars, variableDefinitions
+              )
+
+              const intervention: AiRecoveryIntervention = {
+                failedStepId: step.id,
+                failedAction: step.action,
+                failureReason: result.error ?? 'Unknown',
+                failureCategory: result.errorCategory,
+                recoverySteps: aiResult.steps,
+                success: recoveryStatus === 'completed',
+                duration_ms: Date.now() - recoveryStart,
+                timestamp: new Date().toISOString()
+              }
+
+              // Track the intervention
+              const interventions = this.aiInterventions.get(runKey)
+              if (interventions) interventions.push(intervention)
+              this.aiRecoveryCount.set(runKey, currentCount + 1)
+
+              // Add recovery step results to the main results
+              stepResults.push(...recoveryResults)
+
+              if (recoveryStatus === 'completed') {
+                // Recovery succeeded — continue with the next step
+                i++
+                continue
+              }
+              // Recovery failed — fall through to normal failure
+            } catch (aiErr: any) {
+              // AI call failed (rate limit, API key, etc.) — non-fatal, fall through
+              if (webContents && !webContents.isDestroyed()) {
+                try {
+                  webContents.send('automation:ai-recovery-error', {
+                    workflowId, profileId,
+                    failedStep: step.id,
+                    error: aiErr.message ?? String(aiErr)
+                  })
+                } catch { /* non-fatal */ }
+              }
+            }
+          }
+        }
+
         return 'failed'
       }
 
@@ -2054,7 +2166,7 @@ export class AutomationEngine {
 
         const branch = matched ? (params.thenSteps ?? []) : (params.elseSteps ?? [])
         if (branch.length > 0) {
-          const branchStatus = await this.executeSteps(page, branch, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
+          const branchStatus = await this.executeSteps(page, branch, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
           if (branchStatus === 'stopped') throw new Error('Workflow stopped')
           if (branchStatus === 'failed') throw new Error('Conditional branch failed')
         }
@@ -2067,7 +2179,7 @@ export class AutomationEngine {
         let iterations = 0
         for (let i = 0; i < times; i++) {
           if (control.abort) throw new Error('Workflow stopped')
-          const loopStatus = await this.executeSteps(page, loopSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
+          const loopStatus = await this.executeSteps(page, loopSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
           if (loopStatus === 'stopped') throw new Error('Workflow stopped')
           if (loopStatus === 'failed') throw new Error(`Loop iteration ${i + 1} failed`)
           iterations++
@@ -2095,7 +2207,7 @@ export class AutomationEngine {
         let tryStatus: 'completed' | 'failed' | 'stopped' = 'completed'
 
         try {
-          tryStatus = await this.executeSteps(page, tryBlock, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
+          tryStatus = await this.executeSteps(page, tryBlock, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
           if (tryStatus === 'stopped') throw new Error('Workflow stopped')
           if (tryStatus === 'failed') {
             // Pull the most recent failed result from the try-block window
@@ -2116,7 +2228,7 @@ export class AutomationEngine {
           variables[`${prefix}.message`] = caught
           variables[`${prefix}.caughtAt`] = new Date().toISOString()
           try {
-            const catchStatus = await this.executeSteps(page, catchBlock, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
+            const catchStatus = await this.executeSteps(page, catchBlock, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
             if (catchStatus === 'stopped') throw new Error('Workflow stopped')
             // If the catch block ALSO fails, we re-throw — uncaught.
             if (catchStatus === 'failed') {
@@ -2131,7 +2243,7 @@ export class AutomationEngine {
         }
 
         if (finallyBlock.length > 0) {
-          const finallyStatus = await this.executeSteps(page, finallyBlock, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
+          const finallyStatus = await this.executeSteps(page, finallyBlock, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
           if (finallyStatus === 'stopped') throw new Error('Workflow stopped')
           if (finallyStatus === 'failed') {
             const failedInFinally = allResults.findLast((r) => !r.success)
@@ -2388,7 +2500,7 @@ export class AutomationEngine {
           injected.push(`${prefix}._index`, `${prefix}._total`)
 
           try {
-            const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
+            const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
             if (status === 'stopped') throw new Error('Workflow stopped')
             if (status === 'failed') throw new Error(`Iteration ${idx + 1} failed`)
             completed++
@@ -2706,7 +2818,7 @@ export class AutomationEngine {
         const childRow = row.variable_definitions ? JSON.parse(row.variable_definitions) : undefined
         const childStatus = await this.executeSteps(
           page, subSteps, control, childResults, childVars,
-          undefined, undefined, undefined, undefined, typedVars, childRow ?? variableDefinitions
+          undefined, undefined, undefined, undefined, typedVars, childRow ?? variableDefinitions, aiRecovery
         )
 
         // Merge selected outputs back into parent variables under a prefix.
@@ -3597,7 +3709,7 @@ export class AutomationEngine {
             set('selector', `[${tagAttr}="${idx}"]`)
 
             try {
-              const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
+              const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
               if (status === 'stopped') throw new Error('Workflow stopped')
               if (status === 'failed') throw new Error(`Iteration ${idx} failed`)
               completed++
@@ -3706,7 +3818,7 @@ export class AutomationEngine {
           const shouldRun = await checkCondition()
           if (!shouldRun) break
 
-          const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
+          const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
           if (status === 'stopped') throw new Error('Workflow stopped')
           if (status === 'failed') throw new Error(`whileLoop: iteration ${iterations + 1} failed`)
           iterations++
@@ -3834,7 +3946,7 @@ export class AutomationEngine {
           variables['pg.index'] = String(pagesVisited)
           variables['pg.count'] = String(pagesVisited + 1)
           try {
-            const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions)
+            const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
             if (status === 'stopped') throw new Error('Workflow stopped')
             if (status === 'failed') throw new Error(`paginate: page ${pagesVisited + 1} steps failed`)
           } finally {

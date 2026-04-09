@@ -171,7 +171,8 @@ export class ApiServer {
         steps: JSON.parse(r.steps),
         variables: r.variables ? JSON.parse(r.variables) : {},
         variableDefinitions: r.variable_definitions ? JSON.parse(r.variable_definitions) : undefined,
-        circuitBreaker: r.circuit_breaker ? JSON.parse(r.circuit_breaker) : undefined
+        circuitBreaker: r.circuit_breaker ? JSON.parse(r.circuit_breaker) : undefined,
+        aiRecovery: r.ai_recovery ? JSON.parse(r.ai_recovery) : undefined
       })))
       return
     }
@@ -185,7 +186,8 @@ export class ApiServer {
         steps: JSON.parse(row.steps),
         variables: row.variables ? JSON.parse(row.variables) : {},
         variableDefinitions: row.variable_definitions ? JSON.parse(row.variable_definitions) : undefined,
-        circuitBreaker: row.circuit_breaker ? JSON.parse(row.circuit_breaker) : undefined
+        circuitBreaker: row.circuit_breaker ? JSON.parse(row.circuit_breaker) : undefined,
+        aiRecovery: row.ai_recovery ? JSON.parse(row.ai_recovery) : undefined
       })
       return
     }

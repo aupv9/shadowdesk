@@ -217,8 +217,8 @@ const api = {
   workflows: {
     list:      ()                                                     => ipcRenderer.invoke('workflows:list'),
     get:       (id: string)                                           => ipcRenderer.invoke('workflows:get', id),
-    create:    (input: { name: string; description?: string; steps: any[]; variables?: Record<string, string>; variableDefinitions?: any[]; circuitBreaker?: any }) => ipcRenderer.invoke('workflows:create', input),
-    update:    (id: string, data: { name?: string; description?: string; steps?: any[]; variables?: Record<string, string>; variableDefinitions?: any[]; circuitBreaker?: any }) => ipcRenderer.invoke('workflows:update', id, data),
+    create:    (input: { name: string; description?: string; steps: any[]; variables?: Record<string, string>; variableDefinitions?: any[]; circuitBreaker?: any; aiRecovery?: any }) => ipcRenderer.invoke('workflows:create', input),
+    update:    (id: string, data: { name?: string; description?: string; steps?: any[]; variables?: Record<string, string>; variableDefinitions?: any[]; circuitBreaker?: any; aiRecovery?: any }) => ipcRenderer.invoke('workflows:update', id, data),
     delete:    (id: string)                                           => ipcRenderer.invoke('workflows:delete', id),
     run:       (workflowId: string, profileId: string, variables?: Record<string, string>, opts?: { maxDurationMs?: number; screenshotOnFailureDir?: string }) => ipcRenderer.invoke('workflows:run', workflowId, profileId, variables, opts),
     runParallel: (workflowId: string, profileIds: string[], variables?: Record<string, string>, concurrency?: number) => ipcRenderer.invoke('workflows:runParallel', workflowId, profileIds, variables, concurrency),
@@ -400,6 +400,8 @@ const api = {
     generateWorkflow:    (prompt: string, pageHtml?: string)                               => ipcRenderer.invoke('ai:generateWorkflow', prompt, pageHtml),
     explainStep:         (step: unknown)                                                   => ipcRenderer.invoke('ai:explainStep', step),
     fixStep:             (step: unknown, errorMessage: string)                             => ipcRenderer.invoke('ai:fixStep', step, errorMessage),
+    // Phase 3 — AI Step Recovery
+    generateRecoverySteps: (failedStep: unknown, errorContext: unknown, recentSteps?: unknown[], maxSteps?: number) => ipcRenderer.invoke('ai:generateRecoverySteps', failedStep, errorContext, recentSteps, maxSteps),
     // 16.B — Detection Advisor
     analyzeDetection:    (vectors: unknown[], overallScore: number)                        => ipcRenderer.invoke('ai:analyzeDetection', vectors, overallScore),
     // 16.C — Smart Selector Healing
