@@ -1470,6 +1470,112 @@ export class Database {
     this.run('DELETE FROM proxies WHERE id = ?', [id])
   }
 
+  /**
+   * Partially update a proxy. Credentials are re-encrypted if supplied. Any
+   * field not present in the patch object is left untouched. Updating
+   * host / port / type / username / password also clears the cached health
+   * status so the user knows the result is stale until a new test runs.
+   */
+  updateProxy(id: string, patch: {
+    name?: string
+    type?: string
+    host?: string
+    port?: number
+    username?: string | null
+    password?: string | null
+    country?: string | null
+  }): void {
+    const current = this.getProxy(id)
+    if (!current) throw new Error(`Proxy ${id} not found`)
+
+    const next = {
+      name: patch.name ?? current.name,
+      type: patch.type ?? current.type,
+      host: patch.host ?? current.host,
+      port: patch.port ?? current.port,
+      username:
+        patch.username === undefined ? current.username ?? null : patch.username,
+      password:
+        patch.password === undefined ? current.password ?? null : patch.password,
+      country: patch.country === undefined ? current.country ?? null : patch.country,
+    }
+
+    let encUsername: string | null = null
+    let encPassword: string | null = null
+    let encVersion = 0
+    try {
+      if (next.username) {
+        encUsername = encryptProxyCredential(
+          next.username,
+          this.getMasterKey(),
+          id,
+          'username',
+        )
+      }
+      if (next.password) {
+        encPassword = encryptProxyCredential(
+          next.password,
+          this.getMasterKey(),
+          id,
+          'password',
+        )
+      }
+      encVersion = 1
+    } catch (error) {
+      console.error(`[Database] Failed to encrypt proxy credentials for ${id}:`, error)
+      encUsername = next.username ?? null
+      encPassword = next.password ?? null
+      encVersion = 0
+    }
+
+    // Invalidate cached health when any connection-affecting field changes.
+    const healthChanged =
+      patch.type !== undefined ||
+      patch.host !== undefined ||
+      patch.port !== undefined ||
+      patch.username !== undefined ||
+      patch.password !== undefined
+
+    if (healthChanged) {
+      this.run(
+        `UPDATE proxies
+         SET name = ?, type = ?, host = ?, port = ?, username = ?, password = ?,
+             country = ?, credentials_encryption_version = ?,
+             is_healthy = 0, latency_ms = NULL, last_checked_at = NULL
+         WHERE id = ?`,
+        [
+          next.name,
+          next.type,
+          next.host,
+          next.port,
+          encUsername,
+          encPassword,
+          next.country,
+          encVersion,
+          id,
+        ],
+      )
+    } else {
+      this.run(
+        `UPDATE proxies
+         SET name = ?, type = ?, host = ?, port = ?, username = ?, password = ?,
+             country = ?, credentials_encryption_version = ?
+         WHERE id = ?`,
+        [
+          next.name,
+          next.type,
+          next.host,
+          next.port,
+          encUsername,
+          encPassword,
+          next.country,
+          encVersion,
+          id,
+        ],
+      )
+    }
+  }
+
   // ── Phase 20 — Proxy Provider Marketplace ─────────────────────────────────
   // Stored credentials use the same AES-256-GCM scheme as the proxies table.
   // Each field is salted with a unique tag (e.g. `provider:username:<id>`)

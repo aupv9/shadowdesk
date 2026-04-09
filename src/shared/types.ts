@@ -184,6 +184,10 @@ export interface ProxyConfig {
   username?: string
   password?: string
   country?: string
+  latency_ms?: number
+  is_healthy?: number
+  last_checked_at?: string
+  created_at?: string
 }
 
 // ─── Phase 20 — Proxy Provider Marketplace ──────────────────────────────────
@@ -519,6 +523,21 @@ export interface CreateProxyInput {
   port: number
   username?: string
   password?: string
+}
+
+/**
+ * Partial update for an existing proxy. Every field is optional; omitted
+ * fields are left untouched by the backend. Passing `null` for an optional
+ * credential field explicitly clears it.
+ */
+export interface UpdateProxyInput {
+  name?: string
+  type?: 'http' | 'https' | 'socks5'
+  host?: string
+  port?: number
+  username?: string | null
+  password?: string | null
+  country?: string | null
 }
 
 // ─── Auth Types ──────────────────────────────────────────────────────────────
