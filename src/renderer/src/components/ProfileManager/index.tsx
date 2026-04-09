@@ -23,6 +23,7 @@ import { ExtensionsModal } from './ExtensionsModal'
 import { WarmUpModal } from './WarmUpModal'
 import { CollisionsDrawer } from './CollisionsDrawer'
 import { ImportGuideModal } from './ImportGuideModal'
+import { useImportStore } from '../../stores/importStore'
 // Phase 3 components
 import { PaginationControls } from './PaginationControls'
 import { CleanupMonitor } from './CleanupMonitor'
@@ -62,6 +63,7 @@ export function ProfileManager() {
   const { checkProfileLimit, fetchUsage } = useLicenseStore()
   const pushToast = useToastStore((s) => s.push)
   const confirm = useConfirm()
+  const openBulkImport = useImportStore((s) => s.openWizard)
 
   const [importing, setImporting] = useState(false)
 
@@ -646,6 +648,14 @@ export function ProfileManager() {
             >
               <Upload className={`w-4 h-4 ${importing ? 'animate-pulse' : ''}`} />
               {importing ? 'Importing…' : 'Import'}
+            </button>
+            <button
+              onClick={openBulkImport}
+              className="btn-ghost flex items-center gap-2 text-sm border border-indigo-500/30 hover:border-indigo-500/60 text-indigo-400"
+              title="Bulk import profiles from CSV, JSON, or ZIP files with preview and duplicate detection"
+            >
+              <Upload className="w-4 h-4" />
+              Bulk Import
             </button>
             <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2 text-sm">
               <Plus className="w-4 h-4" />

@@ -138,6 +138,7 @@ export { PLAN_LIMITS } from '../../../shared/types'
 
 export type NavSection =
   | 'profiles'
+  | 'import-history' // Phase 1+2 — Bulk Import Enhancement
   | 'proxies'
   | 'fingerprint'
   | 'behavior'       // Phase 17 — Behavioral Config UI

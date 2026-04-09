@@ -423,6 +423,21 @@ const api = {
     clearSamples:  (profileId: string)          => ipcRenderer.invoke('correlation:clearSamples', profileId),
   },
 
+  // Phase 1+2 — Bulk Import Enhancement
+  bulkImport: {
+    previewCSV:     (csvText: string)                                              => ipcRenderer.invoke('import:previewCSV', csvText),
+    previewJSON:    (jsonText: string)                                             => ipcRenderer.invoke('import:previewJSON', jsonText),
+    previewZIP:     (zipBuffers: Buffer[])                                         => ipcRenderer.invoke('import:previewZIP', zipBuffers),
+    executeCSV:     (csvText: string, options: any, filename: string | null)       => ipcRenderer.invoke('import:executeCSV', csvText, options, filename),
+    executeJSON:    (jsonText: string, options: any, filename: string | null)      => ipcRenderer.invoke('import:executeJSON', jsonText, options, filename),
+    executeZIP:     (zipBuffers: Buffer[], options: any, filenames: string[])      => ipcRenderer.invoke('import:executeZIP', zipBuffers, options, filenames),
+    sessions:       (limit?: number, offset?: number)                              => ipcRenderer.invoke('import:sessions', limit, offset),
+    session:        (id: string)                                                   => ipcRenderer.invoke('import:session', id),
+    records:        (sessionId: string)                                            => ipcRenderer.invoke('import:records', sessionId),
+    deleteSession:  (id: string)                                                   => ipcRenderer.invoke('import:deleteSession', id),
+    stats:          ()                                                             => ipcRenderer.invoke('import:stats')
+  },
+
   // Phase 2.3 — Cleanup Worker
   cleanup: {
     status:       () => ipcRenderer.invoke('cleanup:status'),

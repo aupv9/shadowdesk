@@ -545,6 +545,58 @@ export class Database {
       CREATE INDEX IF NOT EXISTS idx_behavior_correlation_scanned
         ON behavior_correlation_reports(scanned_at);
     `)
+
+    // Phase 1+2 — Bulk Import Enhancement: import sessions, records, fingerprint hash
+    try {
+      this.db.exec(`ALTER TABLE profiles ADD COLUMN fingerprint_hash TEXT`)
+    } catch { /* exists */ }
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_profiles_fingerprint_hash ON profiles(fingerprint_hash)`)
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS import_sessions (
+        id TEXT PRIMARY KEY,
+        timestamp TEXT DEFAULT (datetime('now')),
+        file_count INTEGER DEFAULT 0,
+        success_count INTEGER DEFAULT 0,
+        error_count INTEGER DEFAULT 0,
+        duplicate_count INTEGER DEFAULT 0,
+        skipped_count INTEGER DEFAULT 0,
+        import_source TEXT,
+        original_filename TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_import_sessions_timestamp ON import_sessions(timestamp);
+
+      CREATE TABLE IF NOT EXISTS import_records (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        source_file TEXT,
+        profile_id TEXT,
+        profile_name TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'success',
+        duplicate_of TEXT,
+        error_message TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY(session_id) REFERENCES import_sessions(id) ON DELETE CASCADE,
+        FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_import_records_session ON import_records(session_id);
+      CREATE INDEX IF NOT EXISTS idx_import_records_status ON import_records(status);
+    `)
+
+    // Backfill fingerprint_hash for existing profiles that don't have one
+    try {
+      const rows = this.queryAll(`SELECT id, fingerprint FROM profiles WHERE fingerprint_hash IS NULL AND status = 'active'`)
+      for (const row of rows) {
+        try {
+          const fp = typeof row.fingerprint === 'string' ? JSON.parse(row.fingerprint as string) : row.fingerprint
+          const { createHash } = require('crypto')
+          const json = JSON.stringify(fp, Object.keys(fp).sort())
+          const hash = createHash('sha256').update(json).digest('hex')
+          this.run(`UPDATE profiles SET fingerprint_hash = ? WHERE id = ?`, [hash, row.id as string])
+        } catch { /* skip malformed fingerprint */ }
+      }
+    } catch { /* table may not exist yet on first run */ }
   }
 
   // ── Behavior Correlation Detector (Phase 21) ─────────────────────────────
@@ -2412,5 +2464,76 @@ export class Database {
 
   deleteWorkflowVersion(versionId: string): void {
     this.run(`DELETE FROM workflow_versions WHERE id = ?`, [versionId])
+  }
+
+  // ── Import Sessions & Records (Phase 1+2) ──────────────────────────────────
+
+  // ── Bulk Import Helpers (Phase 1+2) ────────────────────────────────────────
+
+  /** Execute a parameterised SQL statement (INSERT/UPDATE/DELETE). Public for import module. */
+  execSQL(sql: string, params: any[] = []): void {
+    this.run(sql, params)
+  }
+
+  findProfileByName(name: string): { id: string; name: string } | null {
+    const row = this.queryOne(
+      `SELECT id, name FROM profiles WHERE LOWER(name) = LOWER(?) AND status = 'active'`,
+      [name]
+    )
+    return row ? { id: row.id as string, name: row.name as string } : null
+  }
+
+  findProfileByFingerprintHash(hash: string): { id: string; name: string } | null {
+    const row = this.queryOne(
+      `SELECT id, name FROM profiles WHERE fingerprint_hash = ? AND status = 'active'`,
+      [hash]
+    )
+    return row ? { id: row.id as string, name: row.name as string } : null
+  }
+
+  findProxyById(id: string): boolean {
+    return !!this.queryOne(`SELECT id FROM proxies WHERE id = ?`, [id])
+  }
+
+  findGroupById(id: string): boolean {
+    return !!this.queryOne(`SELECT id FROM profile_groups WHERE id = ?`, [id])
+  }
+
+  getImportSessions(limit = 50, offset = 0): any[] {
+    return this.queryAll(
+      `SELECT * FROM import_sessions ORDER BY timestamp DESC LIMIT ? OFFSET ?`,
+      [limit, offset]
+    )
+  }
+
+  getImportSession(id: string): any {
+    return this.queryOne(`SELECT * FROM import_sessions WHERE id = ?`, [id])
+  }
+
+  getImportRecords(sessionId: string): any[] {
+    return this.queryAll(
+      `SELECT * FROM import_records WHERE session_id = ? ORDER BY created_at ASC`,
+      [sessionId]
+    )
+  }
+
+  deleteImportSession(id: string): void {
+    this.run(`DELETE FROM import_records WHERE session_id = ?`, [id])
+    this.run(`DELETE FROM import_sessions WHERE id = ?`, [id])
+  }
+
+  getImportStats(): { totalSessions: number; totalImported: number; totalErrors: number } {
+    const stats = this.queryOne(`
+      SELECT
+        COUNT(DISTINCT s.id) as totalSessions,
+        COALESCE(SUM(s.success_count), 0) as totalImported,
+        COALESCE(SUM(s.error_count), 0) as totalErrors
+      FROM import_sessions s
+    `)
+    return {
+      totalSessions: (stats?.totalSessions as number) ?? 0,
+      totalImported: (stats?.totalImported as number) ?? 0,
+      totalErrors: (stats?.totalErrors as number) ?? 0
+    }
   }
 }

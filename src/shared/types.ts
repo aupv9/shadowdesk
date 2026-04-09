@@ -1872,3 +1872,85 @@ export interface BehaviorCorrelationOptions {
   /** If true, persists the report to the database (default true). */
   persist?: boolean
 }
+
+// ─── Bulk Import Types (Phase 1+2) ──────────────────────────────────────────
+
+export type ImportFormat = 'zip' | 'csv' | 'json'
+
+export type DuplicateResolution = 'skip' | 'rename' | 'overwrite'
+
+export interface SelectiveFields {
+  name: boolean
+  fingerprint: boolean
+  cookies: boolean
+  notes: boolean
+}
+
+export interface ImportOptions {
+  format: ImportFormat
+  duplicateResolution: DuplicateResolution
+  selectiveFields: SelectiveFields
+  /** If set, assign all imported profiles to this proxy */
+  assignProxyId?: string | null
+  /** If set, assign all imported profiles to this group */
+  assignGroupId?: string | null
+}
+
+export interface ImportPreviewRow {
+  index: number
+  name: string
+  preset: string
+  notes: string
+  proxyId: string | null
+  groupId: string | null
+  fingerprintProvided: boolean
+  cookiesProvided: boolean
+  isDuplicate: boolean
+  duplicateOf?: { id: string; name: string }
+  duplicateType?: 'name' | 'fingerprint' | 'both'
+  errors: string[]
+  status: 'ready' | 'duplicate' | 'error'
+}
+
+export interface ImportPreviewResult {
+  totalRows: number
+  validCount: number
+  duplicateCount: number
+  errorCount: number
+  rows: ImportPreviewRow[]
+}
+
+export interface ImportResult {
+  sessionId: string
+  totalFiles: number
+  successCount: number
+  errorCount: number
+  duplicateCount: number
+  skippedCount: number
+  profileIds: string[]
+  errors: ImportRecordEntry[]
+}
+
+export interface ImportSession {
+  id: string
+  timestamp: string
+  file_count: number
+  success_count: number
+  error_count: number
+  duplicate_count: number
+  skipped_count: number
+  import_source: ImportFormat
+  original_filename: string | null
+}
+
+export interface ImportRecordEntry {
+  id: string
+  session_id: string
+  source_file: string | null
+  profile_id: string | null
+  profile_name: string
+  status: 'success' | 'duplicate' | 'skipped' | 'error'
+  duplicate_of: string | null
+  error_message: string | null
+  created_at: string
+}
