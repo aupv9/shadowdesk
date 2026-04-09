@@ -1,0 +1,1109 @@
+[
+  {
+    "id": "b669e3da-1c4f-47ac-8957-e5e92290f4fe",
+    "name": "Shopee VN — Shopper 01",
+    "group_id": "2c64c023-e951-4673-af2a-8dfacb2f999f",
+    "group_name": "E-Commerce Operations",
+    "fingerprint": {
+      "preset": "android-samsung-chrome120",
+      "geolocation": {
+        "latitude": 10.8231,
+        "longitude": 106.6297,
+        "accuracy": 20
+      },
+      "os": {
+        "platform": "Linux armv8l",
+        "version": "13.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Linux; Android 13; SM-A546E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36",
+        "platform": "Linux armv8l",
+        "vendor": "Google Inc.",
+        "version": "120",
+        "languages": [
+          "vi-VN",
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 412,
+        "height": 915,
+        "availWidth": 412,
+        "availHeight": 883,
+        "colorDepth": 24,
+        "pixelRatio": 2.625
+      },
+      "hardware": {
+        "deviceMemory": 8,
+        "hardwareConcurrency": 8,
+        "maxTouchPoints": 5
+      },
+      "locale": {
+        "language": "vi-VN",
+        "languages": [
+          "vi-VN",
+          "en-US",
+          "en"
+        ],
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": 1351465640
+      },
+      "webgl": {
+        "vendor": "Qualcomm",
+        "renderer": "Adreno (TM) 619",
+        "noiseSeed": 1351465640
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": 1351465640
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Roboto",
+          "Droid Sans",
+          "Noto Sans",
+          "Noto Color Emoji",
+          "Droid Serif",
+          "Noto Serif",
+          "Courier New"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 1,
+        "videoInputs": 2
+      },
+      "plugins": {
+        "mode": "empty"
+      },
+      "speech": {
+        "mode": "filter"
+      },
+      "behavior": {
+        "mouseJitter": true,
+        "typingNoise": true,
+        "scrollInertia": true
+      },
+      "timing": {
+        "dateNoisePrecision": 100,
+        "rafJitter": true,
+        "performanceClamp": true
+      }
+    },
+    "proxy_id": "9d971e28-483b-42d6-a023-054b790886b6",
+    "notes": "Primary Shopee VN buyer. Android Samsung A54 fingerprint, mobile-first UX.",
+    "status": "active",
+    "rotation_mode": "none",
+    "user_data_path": "<userdata>/profiles/b669e3da-1c4f-47ac-8957-e5e92290f4fe",
+    "persona": {
+      "platform": "shopee",
+      "preset": "android-samsung-chrome120",
+      "proxy_country": "VN"
+    }
+  },
+  {
+    "id": "cdbf3e75-027e-424f-a560-cbae8271cfb2",
+    "name": "Shopee TH — Shopper 02",
+    "group_id": "2c64c023-e951-4673-af2a-8dfacb2f999f",
+    "group_name": "E-Commerce Operations",
+    "fingerprint": {
+      "preset": "android-pixel-chrome121",
+      "geolocation": {
+        "latitude": 13.7563,
+        "longitude": 100.5018,
+        "accuracy": 20
+      },
+      "os": {
+        "platform": "Linux armv8l",
+        "version": "14.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.143 Mobile Safari/537.36",
+        "platform": "Linux armv8l",
+        "vendor": "Google Inc.",
+        "version": "121",
+        "languages": [
+          "th-TH",
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 412,
+        "height": 915,
+        "availWidth": 412,
+        "availHeight": 891,
+        "colorDepth": 24,
+        "pixelRatio": 2.625
+      },
+      "hardware": {
+        "deviceMemory": 8,
+        "hardwareConcurrency": 8,
+        "maxTouchPoints": 5
+      },
+      "locale": {
+        "language": "th-TH",
+        "languages": [
+          "th-TH",
+          "en-US",
+          "en"
+        ],
+        "timezone": "Asia/Bangkok"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": 1482400913
+      },
+      "webgl": {
+        "vendor": "Google Inc. (ARM)",
+        "renderer": "ANGLE (ARM, Mali-G710 MC10, OpenGL ES 3.2)",
+        "noiseSeed": 1482400913
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": 1482400913
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Roboto",
+          "Noto Sans",
+          "Noto Sans Thai",
+          "Noto Color Emoji",
+          "Droid Sans",
+          "Droid Serif",
+          "Courier New"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 1,
+        "videoInputs": 2
+      },
+      "plugins": {
+        "mode": "empty"
+      },
+      "speech": {
+        "mode": "filter"
+      },
+      "behavior": {
+        "mouseJitter": true,
+        "typingNoise": true,
+        "scrollInertia": true
+      },
+      "timing": {
+        "dateNoisePrecision": 100,
+        "rafJitter": true,
+        "performanceClamp": true
+      }
+    },
+    "proxy_id": "793da0fa-6c3c-4539-8029-e679cd99be16",
+    "notes": "Shopee TH tester. Pixel 7 fingerprint, Bangkok exit.",
+    "status": "active",
+    "rotation_mode": "none",
+    "user_data_path": "<userdata>/profiles/cdbf3e75-027e-424f-a560-cbae8271cfb2",
+    "persona": {
+      "platform": "shopee",
+      "preset": "android-pixel-chrome121",
+      "proxy_country": "TH"
+    }
+  },
+  {
+    "id": "d1a78ef7-2a82-4913-8c8f-bc66e57b9efd",
+    "name": "Shopee ID — Flash Deal Hunter",
+    "group_id": "2c64c023-e951-4673-af2a-8dfacb2f999f",
+    "group_name": "E-Commerce Operations",
+    "fingerprint": {
+      "preset": "android-oppo-chrome120",
+      "geolocation": {
+        "latitude": -6.2088,
+        "longitude": 106.8456,
+        "accuracy": 20
+      },
+      "os": {
+        "platform": "Linux armv8l",
+        "version": "13.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Linux; Android 13; CPH2385) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36",
+        "platform": "Linux armv8l",
+        "vendor": "Google Inc.",
+        "version": "120",
+        "languages": [
+          "id-ID",
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 393,
+        "height": 873,
+        "availWidth": 393,
+        "availHeight": 845,
+        "colorDepth": 24,
+        "pixelRatio": 2.75
+      },
+      "hardware": {
+        "deviceMemory": 8,
+        "hardwareConcurrency": 8,
+        "maxTouchPoints": 5
+      },
+      "locale": {
+        "language": "id-ID",
+        "languages": [
+          "id-ID",
+          "en-US",
+          "en"
+        ],
+        "timezone": "Asia/Jakarta"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": -93638036
+      },
+      "webgl": {
+        "vendor": "Qualcomm",
+        "renderer": "Adreno (TM) 730",
+        "noiseSeed": -93638036
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": -93638036
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Roboto",
+          "Noto Sans",
+          "Noto Color Emoji",
+          "Droid Sans",
+          "Droid Serif",
+          "Courier New"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 1,
+        "videoInputs": 2
+      },
+      "plugins": {
+        "mode": "empty"
+      },
+      "speech": {
+        "mode": "filter"
+      },
+      "behavior": {
+        "mouseJitter": true,
+        "typingNoise": true,
+        "scrollInertia": true
+      },
+      "timing": {
+        "dateNoisePrecision": 100,
+        "rafJitter": true,
+        "performanceClamp": true
+      }
+    },
+    "proxy_id": "e65dab67-23f8-4df6-8acf-d41f89fa5427",
+    "notes": "Shopee ID flash sale monitor. OPPO Reno fingerprint.",
+    "status": "active",
+    "rotation_mode": "round-robin",
+    "user_data_path": "<userdata>/profiles/d1a78ef7-2a82-4913-8c8f-bc66e57b9efd",
+    "persona": {
+      "platform": "shopee",
+      "preset": "android-oppo-chrome120",
+      "proxy_country": "ID"
+    }
+  },
+  {
+    "id": "9b6f2d0e-6796-48a6-84db-d31b7972ff88",
+    "name": "Lazada VN — Buyer 01",
+    "group_id": "2c64c023-e951-4673-af2a-8dfacb2f999f",
+    "group_name": "E-Commerce Operations",
+    "fingerprint": {
+      "preset": "win10-chrome120",
+      "os": {
+        "platform": "Win32",
+        "version": "10.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "platform": "Win32",
+        "vendor": "Google Inc.",
+        "version": "120",
+        "languages": [
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 1920,
+        "height": 1080,
+        "availWidth": 1920,
+        "availHeight": 1040,
+        "colorDepth": 24,
+        "pixelRatio": 1
+      },
+      "hardware": {
+        "deviceMemory": 8,
+        "hardwareConcurrency": 8,
+        "maxTouchPoints": 0
+      },
+      "locale": {
+        "language": "en-US",
+        "languages": [
+          "en-US",
+          "en"
+        ],
+        "timezone": "America/New_York"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": 1407519966
+      },
+      "webgl": {
+        "vendor": "Google Inc. (NVIDIA)",
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "noiseSeed": 1407519966
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": 1407519966
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Arial",
+          "Arial Black",
+          "Calibri",
+          "Cambria",
+          "Comic Sans MS",
+          "Consolas",
+          "Courier New",
+          "Georgia",
+          "Impact",
+          "Segoe UI",
+          "Tahoma",
+          "Times New Roman",
+          "Trebuchet MS",
+          "Verdana"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 1,
+        "videoInputs": 1
+      },
+      "plugins": {
+        "mode": "realistic"
+      },
+      "speech": {
+        "mode": "filter"
+      },
+      "behavior": {
+        "mouseJitter": true,
+        "typingNoise": true,
+        "scrollInertia": true
+      },
+      "timing": {
+        "dateNoisePrecision": 100,
+        "rafJitter": true,
+        "performanceClamp": true
+      }
+    },
+    "proxy_id": "9d971e28-483b-42d6-a023-054b790886b6",
+    "notes": "Lazada VN desktop buyer. Windows 10 Chrome 120.",
+    "status": "active",
+    "rotation_mode": "none",
+    "user_data_path": "<userdata>/profiles/9b6f2d0e-6796-48a6-84db-d31b7972ff88",
+    "persona": {
+      "platform": "lazada",
+      "preset": "win10-chrome120",
+      "proxy_country": "VN"
+    }
+  },
+  {
+    "id": "54e98333-ab94-4c7d-b3e6-29fca7bd322b",
+    "name": "Lazada MY — Buyer 02",
+    "group_id": "2c64c023-e951-4673-af2a-8dfacb2f999f",
+    "group_name": "E-Commerce Operations",
+    "fingerprint": {
+      "preset": "android-oppo-chrome120",
+      "geolocation": {
+        "latitude": -6.2088,
+        "longitude": 106.8456,
+        "accuracy": 20
+      },
+      "os": {
+        "platform": "Linux armv8l",
+        "version": "13.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Linux; Android 13; CPH2385) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36",
+        "platform": "Linux armv8l",
+        "vendor": "Google Inc.",
+        "version": "120",
+        "languages": [
+          "id-ID",
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 393,
+        "height": 873,
+        "availWidth": 393,
+        "availHeight": 845,
+        "colorDepth": 24,
+        "pixelRatio": 2.75
+      },
+      "hardware": {
+        "deviceMemory": 8,
+        "hardwareConcurrency": 8,
+        "maxTouchPoints": 5
+      },
+      "locale": {
+        "language": "id-ID",
+        "languages": [
+          "id-ID",
+          "en-US",
+          "en"
+        ],
+        "timezone": "Asia/Jakarta"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": 1075085367
+      },
+      "webgl": {
+        "vendor": "Qualcomm",
+        "renderer": "Adreno (TM) 730",
+        "noiseSeed": 1075085367
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": 1075085367
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Roboto",
+          "Noto Sans",
+          "Noto Color Emoji",
+          "Droid Sans",
+          "Droid Serif",
+          "Courier New"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 1,
+        "videoInputs": 2
+      },
+      "plugins": {
+        "mode": "empty"
+      },
+      "speech": {
+        "mode": "filter"
+      },
+      "behavior": {
+        "mouseJitter": true,
+        "typingNoise": true,
+        "scrollInertia": true
+      },
+      "timing": {
+        "dateNoisePrecision": 100,
+        "rafJitter": true,
+        "performanceClamp": true
+      }
+    },
+    "proxy_id": "69d3205d-71ab-4aed-8ba1-4f084eadef43",
+    "notes": "Lazada MY mobile shopper. OPPO fingerprint for SEA alignment.",
+    "status": "active",
+    "rotation_mode": "none",
+    "user_data_path": "<userdata>/profiles/54e98333-ab94-4c7d-b3e6-29fca7bd322b",
+    "persona": {
+      "platform": "lazada",
+      "preset": "android-oppo-chrome120",
+      "proxy_country": "MY"
+    }
+  },
+  {
+    "id": "084f5b1c-77d6-493d-bf76-41039eb38448",
+    "name": "TikTok Shop VN — Live Scraper",
+    "group_id": "2c64c023-e951-4673-af2a-8dfacb2f999f",
+    "group_name": "E-Commerce Operations",
+    "fingerprint": {
+      "preset": "android-pixel-chrome121",
+      "geolocation": {
+        "latitude": 13.7563,
+        "longitude": 100.5018,
+        "accuracy": 20
+      },
+      "os": {
+        "platform": "Linux armv8l",
+        "version": "14.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.143 Mobile Safari/537.36",
+        "platform": "Linux armv8l",
+        "vendor": "Google Inc.",
+        "version": "121",
+        "languages": [
+          "th-TH",
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 412,
+        "height": 915,
+        "availWidth": 412,
+        "availHeight": 891,
+        "colorDepth": 24,
+        "pixelRatio": 2.625
+      },
+      "hardware": {
+        "deviceMemory": 8,
+        "hardwareConcurrency": 8,
+        "maxTouchPoints": 5
+      },
+      "locale": {
+        "language": "th-TH",
+        "languages": [
+          "th-TH",
+          "en-US",
+          "en"
+        ],
+        "timezone": "Asia/Bangkok"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": -442517609
+      },
+      "webgl": {
+        "vendor": "Google Inc. (ARM)",
+        "renderer": "ANGLE (ARM, Mali-G710 MC10, OpenGL ES 3.2)",
+        "noiseSeed": -442517609
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": -442517609
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Roboto",
+          "Noto Sans",
+          "Noto Sans Thai",
+          "Noto Color Emoji",
+          "Droid Sans",
+          "Droid Serif",
+          "Courier New"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 1,
+        "videoInputs": 2
+      },
+      "plugins": {
+        "mode": "empty"
+      },
+      "speech": {
+        "mode": "filter"
+      },
+      "behavior": {
+        "mouseJitter": true,
+        "typingNoise": true,
+        "scrollInertia": true
+      },
+      "timing": {
+        "dateNoisePrecision": 100,
+        "rafJitter": true,
+        "performanceClamp": true
+      }
+    },
+    "proxy_id": "9d971e28-483b-42d6-a023-054b790886b6",
+    "notes": "TikTok Shop live-stream monitoring. Mobile preset REQUIRED — Phase 17.H validator blocks desktop.",
+    "status": "active",
+    "rotation_mode": "none",
+    "user_data_path": "<userdata>/profiles/084f5b1c-77d6-493d-bf76-41039eb38448",
+    "persona": {
+      "platform": "tiktok-shop",
+      "preset": "android-pixel-chrome121",
+      "proxy_country": "VN"
+    }
+  },
+  {
+    "id": "1d93668d-f13e-4aa9-b383-ec7b534f60c3",
+    "name": "TikTok Shop ID — Feed Browser",
+    "group_id": "2c64c023-e951-4673-af2a-8dfacb2f999f",
+    "group_name": "E-Commerce Operations",
+    "fingerprint": {
+      "preset": "android-samsung-chrome120",
+      "geolocation": {
+        "latitude": 10.8231,
+        "longitude": 106.6297,
+        "accuracy": 20
+      },
+      "os": {
+        "platform": "Linux armv8l",
+        "version": "13.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Linux; Android 13; SM-A546E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36",
+        "platform": "Linux armv8l",
+        "vendor": "Google Inc.",
+        "version": "120",
+        "languages": [
+          "vi-VN",
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 412,
+        "height": 915,
+        "availWidth": 412,
+        "availHeight": 883,
+        "colorDepth": 24,
+        "pixelRatio": 2.625
+      },
+      "hardware": {
+        "deviceMemory": 8,
+        "hardwareConcurrency": 8,
+        "maxTouchPoints": 5
+      },
+      "locale": {
+        "language": "vi-VN",
+        "languages": [
+          "vi-VN",
+          "en-US",
+          "en"
+        ],
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": -1167117800
+      },
+      "webgl": {
+        "vendor": "Qualcomm",
+        "renderer": "Adreno (TM) 619",
+        "noiseSeed": -1167117800
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": -1167117800
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Roboto",
+          "Droid Sans",
+          "Noto Sans",
+          "Noto Color Emoji",
+          "Droid Serif",
+          "Noto Serif",
+          "Courier New"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 1,
+        "videoInputs": 2
+      },
+      "plugins": {
+        "mode": "empty"
+      },
+      "speech": {
+        "mode": "filter"
+      },
+      "behavior": {
+        "mouseJitter": true,
+        "typingNoise": true,
+        "scrollInertia": true
+      },
+      "timing": {
+        "dateNoisePrecision": 100,
+        "rafJitter": true,
+        "performanceClamp": true
+      }
+    },
+    "proxy_id": "e65dab67-23f8-4df6-8acf-d41f89fa5427",
+    "notes": "TikTok Shop Indonesia feed browsing + trending scraper.",
+    "status": "active",
+    "rotation_mode": "none",
+    "user_data_path": "<userdata>/profiles/1d93668d-f13e-4aa9-b383-ec7b534f60c3",
+    "persona": {
+      "platform": "tiktok-shop",
+      "preset": "android-samsung-chrome120",
+      "proxy_country": "ID"
+    }
+  },
+  {
+    "id": "d3399683-f844-4a21-8735-92ae42634cd9",
+    "name": "Tiki VN — Search Bot",
+    "group_id": "2c64c023-e951-4673-af2a-8dfacb2f999f",
+    "group_name": "E-Commerce Operations",
+    "fingerprint": {
+      "preset": "win11-chrome121",
+      "os": {
+        "platform": "Win32",
+        "version": "10.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "platform": "Win32",
+        "vendor": "Google Inc.",
+        "version": "121",
+        "languages": [
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 2560,
+        "height": 1440,
+        "availWidth": 2560,
+        "availHeight": 1400,
+        "colorDepth": 24,
+        "pixelRatio": 1
+      },
+      "hardware": {
+        "deviceMemory": 16,
+        "hardwareConcurrency": 12,
+        "maxTouchPoints": 0
+      },
+      "locale": {
+        "language": "en-US",
+        "languages": [
+          "en-US",
+          "en"
+        ],
+        "timezone": "America/Chicago"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": 2015793506
+      },
+      "webgl": {
+        "vendor": "Google Inc. (AMD)",
+        "renderer": "ANGLE (AMD, AMD Radeon RX 6700 XT Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "noiseSeed": 2015793506
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": 2015793506
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Arial",
+          "Arial Black",
+          "Calibri",
+          "Cambria",
+          "Comic Sans MS",
+          "Consolas",
+          "Courier New",
+          "Georgia",
+          "Impact",
+          "Segoe UI",
+          "Tahoma",
+          "Times New Roman",
+          "Trebuchet MS",
+          "Verdana"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 2,
+        "videoInputs": 1
+      },
+      "plugins": {
+        "mode": "realistic"
+      },
+      "speech": {
+        "mode": "filter"
+      },
+      "behavior": {
+        "mouseJitter": true,
+        "typingNoise": true,
+        "scrollInertia": true
+      },
+      "timing": {
+        "dateNoisePrecision": 100,
+        "rafJitter": true,
+        "performanceClamp": true
+      }
+    },
+    "proxy_id": "9d971e28-483b-42d6-a023-054b790886b6",
+    "notes": "Tiki VN desktop search + flash-deal monitor. Windows 11.",
+    "status": "active",
+    "rotation_mode": "none",
+    "user_data_path": "<userdata>/profiles/d3399683-f844-4a21-8735-92ae42634cd9",
+    "persona": {
+      "platform": "tiki",
+      "preset": "win11-chrome121",
+      "proxy_country": "VN"
+    }
+  },
+  {
+    "id": "e7658915-d82f-4be5-9893-6b16ade45976",
+    "name": "Tiki VN — Deal Tracker",
+    "group_id": "2c64c023-e951-4673-af2a-8dfacb2f999f",
+    "group_name": "E-Commerce Operations",
+    "fingerprint": {
+      "preset": "mac-sonoma-chrome121",
+      "os": {
+        "platform": "MacIntel",
+        "version": "14.2.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "platform": "MacIntel",
+        "vendor": "Google Inc.",
+        "version": "121",
+        "languages": [
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 1512,
+        "height": 982,
+        "availWidth": 1512,
+        "availHeight": 944,
+        "colorDepth": 30,
+        "pixelRatio": 2
+      },
+      "hardware": {
+        "deviceMemory": 16,
+        "hardwareConcurrency": 10,
+        "maxTouchPoints": 0
+      },
+      "locale": {
+        "language": "en-US",
+        "languages": [
+          "en-US",
+          "en"
+        ],
+        "timezone": "America/Los_Angeles"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": -1326482887
+      },
+      "webgl": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2, Unspecified Version)",
+        "noiseSeed": -1326482887
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": -1326482887
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Arial",
+          "Arial Black",
+          "Courier New",
+          "Georgia",
+          "Helvetica",
+          "Helvetica Neue",
+          "Impact",
+          "Monaco",
+          "Optima",
+          "San Francisco",
+          "Times New Roman",
+          "Trebuchet MS",
+          "Verdana"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 1,
+        "videoInputs": 1
+      },
+      "plugins": {
+        "mode": "realistic"
+      },
+      "speech": {
+        "mode": "filter"
+      },
+      "behavior": {
+        "mouseJitter": true,
+        "typingNoise": true,
+        "scrollInertia": true
+      },
+      "timing": {
+        "dateNoisePrecision": 100,
+        "rafJitter": true,
+        "performanceClamp": true
+      }
+    },
+    "proxy_id": "9d971e28-483b-42d6-a023-054b790886b6",
+    "notes": "Tiki flash deal monitor. macOS Sonoma fingerprint — contrasts with the Windows buyer.",
+    "status": "active",
+    "rotation_mode": "none",
+    "user_data_path": "<userdata>/profiles/e7658915-d82f-4be5-9893-6b16ade45976",
+    "persona": {
+      "platform": "tiki",
+      "preset": "mac-sonoma-chrome121",
+      "proxy_country": "VN"
+    }
+  },
+  {
+    "id": "9e98deaf-aa02-4a3a-a5e0-ed6ef177dda2",
+    "name": "GrabFood VN — Restaurant Explorer",
+    "group_id": "2c64c023-e951-4673-af2a-8dfacb2f999f",
+    "group_name": "E-Commerce Operations",
+    "fingerprint": {
+      "preset": "android-samsung-chrome120",
+      "geolocation": {
+        "latitude": 10.8231,
+        "longitude": 106.6297,
+        "accuracy": 20
+      },
+      "os": {
+        "platform": "Linux armv8l",
+        "version": "13.0.0"
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Linux; Android 13; SM-A546E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36",
+        "platform": "Linux armv8l",
+        "vendor": "Google Inc.",
+        "version": "120",
+        "languages": [
+          "vi-VN",
+          "en-US",
+          "en"
+        ]
+      },
+      "screen": {
+        "width": 412,
+        "height": 915,
+        "availWidth": 412,
+        "availHeight": 883,
+        "colorDepth": 24,
+        "pixelRatio": 2.625
+      },
+      "hardware": {
+        "deviceMemory": 8,
+        "hardwareConcurrency": 8,
+        "maxTouchPoints": 5
+      },
+      "locale": {
+        "language": "vi-VN",
+        "languages": [
+          "vi-VN",
+          "en-US",
+          "en"
+        ],
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "webrtc": {
+        "enabled": false,
+        "mode": "disabled"
+      },
+      "canvas": {
+        "mode": "noise",
+        "noiseSeed": 1673677909
+      },
+      "webgl": {
+        "vendor": "Qualcomm",
+        "renderer": "Adreno (TM) 619",
+        "noiseSeed": 1673677909
+      },
+      "audio": {
+        "mode": "noise",
+        "noiseSeed": 1673677909
+      },
+      "fonts": {
+        "mode": "whitelist",
+        "whitelist": [
+          "Roboto",
+          "Droid Sans",
+          "Noto Sans",
+          "Noto Color Emoji",
+          "Droid Serif",
+          "Noto Serif",
+          "Courier New"
+        ]
+      },
+      "media": {
+        "audioInputs": 1,
+        "audioOutputs": 1,
+        "videoInputs": 2
+      },
+      "plugins": {
+        "mode": "empty"
+      },
+      "speech": {
+        "mode": "filter"
+      },
+      "behavior": {
+        "mouseJitter": true,
+        "typingNoise": true,
+        "scrollInertia": true
+      },
+      "timing": {
+        "dateNoisePrecision": 100,
+        "rafJitter": true,
+        "performanceClamp": true
+      }
+    },
+    "proxy_id": "9d971e28-483b-42d6-a023-054b790886b6",
+    "notes": "GrabFood Vietnam restaurant browsing. Delivery address = Nguyen Hue Walking Street.",
+    "status": "active",
+    "rotation_mode": "none",
+    "user_data_path": "<userdata>/profiles/9e98deaf-aa02-4a3a-a5e0-ed6ef177dda2",
+    "persona": {
+      "platform": "grab",
+      "preset": "android-samsung-chrome120",
+      "proxy_country": "VN"
+    }
+  }
+]

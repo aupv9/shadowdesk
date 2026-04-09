@@ -1,0 +1,80 @@
+[
+  {
+    "id": "9d971e28-483b-42d6-a023-054b790886b6",
+    "name": "SEA Residential — Ho Chi Minh (VN)",
+    "type": "http",
+    "host": "103.145.58.21",
+    "port": 30000,
+    "username": "gb_vn_user",
+    "password": "DEMO-VN-2026",
+    "country": "VN",
+    "is_healthy": 1,
+    "latency_ms": 80,
+    "notes": "Demo proxy for Ho Chi Minh. Replace host/creds before live runs."
+  },
+  {
+    "id": "793da0fa-6c3c-4539-8029-e679cd99be16",
+    "name": "SEA Residential — Bangkok (TH)",
+    "type": "http",
+    "host": "103.77.248.5",
+    "port": 30100,
+    "username": "gb_th_user",
+    "password": "DEMO-TH-2026",
+    "country": "TH",
+    "is_healthy": 1,
+    "latency_ms": 105,
+    "notes": "Demo proxy for Bangkok. Replace host/creds before live runs."
+  },
+  {
+    "id": "e65dab67-23f8-4df6-8acf-d41f89fa5427",
+    "name": "SEA Residential — Jakarta (ID)",
+    "type": "http",
+    "host": "103.167.85.92",
+    "port": 30200,
+    "username": "gb_id_user",
+    "password": "DEMO-ID-2026",
+    "country": "ID",
+    "is_healthy": 1,
+    "latency_ms": 130,
+    "notes": "Demo proxy for Jakarta. Replace host/creds before live runs."
+  },
+  {
+    "id": "69d3205d-71ab-4aed-8ba1-4f084eadef43",
+    "name": "SEA Residential — Kuala Lumpur (MY)",
+    "type": "http",
+    "host": "103.3.60.110",
+    "port": 30300,
+    "username": "gb_my_user",
+    "password": "DEMO-MY-2026",
+    "country": "MY",
+    "is_healthy": 1,
+    "latency_ms": 155,
+    "notes": "Demo proxy for Kuala Lumpur. Replace host/creds before live runs."
+  },
+  {
+    "id": "90d46d48-d052-48d4-a331-8cdd7438e6bc",
+    "name": "SEA Residential — Manila (PH)",
+    "type": "http",
+    "host": "103.171.39.62",
+    "port": 30400,
+    "username": "gb_ph_user",
+    "password": "DEMO-PH-2026",
+    "country": "PH",
+    "is_healthy": 1,
+    "latency_ms": 180,
+    "notes": "Demo proxy for Manila. Replace host/creds before live runs."
+  },
+  {
+    "id": "40cf741e-19ab-4d57-a51c-9031cd8fc860",
+    "name": "SEA Residential — Singapore (SG)",
+    "type": "http",
+    "host": "103.47.134.17",
+    "port": 30500,
+    "username": "gb_sg_user",
+    "password": "DEMO-SG-2026",
+    "country": "SG",
+    "is_healthy": 1,
+    "latency_ms": 205,
+    "notes": "Demo proxy for Singapore. Replace host/creds before live runs."
+  }
+]
