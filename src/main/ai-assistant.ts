@@ -25,8 +25,11 @@ import type {
   AiDetectionAdvice,
   AiWorkflowResult,
   AiSelectorHealResult,
+  AiRecoveryResult,
   BehaviorArchetype,
-  DetectionVectorResult
+  DetectionVectorResult,
+  ErrorContext,
+  ErrorCategory
 } from '../shared/types'
 
 // ── Built-in Behaviour Archetypes (Phase 16.D) ────────────────────────────────
@@ -352,6 +355,110 @@ Respond ONLY with a valid JSON object matching the AutomationStep shape:
     params: fixed.params ?? step.params,
     retries: step.retries,
     retryDelay: step.retryDelay
+  }
+}
+
+// ── Phase 3: AI Step Recovery ────────────────────────────────────────────────
+
+const RECOVERY_SYSTEM_PROMPT = `You are a web automation recovery expert for ShadowDesk anti-detect browser.
+A workflow step has failed. Your job is to generate 1-3 recovery steps that can fix the situation
+so the workflow can continue.
+
+Rules:
+- Return ONLY valid JSON matching the shape below.
+- Each recovery step must have: id (use "recovery-1", "recovery-2", etc.), action, label, params.
+- Allowed actions: navigate, click, type, wait, waitForSelector, screenshot, extractText, scroll,
+  select, keyPress, evaluate, hover, waitForNavigation, setAttribute, httpRequest.
+- Do NOT generate potentially dangerous actions (upload, download, evaluate with harmful code).
+- Keep recovery minimal — prefer 1 step if possible, max 3.
+- For selector errors: suggest a more robust selector or a waitForSelector with longer timeout.
+- For timeout errors: suggest a wait step then retry the original action.
+- For network errors: suggest a wait with backoff then a retry.
+- For captcha errors: suggest a solveCaptcha step if not already present.
+- For navigation errors: suggest a page refresh or navigate to the expected URL.
+
+Respond with valid JSON:
+{
+  "steps": [{ "id": "recovery-1", "action": "...", "label": "...", "params": {...} }],
+  "reasoning": "Why these recovery steps should fix the issue",
+  "confidence": "high" | "medium" | "low"
+}`
+
+/**
+ * Phase 3 — Generate recovery steps for a failed automation step.
+ *
+ * Uses the AI model to analyze the failure context and suggest 1-3 recovery
+ * steps that can be injected into the workflow to recover from the error.
+ *
+ * Safety: generated steps are validated against a whitelist of safe actions
+ * before being returned. Max 3 steps per call.
+ */
+export async function generateRecoverySteps(
+  failedStep: AutomationStep,
+  errorContext: ErrorContext,
+  recentSteps?: AutomationStep[],
+  maxSteps: number = 3
+): Promise<AiRecoveryResult> {
+  checkRateLimit()
+  const client = getClient()
+
+  const contextSummary = [
+    `Failed step: ${JSON.stringify({ id: failedStep.id, action: failedStep.action, label: failedStep.label, params: failedStep.params })}`,
+    `Error: ${errorContext.errorMessage}`,
+    `Error category: ${errorContext.errorCategory}`,
+    errorContext.pageUrl ? `Page URL: ${errorContext.pageUrl}` : null,
+    `Attempt: ${errorContext.attempt}`,
+    recentSteps && recentSteps.length > 0
+      ? `Previous ${recentSteps.length} steps: ${JSON.stringify(recentSteps.map(s => ({ id: s.id, action: s.action, label: s.label })))}`
+      : null
+  ].filter(Boolean).join('\n')
+
+  const response = await client.messages.create({
+    model: 'claude-haiku-4-5',
+    max_tokens: 768,
+    system: RECOVERY_SYSTEM_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `${contextSummary}\n\nGenerate recovery steps (max ${maxSteps}).`
+      }
+    ]
+  })
+  incrementCall()
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const jsonMatch = text.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    throw new Error('AI did not return valid JSON for step recovery')
+  }
+
+  const parsed = JSON.parse(jsonMatch[0])
+
+  // Validate and sanitize generated steps
+  const SAFE_ACTIONS = new Set([
+    'navigate', 'click', 'type', 'wait', 'waitForSelector', 'screenshot',
+    'extractText', 'scroll', 'select', 'keyPress', 'evaluate', 'hover',
+    'waitForNavigation', 'setAttribute', 'httpRequest', 'solveCaptcha'
+  ])
+
+  const steps: AutomationStep[] = (parsed.steps ?? [])
+    .slice(0, maxSteps)
+    .filter((s: any) => s && s.action && SAFE_ACTIONS.has(s.action))
+    .map((s: any, idx: number): AutomationStep => ({
+      id: s.id ?? `recovery-${idx + 1}`,
+      action: s.action,
+      label: s.label ?? `AI recovery: ${s.action}`,
+      params: s.params ?? {}
+    }))
+
+  if (steps.length === 0) {
+    throw new Error('AI generated no valid recovery steps')
+  }
+
+  return {
+    steps,
+    reasoning: parsed.reasoning ?? 'Recovery steps generated.',
+    confidence: ['high', 'medium', 'low'].includes(parsed.confidence) ? parsed.confidence : 'medium'
   }
 }
 

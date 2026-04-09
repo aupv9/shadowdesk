@@ -334,6 +334,11 @@ export class Database {
       this.db.exec(`ALTER TABLE workflows ADD COLUMN circuit_breaker TEXT`)
     } catch { /* exists */ }
 
+    // Phase 3: AI recovery config for workflows (JSON of AiRecoveryConfig)
+    try {
+      this.db.exec(`ALTER TABLE workflows ADD COLUMN ai_recovery TEXT`)
+    } catch { /* exists */ }
+
     // Sync history error_message column (Account C3)
     try {
       this.db.exec(`ALTER TABLE sync_log ADD COLUMN error_message TEXT`)
@@ -1848,9 +1853,9 @@ export class Database {
     return this.queryOne('SELECT * FROM workflows WHERE id = ?', [id])
   }
 
-  createWorkflow(workflow: { id: string; name: string; description?: string; steps: any[]; variables?: Record<string, string>; variableDefinitions?: import('../shared/types').VariableDefinition[]; circuitBreaker?: import('../shared/types').CircuitBreakerConfig }): void {
+  createWorkflow(workflow: { id: string; name: string; description?: string; steps: any[]; variables?: Record<string, string>; variableDefinitions?: import('../shared/types').VariableDefinition[]; circuitBreaker?: import('../shared/types').CircuitBreakerConfig; aiRecovery?: import('../shared/types').AiRecoveryConfig }): void {
     this.run(
-      'INSERT INTO workflows (id, name, description, steps, variables, variable_definitions, circuit_breaker) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO workflows (id, name, description, steps, variables, variable_definitions, circuit_breaker, ai_recovery) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         workflow.id,
         workflow.name,
@@ -1858,14 +1863,15 @@ export class Database {
         JSON.stringify(workflow.steps),
         workflow.variables ? JSON.stringify(workflow.variables) : null,
         workflow.variableDefinitions ? JSON.stringify(workflow.variableDefinitions) : null,
-        workflow.circuitBreaker ? JSON.stringify(workflow.circuitBreaker) : null
+        workflow.circuitBreaker ? JSON.stringify(workflow.circuitBreaker) : null,
+        workflow.aiRecovery ? JSON.stringify(workflow.aiRecovery) : null
       ]
     )
   }
 
   updateWorkflow(
     id: string,
-    data: { name?: string; description?: string; steps?: any[]; variables?: Record<string, string>; variableDefinitions?: import('../shared/types').VariableDefinition[]; circuitBreaker?: import('../shared/types').CircuitBreakerConfig | null }
+    data: { name?: string; description?: string; steps?: any[]; variables?: Record<string, string>; variableDefinitions?: import('../shared/types').VariableDefinition[]; circuitBreaker?: import('../shared/types').CircuitBreakerConfig | null; aiRecovery?: import('../shared/types').AiRecoveryConfig | null }
   ): void {
     const sets: string[] = []
     const vals: any[] = []
@@ -1875,6 +1881,7 @@ export class Database {
     if (data.variables !== undefined) { sets.push('variables = ?'); vals.push(JSON.stringify(data.variables)) }
     if (data.variableDefinitions !== undefined) { sets.push('variable_definitions = ?'); vals.push(JSON.stringify(data.variableDefinitions)) }
     if (data.circuitBreaker !== undefined) { sets.push('circuit_breaker = ?'); vals.push(data.circuitBreaker ? JSON.stringify(data.circuitBreaker) : null) }
+    if (data.aiRecovery !== undefined) { sets.push('ai_recovery = ?'); vals.push(data.aiRecovery ? JSON.stringify(data.aiRecovery) : null) }
     if (sets.length === 0) return
     sets.push("updated_at = datetime('now')")
     this.run(`UPDATE workflows SET ${sets.join(', ')} WHERE id = ?`, [...vals, id])

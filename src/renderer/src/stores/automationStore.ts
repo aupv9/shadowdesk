@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AutomationWorkflow, AutomationRunResult, AutomationStep, CreateWorkflowInput, VariableDefinition, CircuitBreakerConfig } from '../types'
+import type { AutomationWorkflow, AutomationRunResult, AutomationStep, CreateWorkflowInput, VariableDefinition, CircuitBreakerConfig, AiRecoveryConfig } from '../types'
 
 interface AutomationState {
   workflows: AutomationWorkflow[]
@@ -14,7 +14,7 @@ interface AutomationState {
   fetchWorkflows: () => Promise<void>
   selectWorkflow: (id: string | null) => Promise<void>
   createWorkflow: (input: CreateWorkflowInput) => Promise<AutomationWorkflow>
-  updateWorkflow: (id: string, data: { name?: string; description?: string; steps?: AutomationStep[]; variables?: Record<string, string>; variableDefinitions?: VariableDefinition[]; circuitBreaker?: CircuitBreakerConfig | null }) => Promise<void>
+  updateWorkflow: (id: string, data: { name?: string; description?: string; steps?: AutomationStep[]; variables?: Record<string, string>; variableDefinitions?: VariableDefinition[]; circuitBreaker?: CircuitBreakerConfig | null; aiRecovery?: AiRecoveryConfig | null }) => Promise<void>
   deleteWorkflow: (id: string) => Promise<void>
   runWorkflow: (workflowId: string, profileId: string, variables?: Record<string, string>) => Promise<AutomationRunResult>
   runWorkflowParallel: (workflowId: string, profileIds: string[], variables?: Record<string, string>, concurrency?: number) => Promise<AutomationRunResult[]>

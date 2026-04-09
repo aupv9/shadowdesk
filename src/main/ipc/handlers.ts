@@ -57,6 +57,7 @@ import {
   getAiStatus, setAiApiKey, setAiEnabled,
   generateWorkflow, explainStep, fixStep,
   analyzeDetection, healSelector,
+  generateRecoverySteps,
   getBehaviorArchetypes, getBehaviorArchetype
 } from '../ai-assistant'
 // Phase 21 — Behavior Correlation Detector
@@ -1291,7 +1292,8 @@ export function registerIpcHandlers(): void {
     steps: JSON.parse(row.steps),
     variables: row.variables ? JSON.parse(row.variables) : {},
     variableDefinitions: row.variable_definitions ? JSON.parse(row.variable_definitions) : undefined,
-    circuitBreaker: row.circuit_breaker ? JSON.parse(row.circuit_breaker) : undefined
+    circuitBreaker: row.circuit_breaker ? JSON.parse(row.circuit_breaker) : undefined,
+    aiRecovery: row.ai_recovery ? JSON.parse(row.ai_recovery) : undefined
   })
 
   ipcMain.handle('workflows:list', () => {
@@ -1314,7 +1316,8 @@ export function registerIpcHandlers(): void {
       steps: input.steps,
       variables: input.variables,
       variableDefinitions: input.variableDefinitions,
-      circuitBreaker: input.circuitBreaker
+      circuitBreaker: input.circuitBreaker,
+      aiRecovery: input.aiRecovery
     })
     return hydrateWorkflow(db.getWorkflow(id))
   })
@@ -1953,6 +1956,11 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('ai:fixStep', (_e, step: AutomationStep, errorMessage: string) =>
     fixStep(step, errorMessage)
+  )
+
+  // Phase 3 — AI Step Recovery (manual trigger from UI)
+  ipcMain.handle('ai:generateRecoverySteps', (_e, failedStep: AutomationStep, errorContext: any, recentSteps?: AutomationStep[], maxSteps?: number) =>
+    generateRecoverySteps(failedStep, errorContext, recentSteps, maxSteps)
   )
 
   // 16.B — AI Detection Advisor
