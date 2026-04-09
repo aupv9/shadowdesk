@@ -14,7 +14,12 @@ import type {
   PreFlightValidationResult,
   VariableType,
   VariableDefinition,
-  TypedVariable
+  TypedVariable,
+  ErrorCategory,
+  ErrorContext,
+  CircuitBreakerConfig,
+  CircuitBreakerState,
+  AutomationRunMetrics
 } from '../shared/types'
 import { validatePreFlight, analyzeRuntimeSignal } from './platform-hardener'
 import type { Page, ElementHandle } from 'puppeteer-core'
@@ -367,6 +372,214 @@ export function setTypedVariable(
   }
 }
 
+// ─── Phase 2: Error Categorization ───────────────────────────────────────────
+
+/** Known error patterns mapped to categories for smarter recovery. */
+const ERROR_PATTERNS: [RegExp, ErrorCategory][] = [
+  // Timeout patterns
+  [/timed?\s*out/i, 'timeout'],
+  [/timeout/i, 'timeout'],
+  [/waiting for selector/i, 'timeout'],
+  [/exceeded.*ms/i, 'timeout'],
+  // Network patterns
+  [/net::ERR_/i, 'network'],
+  [/ECONNREFUSED/i, 'network'],
+  [/ENOTFOUND/i, 'network'],
+  [/ECONNRESET/i, 'network'],
+  [/ETIMEDOUT/i, 'network'],
+  [/fetch failed/i, 'network'],
+  [/request failed/i, 'network'],
+  [/proxy.*error/i, 'network'],
+  [/status\s+4(0[0-9]|[1-9]\d)/i, 'network'],  // 4xx
+  [/status\s+5\d{2}/i, 'network'],               // 5xx
+  // Selector patterns
+  [/not found/i, 'selector'],
+  [/no element/i, 'selector'],
+  [/selector.*not.*match/i, 'selector'],
+  [/failed to find/i, 'selector'],
+  // Navigation patterns
+  [/navigation/i, 'navigation'],
+  [/ERR_TOO_MANY_REDIRECTS/i, 'navigation'],
+  [/ERR_ABORTED/i, 'navigation'],
+  // Captcha patterns
+  [/captcha/i, 'captcha'],
+  [/recaptcha/i, 'captcha'],
+  [/hcaptcha/i, 'captcha'],
+  // Validation patterns
+  [/assert/i, 'validation'],
+  [/expected/i, 'validation'],
+  [/mismatch/i, 'validation'],
+  // Permission patterns
+  [/EACCES/i, 'permission'],
+  [/EPERM/i, 'permission'],
+  [/permission denied/i, 'permission'],
+]
+
+/**
+ * Categorize an error message into a known ErrorCategory.
+ * Falls back to 'unknown' if no pattern matches.
+ */
+export function categorizeError(message: string): ErrorCategory {
+  for (const [pattern, category] of ERROR_PATTERNS) {
+    if (pattern.test(message)) return category
+  }
+  return 'unknown'
+}
+
+// ─── Phase 2: Circuit Breaker ────────────────────────────────────────────────
+
+/**
+ * Per-workflow circuit breaker that monitors consecutive step failures.
+ *
+ * States:
+ *  - CLOSED:    Normal execution. Failures increment the counter.
+ *  - OPEN:      Too many failures. Steps are skipped until resetTimeout elapses.
+ *  - HALF_OPEN: After timeout, allow a limited number of steps to test recovery.
+ *               If they succeed → CLOSED. If they fail → back to OPEN.
+ */
+export class CircuitBreaker {
+  private status: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED'
+  private failureCount = 0
+  private successCount = 0
+  private halfOpenAttempts = 0
+  private lastFailureTime: number | null = null
+  private tripCount = 0
+
+  constructor(private readonly config: CircuitBreakerConfig) {}
+
+  /** Record a successful step execution. */
+  recordSuccess(): void {
+    this.failureCount = 0
+    if (this.status === 'HALF_OPEN') {
+      this.successCount++
+      if (this.successCount >= this.config.successThreshold) {
+        this.status = 'CLOSED'
+        this.successCount = 0
+        this.halfOpenAttempts = 0
+      }
+    }
+  }
+
+  /** Record a failed step execution. Returns true if the circuit just tripped. */
+  recordFailure(): boolean {
+    this.successCount = 0
+    this.lastFailureTime = Date.now()
+
+    if (this.status === 'HALF_OPEN') {
+      // Failed during recovery test — trip back to OPEN
+      this.status = 'OPEN'
+      this.halfOpenAttempts = 0
+      this.tripCount++
+      return true
+    }
+
+    this.failureCount++
+    if (this.status === 'CLOSED' && this.failureCount >= this.config.failureThreshold) {
+      this.status = 'OPEN'
+      this.failureCount = 0
+      this.tripCount++
+      return true
+    }
+    return false
+  }
+
+  /**
+   * Check if execution should proceed.
+   * - CLOSED: always allow
+   * - OPEN: check if reset timeout elapsed → transition to HALF_OPEN
+   * - HALF_OPEN: allow up to halfOpenMaxAttempts
+   */
+  canExecute(): boolean {
+    if (this.status === 'CLOSED') return true
+
+    if (this.status === 'OPEN') {
+      if (this.lastFailureTime &&
+          Date.now() - this.lastFailureTime >= this.config.resetTimeoutMs) {
+        this.status = 'HALF_OPEN'
+        this.halfOpenAttempts = 0
+        this.successCount = 0
+        return true
+      }
+      return false
+    }
+
+    // HALF_OPEN
+    const maxAttempts = this.config.halfOpenMaxAttempts ?? 3
+    return this.halfOpenAttempts < maxAttempts
+  }
+
+  /** Increment the half-open attempt counter before executing a step. */
+  markHalfOpenAttempt(): void {
+    if (this.status === 'HALF_OPEN') {
+      this.halfOpenAttempts++
+    }
+  }
+
+  /** Get the current state snapshot for reporting. */
+  getState(): CircuitBreakerState {
+    return {
+      status: this.status,
+      failureCount: this.failureCount,
+      successCount: this.successCount,
+      lastFailureTime: this.lastFailureTime
+        ? new Date(this.lastFailureTime).toISOString()
+        : undefined,
+      nextAttemptTime: (this.status === 'OPEN' && this.lastFailureTime)
+        ? new Date(this.lastFailureTime + this.config.resetTimeoutMs).toISOString()
+        : undefined,
+      tripCount: this.tripCount
+    }
+  }
+
+  /** Check if the circuit is currently open (blocking execution). */
+  isOpen(): boolean {
+    return this.status === 'OPEN'
+  }
+}
+
+// ─── Phase 2: Enhanced Backoff ───────────────────────────────────────────────
+
+/**
+ * Calculate retry delay with jitter and max cap support.
+ *
+ * @param baseDelay  - Base delay in ms
+ * @param attempt    - 0-based attempt number
+ * @param backoff    - Strategy: fixed, linear, exponential
+ * @param jitter     - Add randomized jitter (±25%) to prevent thundering herd
+ * @param maxDelay   - Cap the maximum delay (default 30s)
+ */
+export function calculateRetryDelay(
+  baseDelay: number,
+  attempt: number,
+  backoff: 'fixed' | 'linear' | 'exponential',
+  jitter: boolean = false,
+  maxDelay: number = 30_000
+): number {
+  let delay: number
+  switch (backoff) {
+    case 'linear':
+      delay = baseDelay * (attempt + 1)
+      break
+    case 'exponential':
+      delay = baseDelay * Math.pow(2, attempt)
+      break
+    default: // fixed
+      delay = baseDelay
+      break
+  }
+
+  // Cap at max delay
+  delay = Math.min(delay, maxDelay)
+
+  // Add jitter: ±25% randomization
+  if (jitter) {
+    const jitterRange = delay * 0.25
+    delay = delay - jitterRange + Math.random() * jitterRange * 2
+  }
+
+  return Math.max(0, Math.round(delay))
+}
+
 /**
  * Phase 18 — Minimal JSONPath getter.
  *
@@ -559,6 +772,10 @@ export class AutomationEngine {
   private failureScreenshotDir: string | null = null
   /** Active iframe context set by `switchFrame` action; null = main frame. */
   private activeFrame: import('puppeteer-core').Frame | null = null
+  /** Phase 2: Per-run circuit breaker instances. Keyed by runKey. */
+  private circuitBreakers = new Map<string, CircuitBreaker>()
+  /** Phase 2: Per-run error context stacks. Keyed by runKey. */
+  private errorStacks = new Map<string, ErrorContext[]>()
 
   static getInstance(): AutomationEngine {
     if (!AutomationEngine.instance) {
@@ -679,7 +896,8 @@ export class AutomationEngine {
       ...workflowRow,
       steps: JSON.parse(workflowRow.steps),
       variables: workflowRow.variables ? JSON.parse(workflowRow.variables) : undefined,
-      variableDefinitions: workflowRow.variable_definitions ? JSON.parse(workflowRow.variable_definitions) : undefined
+      variableDefinitions: workflowRow.variable_definitions ? JSON.parse(workflowRow.variable_definitions) : undefined,
+      circuitBreaker: workflowRow.circuit_breaker ? JSON.parse(workflowRow.circuit_breaker) : undefined
     }
 
     // Phase 18.1: Pre-flight validation of regex patterns
@@ -766,6 +984,13 @@ export class AutomationEngine {
     }
     this.running.set(runKey, control)
 
+    // Phase 2: Initialize circuit breaker for this run (if configured)
+    if (workflow.circuitBreaker) {
+      this.circuitBreakers.set(runKey, new CircuitBreaker(workflow.circuitBreaker))
+    }
+    // Phase 2: Initialize error context stack for this run
+    this.errorStacks.set(runKey, [])
+
     const startedAt = new Date().toISOString()
     const startedAtMs = Date.now()
     const stepResults: AutomationStepResult[] = []
@@ -817,6 +1042,7 @@ export class AutomationEngine {
       this.failureScreenshotDir = null
       this.running.delete(runKey)
       this.currentPages.delete(profileId)
+      // Phase 2: circuit breaker cleanup is deferred until after metrics are collected
       // Tier 5: emit after-workflow hook
       await this.callHooks(runKey, 'after-workflow', {
         workflowId,
@@ -833,6 +1059,24 @@ export class AutomationEngine {
     }
 
     const completedAt = new Date().toISOString()
+
+    // Phase 2: Collect run metrics before cleaning up
+    const errorStack = this.errorStacks.get(runKey) ?? []
+    const cb = this.circuitBreakers.get(runKey)
+    const metrics: AutomationRunMetrics = {
+      totalAttempts: stepResults.reduce((sum, r) => {
+        const retried = r.output?.retriedAfter ?? 0
+        return sum + 1 + retried
+      }, 0),
+      retriedSteps: stepResults.filter(r => r.retryAttempt && r.retryAttempt > 0).length,
+      circuitBreakerState: cb?.getState(),
+      errorStack
+    }
+
+    // Phase 2: Cleanup circuit breaker and error stack
+    this.circuitBreakers.delete(runKey)
+    this.errorStacks.delete(runKey)
+
     const runResult: AutomationRunResult = {
       workflowId,
       profileId,
@@ -840,7 +1084,8 @@ export class AutomationEngine {
       startedAt,
       completedAt,
       stepResults,
-      error: runError
+      error: runError,
+      metrics
     }
 
     // Persist run to DB (Tier 2: includes started_at, duration, variables snapshot)
@@ -1256,8 +1501,48 @@ export class AutomationEngine {
       }).catch(() => { /* non-fatal */ })
       }
 
-      const result = await this.executeStep(page, liveStep, control, stepResults, variables, profileId, typedVars, variableDefinitions)
+      // Phase 2: Check circuit breaker before executing the step
+      const cb = runKey ? this.circuitBreakers.get(runKey) : undefined
+      if (cb && !cb.canExecute()) {
+        const skipResult: AutomationStepResult = {
+          stepId: step.id,
+          action: step.action,
+          success: false,
+          duration_ms: 0,
+          error: `Circuit breaker OPEN — step skipped (${cb.getState().tripCount} trip(s), next attempt at ${cb.getState().nextAttemptTime})`,
+          errorCategory: 'unknown'
+        }
+        stepResults.push(skipResult)
+        // Emit progress so the UI shows the skip
+        if (webContents && !webContents.isDestroyed()) {
+          try { webContents.send('automation:step-progress', { workflowId, profileId, step: skipResult }) } catch { /* non-fatal */ }
+        }
+        i++
+        continue
+      }
+      if (cb) cb.markHalfOpenAttempt()
+
+      const result = await this.executeStep(page, liveStep, control, stepResults, variables, profileId, typedVars, variableDefinitions, runKey)
       stepResults.push(result)
+
+      // Phase 2: Feed result into circuit breaker
+      if (cb) {
+        if (result.success) {
+          cb.recordSuccess()
+        } else {
+          const tripped = cb.recordFailure()
+          if (tripped && webContents && !webContents.isDestroyed()) {
+            try {
+              webContents.send('automation:circuit-breaker', {
+                workflowId, profileId,
+                state: cb.getState(),
+                triggerStep: step.id,
+                triggerError: result.error
+              })
+            } catch { /* non-fatal */ }
+          }
+        }
+      }
 
       // Tier 5: emit after-step hook (even on failure)
       if (runKey) {
@@ -1273,6 +1558,7 @@ export class AutomationEngine {
           stepId: step.id,
           action: step.action,
           error: result.error,
+          errorCategory: result.errorCategory,
           duration_ms: result.duration_ms
           }).catch(() => { /* non-fatal */ })
 
@@ -1445,17 +1731,23 @@ export class AutomationEngine {
     variables: Record<string, string>,
     profileId?: string,
     typedVars?: Map<string, TypedVariable>,
-    variableDefinitions?: VariableDefinition[]
+    variableDefinitions?: VariableDefinition[],
+    runKey?: string
   ): Promise<AutomationStepResult> {
     const start = Date.now()
+    const { params } = step
     const maxAttempts = Math.max(1, (step.retries ?? 0) + 1)
     const baseDelay = step.retryDelay ?? 1000
     const backoff: 'fixed' | 'linear' | 'exponential' = step.retryBackoff ?? 'fixed'
+    const jitter: boolean = step.retryJitter ?? false
+    const maxDelay: number = step.retryMaxDelay ?? 30_000
     const retryOn: string[] | undefined = Array.isArray(step.retryOn) && step.retryOn.length > 0
       ? step.retryOn
       : undefined
     let lastError: string = ''
+    let lastErrorCategory: ErrorCategory = 'unknown'
     let attemptsTaken = 0
+    const attemptErrors: ErrorContext[] = []
 
     // Tier 7: Match an error against retryOn patterns. Each entry is treated
     // as a substring first, falling back to a regex if it parses.
@@ -1506,16 +1798,33 @@ export class AutomationEngine {
           success: true,
           duration_ms: Date.now() - start,
           output: attempt > 0 ? { ...(output as any), retriedAfter: attempt } : output,
+          retryAttempt: attempt > 0 ? attempt : undefined,
           ...(Object.keys(savedVariables).length > 0 ? { savedVariables } : {})
         }
       } catch (err: any) {
         lastError = err.message ?? String(err)
+        lastErrorCategory = categorizeError(lastError)
+
+        // Phase 2: Capture error context for this attempt
+        let pageUrl: string | undefined
+        try { pageUrl = page.url() } catch { /* closed page */ }
+        const errCtx: ErrorContext = {
+          stepId: step.id,
+          action: step.action,
+          errorMessage: lastError,
+          errorCategory: lastErrorCategory,
+          timestamp: new Date().toISOString(),
+          attempt: attemptsTaken,
+          pageUrl,
+          variableSnapshot: { ...variables }
+        }
+        attemptErrors.push(errCtx)
+
         // If retryOn is set and the error doesn't match, abort retries early.
         if (!matchesRetryOn(lastError)) break
         if (attempt < maxAttempts - 1) {
-          let delay = baseDelay
-          if (backoff === 'linear')      delay = baseDelay * (attempt + 1)
-          if (backoff === 'exponential') delay = baseDelay * Math.pow(2, attempt)
+          // Phase 2: Enhanced backoff with jitter and max cap
+          const delay = calculateRetryDelay(baseDelay, attempt, backoff, jitter, maxDelay)
           await new Promise((r) => setTimeout(r, delay))
         }
       }
@@ -1530,7 +1839,17 @@ export class AutomationEngine {
         await mkdir(dirname(target), { recursive: true })
         await page.screenshot({ path: target as `${string}.png`, fullPage: false })
         failureScreenshot = target
+        // Annotate the last error context with the screenshot path
+        if (attemptErrors.length > 0) {
+          attemptErrors[attemptErrors.length - 1].screenshotPath = target
+        }
       } catch { /* non-fatal */ }
+    }
+
+    // Phase 2: Push error contexts to the run-level error stack
+    if (runKey) {
+      const stack = this.errorStacks.get(runKey)
+      if (stack) stack.push(...attemptErrors)
     }
 
     return {
@@ -1539,6 +1858,9 @@ export class AutomationEngine {
       success: false,
       duration_ms: Date.now() - start,
       error: attemptsTaken > 1 ? `Failed after ${attemptsTaken} attempts: ${lastError}` : lastError,
+      errorCategory: lastErrorCategory,
+      errorContext: attemptErrors.length > 0 ? attemptErrors : undefined,
+      retryAttempt: attemptsTaken > 1 ? attemptsTaken - 1 : undefined,
       output: failureScreenshot ? { failureScreenshot } : undefined
     }
   }
@@ -2429,7 +2751,7 @@ export class AutomationEngine {
               ...s,
               params: interpolateParams(s.params, variables)
             }
-            return this.executeStep(page, liveStep, control, allResults, variables, profileId, typedVars, variableDefinitions)
+            return this.executeStep(page, liveStep, control, allResults, variables, profileId, typedVars, variableDefinitions, undefined)
           })
         )
 
