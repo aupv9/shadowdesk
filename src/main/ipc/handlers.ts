@@ -1900,6 +1900,23 @@ export function registerIpcHandlers(): void {
     return { total: profileIds.length, completed, failed, results }
   })
 
+  // ── SEA Platform Detection Profiles ────────────────────────────────────────
+
+  ipcMain.handle('detection:seaProfiles', () => {
+    const { getDetectionProfiles } = require('../sea-detection-profiles')
+    return getDetectionProfiles()
+  })
+
+  ipcMain.handle('detection:seaProfile', (_event, id: string) => {
+    const { getDetectionProfile } = require('../sea-detection-profiles')
+    return getDetectionProfile(id)
+  })
+
+  ipcMain.handle('detection:seaProfilesByRegion', (_event, region: string) => {
+    const { getDetectionProfilesByRegion } = require('../sea-detection-profiles')
+    return getDetectionProfilesByRegion(region)
+  })
+
   // ── Chromium Patches (Phase 8) ────────────────────────────────────────────
 
   const patchManager = ChromiumPatchManager.getInstance()

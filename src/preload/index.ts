@@ -339,7 +339,11 @@ const api = {
     // Phase 7: result management + batch testing
     deleteResult: (resultId: string)           => ipcRenderer.invoke('detection:deleteResult', resultId),
     clearHistory: (profileId?: string)         => ipcRenderer.invoke('detection:clearHistory', profileId),
-    batchTest:    (profileIds: string[])       => ipcRenderer.invoke('detection:batchTest', profileIds)
+    batchTest:    (profileIds: string[])       => ipcRenderer.invoke('detection:batchTest', profileIds),
+    // SEA platform detection profiles
+    seaProfiles:         ()                    => ipcRenderer.invoke('detection:seaProfiles'),
+    seaProfile:          (id: string)          => ipcRenderer.invoke('detection:seaProfile', id),
+    seaProfilesByRegion: (region: string)      => ipcRenderer.invoke('detection:seaProfilesByRegion', region)
   },
   // Phase 8: Chromium Patch Manager
   patches: {
