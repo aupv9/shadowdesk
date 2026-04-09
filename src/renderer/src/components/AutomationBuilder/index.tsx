@@ -1,23 +1,22 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Play,
   Plus,
   Trash2,
   Square,
-  ChevronRight,
   Clock,
   CheckCircle,
   XCircle,
   AlertCircle,
   Bot,
-  FileCode,
   Layers,
   Calendar,
   Circle,
   StopCircle,
   Download,
   Upload,
-  Loader2
+  Loader2,
+  Keyboard
 } from 'lucide-react'
 import { useAutomationStore } from '../../stores/automationStore'
 import { useProfileStore } from '../../stores/profileStore'
@@ -32,6 +31,11 @@ import { TemplatePickerModal } from './TemplatePickerModal'
 import { SchedulesModal } from './SchedulesModal'
 import { VariablesEditor } from './VariablesEditor'
 import { RecordingReview } from './RecordingReview'
+import { WorkflowSidebar } from './WorkflowSidebar'
+import { WorkflowStats } from './WorkflowStats'
+import { StepsToolbar, type StepFilterMode } from './StepsToolbar'
+import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
+import { validateStep } from './stepValidator'
 import type { AutomationStep, AutomationStepResult, NavSection } from '../../types'
 
 interface AutomationBuilderProps {
@@ -81,6 +85,12 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
   // Drag & Drop state
   const [draggedStepIndex, setDraggedStepIndex] = useState<number | null>(null)
   const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null)
+  // Steps toolbar — bulk expand/collapse and quick filter by validation state
+  const [forceExpandTick, setForceExpandTick] = useState<number>(0)
+  const [forceExpandValue, setForceExpandValue] = useState<boolean | undefined>(undefined)
+  const [stepFilter, setStepFilter] = useState<StepFilterMode>('all')
+  // Keyboard shortcuts cheatsheet
+  const [showShortcuts, setShowShortcuts] = useState(false)
 
   // Reset overrides and live steps when switching workflows
   useEffect(() => {
@@ -428,6 +438,191 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
     URL.revokeObjectURL(url)
   }
 
+  // ── Bulk expand/collapse steps ──────────────────────────────────────────────
+  // We use a "tick" pattern so clicking Expand All twice in a row still
+  // re-expands steps even if the value hasn't changed — this lets a user
+  // re-apply the bulk action after manually collapsing a few steps.
+  const handleExpandAll = () => {
+    setForceExpandValue(true)
+    setForceExpandTick((t) => t + 1)
+  }
+  const handleCollapseAll = () => {
+    setForceExpandValue(false)
+    setForceExpandTick((t) => t + 1)
+  }
+
+  // Filter steps for the visible list while keeping the original index so
+  // drag-and-drop, ordering, and navigation stay consistent.
+  const visibleSteps = useMemo(() => {
+    if (!selectedWorkflow) return [] as Array<{ step: AutomationStep; index: number }>
+    const all = selectedWorkflow.steps.map((step, index) => ({ step, index }))
+    if (stepFilter === 'all') return all
+    return all.filter(({ step }) => {
+      const result = validateStep(step)
+      if (stepFilter === 'invalid') return result.level === 'invalid'
+      if (stepFilter === 'incomplete')
+        return result.level === 'invalid' || result.level === 'incomplete'
+      return true
+    })
+  }, [selectedWorkflow, stepFilter])
+
+  // Validation counts feed the filter chips in StepsToolbar
+  const stepValidationCounts = useMemo(() => {
+    if (!selectedWorkflow) return { invalid: 0, incomplete: 0 }
+    let invalid = 0
+    let incomplete = 0
+    for (const step of selectedWorkflow.steps) {
+      const result = validateStep(step)
+      if (result.level === 'invalid') invalid++
+      else if (result.level === 'incomplete') incomplete++
+    }
+    return { invalid, incomplete }
+  }, [selectedWorkflow])
+
+  // Last-run status map for the sidebar badges. We only have run history for
+  // the currently-selected workflow (lazy-fetched on select), so this map
+  // covers the active workflow only — enough to give a visible indicator
+  // after the user has run it at least once.
+  const lastRunsMap = useMemo(() => {
+    const map: Record<string, { status: 'completed' | 'failed' | 'stopped'; at: string }> = {}
+    if (selectedWorkflow && runHistory.length > 0) {
+      const latest = runHistory[0]
+      map[selectedWorkflow.id] = {
+        status: latest.status,
+        at: latest.started_at
+      }
+    }
+    return map
+  }, [selectedWorkflow, runHistory])
+
+  // ── Keyboard shortcuts ──────────────────────────────────────────────────────
+  // Keep a ref to the latest handlers + state so the global key listener
+  // doesn't capture stale closures. This lets us register the listener once
+  // and still react to the current workflow / run state every keystroke.
+  const shortcutRef = useRef({
+    selectedWorkflow,
+    running,
+    handleRun,
+    handleStop,
+    handleExport,
+    handleAddStep,
+    handleExpandAll,
+    handleCollapseAll
+  })
+  shortcutRef.current = {
+    selectedWorkflow,
+    running,
+    handleRun,
+    handleStop,
+    handleExport,
+    handleAddStep,
+    handleExpandAll,
+    handleCollapseAll
+  }
+
+  useEffect(() => {
+    const isEditableTarget = (t: EventTarget | null) => {
+      if (!(t instanceof HTMLElement)) return false
+      const tag = t.tagName
+      return (
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        t.isContentEditable
+      )
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const ctx = shortcutRef.current
+
+      // "?" opens the cheatsheet regardless, as long as we're not typing.
+      if (e.key === '?' && !isEditableTarget(e.target)) {
+        e.preventDefault()
+        setShowShortcuts(true)
+        return
+      }
+
+      // Everything else is Ctrl/Cmd-prefixed.
+      const mod = e.ctrlKey || e.metaKey
+      if (!mod) return
+      // When the user is typing in a field, only Ctrl+Enter is allowed so it
+      // can kick off a run without having to click away first.
+      if (isEditableTarget(e.target) && !(e.ctrlKey && e.key === 'Enter')) {
+        return
+      }
+
+      const key = e.key.toLowerCase()
+
+      // Ctrl+N — new workflow
+      if (key === 'n' && !e.shiftKey) {
+        e.preventDefault()
+        setShowCreationFlow(true)
+        return
+      }
+      // Ctrl+T — templates
+      if (key === 't' && !e.shiftKey) {
+        e.preventDefault()
+        setShowTemplates(true)
+        return
+      }
+      // Ctrl+I — import
+      if (key === 'i' && !e.shiftKey) {
+        e.preventDefault()
+        importInputRef.current?.click()
+        return
+      }
+      // Ctrl+E — export (only if a workflow is selected)
+      if (key === 'e' && !e.shiftKey && ctx.selectedWorkflow) {
+        e.preventDefault()
+        ctx.handleExport()
+        return
+      }
+      // Ctrl+K — focus search in sidebar
+      if (key === 'k' && !e.shiftKey) {
+        e.preventDefault()
+        const input = document.querySelector<HTMLInputElement>(
+          'input[placeholder="Search workflows…"]'
+        )
+        input?.focus()
+        input?.select()
+        return
+      }
+      // Ctrl+Enter — run
+      if (e.key === 'Enter' && ctx.selectedWorkflow && !ctx.running) {
+        e.preventDefault()
+        ctx.handleRun()
+        return
+      }
+      // Ctrl+. — stop
+      if (e.key === '.' && ctx.selectedWorkflow && ctx.running) {
+        e.preventDefault()
+        ctx.handleStop()
+        return
+      }
+      // Ctrl+Shift+A — add step
+      if (e.shiftKey && key === 'a' && ctx.selectedWorkflow) {
+        e.preventDefault()
+        ctx.handleAddStep()
+        return
+      }
+      // Ctrl+Shift+E — expand all
+      if (e.shiftKey && key === 'e' && ctx.selectedWorkflow) {
+        e.preventDefault()
+        ctx.handleExpandAll()
+        return
+      }
+      // Ctrl+Shift+C — collapse all
+      if (e.shiftKey && key === 'c' && ctx.selectedWorkflow) {
+        e.preventDefault()
+        ctx.handleCollapseAll()
+        return
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   // ── Import workflow from JSON file ──────────────────────────────────────────
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -494,10 +689,17 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
           <button
             onClick={() => setShowCreationFlow(true)}
             className="flex items-center gap-2 px-3 py-2 bg-ghost-600 hover:bg-ghost-700 text-white text-sm font-medium rounded-lg transition-colors"
-            title="Create a new workflow — choose how you want to build it"
+            title="Create a new workflow — Ctrl+N"
           >
             <Plus className="w-4 h-4" />
             New Workflow
+          </button>
+          <button
+            onClick={() => setShowShortcuts(true)}
+            className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+            title="Keyboard shortcuts (?)"
+          >
+            <Keyboard className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -512,37 +714,14 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Workflow list sidebar */}
-        <div className="w-64 border-r border-slate-800 overflow-y-auto">
-          {loading ? (
-            <div className="p-4 text-sm text-slate-500">Loading...</div>
-          ) : workflows.length === 0 ? (
-            <div className="p-4 text-sm text-slate-500">
-              No workflows yet. Create one or pick a template.
-            </div>
-          ) : (
-            <div className="py-2">
-              {workflows.map((w) => (
-                <button
-                  key={w.id}
-                  onClick={() => selectWorkflow(w.id)}
-                  className={`w-full flex items-center gap-2 px-4 py-3 text-left transition-colors ${
-                    selectedWorkflow?.id === w.id
-                      ? 'bg-ghost-600/10 text-ghost-400 border-r-2 border-ghost-500'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                  }`}
-                >
-                  <Bot className="w-4 h-4 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{w.name}</div>
-                    <div className="text-xs text-slate-500">{w.steps.length} steps</div>
-                  </div>
-                  <ChevronRight className="w-3 h-3 shrink-0 opacity-50" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Workflow list sidebar with search + sort + last-run badges */}
+        <WorkflowSidebar
+          workflows={workflows}
+          selectedId={selectedWorkflow?.id ?? null}
+          loading={loading}
+          lastRuns={lastRunsMap}
+          onSelect={selectWorkflow}
+        />
 
         {/* Main content */}
         <div className="flex-1 overflow-y-auto">
@@ -582,6 +761,9 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
                   </button>
                 </div>
               </div>
+
+              {/* Workflow stats strip — step count, variables, health, success rate */}
+              <WorkflowStats workflow={selectedWorkflow} runHistory={runHistory} />
 
               {/* Variables editor — Phase 12.B.4 */}
               <VariablesEditor
@@ -872,9 +1054,32 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
                 </div>
               )}
 
+              {/* Steps toolbar — expand/collapse all + validation filter chips */}
+              <StepsToolbar
+                stepCount={selectedWorkflow.steps.length}
+                invalidCount={stepValidationCounts.invalid}
+                incompleteCount={stepValidationCounts.incomplete}
+                allExpanded={forceExpandValue === true}
+                filterMode={stepFilter}
+                onExpandAll={handleExpandAll}
+                onCollapseAll={handleCollapseAll}
+                onFilterChange={setStepFilter}
+              />
+
               {/* Steps */}
               <div className="space-y-3">
-                {selectedWorkflow.steps.map((step, idx) => (
+                {visibleSteps.length === 0 && selectedWorkflow.steps.length > 0 && (
+                  <div className="p-4 text-center text-xs text-slate-500 border border-dashed border-slate-700 rounded-lg">
+                    No steps match the current filter.{' '}
+                    <button
+                      onClick={() => setStepFilter('all')}
+                      className="text-ghost-400 hover:text-ghost-300 underline"
+                    >
+                      Show all steps
+                    </button>
+                  </div>
+                )}
+                {visibleSteps.map(({ step, index: idx }) => (
                   <StepEditor
                     key={step.id}
                     step={step}
@@ -892,12 +1097,15 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
                     onDragLeave={handleDragLeave}
                     onDrop={(_, targetIndex) => handleDrop(targetIndex)}
                     previousActionType={selectedWorkflow.steps[idx - 1]?.action}
+                    forceExpanded={forceExpandValue}
+                    forceExpandTick={forceExpandTick}
                   />
                 ))}
 
                 <button
                   onClick={handleAddStep}
                   className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-700 hover:border-ghost-500 text-slate-500 hover:text-ghost-400 rounded-lg transition-colors"
+                  title="Add a new step — Ctrl+Shift+A"
                 >
                   <Plus className="w-4 h-4" />
                   Add Step
@@ -907,24 +1115,51 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
               {/* Run History */}
               {runHistory.length > 0 && (
                 <div className="mt-8">
-                  <h3 className="text-sm font-medium text-slate-300 mb-3">Run History</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium text-slate-300">Run History</h3>
+                    <span className="text-[10px] text-slate-500">
+                      Last {Math.min(runHistory.length, 10)} of {runHistory.length}
+                    </span>
+                  </div>
                   <div className="space-y-2">
-                    {runHistory.slice(0, 10).map((run: any) => (
-                      <div
-                        key={run.id}
-                        className="flex items-center gap-3 px-3 py-2 bg-slate-800/50 rounded-lg text-xs"
-                      >
-                        {run.status === 'completed' && <CheckCircle className="w-3.5 h-3.5 text-green-400" />}
-                        {run.status === 'failed' && <XCircle className="w-3.5 h-3.5 text-red-400" />}
-                        {run.status === 'stopped' && <Square className="w-3.5 h-3.5 text-yellow-400" />}
-                        <span className="text-slate-400 capitalize">{run.status}</span>
-                        <span className="text-slate-600">{run.step_results.length} steps</span>
-                        <Clock className="w-3 h-3 text-slate-600 ml-auto" />
-                        <span className="text-slate-500">
-                          {new Date(run.started_at).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
+                    {runHistory.slice(0, 10).map((run: any) => {
+                      const failedSteps = run.step_results.filter((s: any) => !s.success).length
+                      const duration = run.completed_at
+                        ? new Date(run.completed_at).getTime() - new Date(run.started_at).getTime()
+                        : null
+                      return (
+                        <div
+                          key={run.id}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs border ${
+                            run.status === 'completed'
+                              ? 'bg-slate-800/50 border-transparent'
+                              : run.status === 'failed'
+                                ? 'bg-red-500/5 border-red-500/15'
+                                : 'bg-yellow-500/5 border-yellow-500/15'
+                          }`}
+                        >
+                          {run.status === 'completed' && <CheckCircle className="w-3.5 h-3.5 text-green-400 shrink-0" />}
+                          {run.status === 'failed' && <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />}
+                          {run.status === 'stopped' && <Square className="w-3.5 h-3.5 text-yellow-400 shrink-0" />}
+                          <span className="text-slate-400 capitalize w-16">{run.status}</span>
+                          <span className="text-slate-500">
+                            {run.step_results.length} step{run.step_results.length === 1 ? '' : 's'}
+                          </span>
+                          {failedSteps > 0 && (
+                            <span className="text-red-400">· {failedSteps} failed</span>
+                          )}
+                          {duration !== null && (
+                            <span className="text-slate-600">
+                              · {duration < 1000 ? `${duration}ms` : `${(duration / 1000).toFixed(1)}s`}
+                            </span>
+                          )}
+                          <Clock className="w-3 h-3 text-slate-600 ml-auto shrink-0" />
+                          <span className="text-slate-500">
+                            {new Date(run.started_at).toLocaleString()}
+                          </span>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -1017,6 +1252,9 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
           }}
         />
       )}
+
+      {/* Keyboard shortcuts cheatsheet */}
+      {showShortcuts && <KeyboardShortcutsHelp onClose={() => setShowShortcuts(false)} />}
     </div>
   )
 }
