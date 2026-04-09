@@ -831,6 +831,10 @@ export type AutomationActionType =
   | 'waitForRequest'
   | 'waitForResponse'
   | 'paginate'
+  // Phase 4 — Enhanced flow control
+  | 'break'       // Exit the current loop (loop, whileLoop, forEachRow, forEachElement)
+  | 'continue'    // Skip to next iteration of the current loop
+  | 'switch'      // Multi-way branching based on expression/variable value
 
 export interface AutomationStep {
   id: string

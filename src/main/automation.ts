@@ -759,6 +759,34 @@ interface DebugControl {
   resumeWaiter: (() => void) | null
 }
 
+// ─── Phase 4: Flow Control Signals ───────────────────────────────────────────
+// Special error subclasses used by `break` and `continue` actions to unwind
+// the call stack back to the nearest loop handler. This mirrors how JS engines
+// handle break/continue — the signal propagates through executeSteps until a
+// loop handler catches it.
+
+/** Thrown by the `break` action to exit the current loop. */
+class BreakSignal extends Error {
+  readonly isBreak = true
+  constructor() { super('break'); this.name = 'BreakSignal' }
+}
+
+/** Thrown by the `continue` action to skip to the next loop iteration. */
+class ContinueSignal extends Error {
+  readonly isContinue = true
+  constructor() { super('continue'); this.name = 'ContinueSignal' }
+}
+
+/** Type guard for BreakSignal. */
+function isBreakSignal(err: any): err is BreakSignal {
+  return err instanceof BreakSignal || err?.isBreak === true
+}
+
+/** Type guard for ContinueSignal. */
+function isContinueSignal(err: any): err is ContinueSignal {
+  return err instanceof ContinueSignal || err?.isContinue === true
+}
+
 export class AutomationEngine {
   private static instance: AutomationEngine
   private running = new Map<string, DebugControl>()
@@ -868,6 +896,15 @@ export class AutomationEngine {
       }
       if (step.action === 'parallelSteps' && step.params?.steps) {
         this.validateWorkflowRegex(step.params.steps)
+      }
+      // Phase 4: switch cases + default
+      if (step.action === 'switch' && step.params?.cases) {
+        for (const c of step.params.cases) {
+          if (Array.isArray(c.steps)) this.validateWorkflowRegex(c.steps)
+        }
+      }
+      if (step.action === 'switch' && step.params?.defaultSteps) {
+        this.validateWorkflowRegex(step.params.defaultSteps)
       }
     }
   }
@@ -1298,7 +1335,11 @@ export class AutomationEngine {
       whileLoop: [],                 // condition validated by runtime
       waitForRequest: ['urlPattern'],
       waitForResponse: ['urlPattern'],
-      paginate: ['nextSelector']
+      paginate: ['nextSelector'],
+      // Phase 4 — Enhanced flow control
+      switch: ['expression'],
+      break: [],
+      continue: []
     }
 
     const KNOWN_ACTIONS = new Set([
@@ -1321,7 +1362,9 @@ export class AutomationEngine {
       // Tier 9
       'dragAndDrop', 'keyCombo', 'selectContextMenu', 'setRangeInput', 'scrollIntoView', 'switchFrame',
       // Phase 18 — Data pipelines & advanced control flow
-      'extractJson', 'forEachElement', 'whileLoop', 'waitForRequest', 'waitForResponse', 'paginate'
+      'extractJson', 'forEachElement', 'whileLoop', 'waitForRequest', 'waitForResponse', 'paginate',
+      // Phase 4 — Enhanced flow control
+      'break', 'continue', 'switch'
     ])
 
     // Pre-collect ids that produce variables so {var} references resolve.
@@ -1353,6 +1396,13 @@ export class AutomationEngine {
         if (Array.isArray(s.params?.tryBlock))     collectProduced(s.params.tryBlock)
         if (Array.isArray(s.params?.catchBlock))   collectProduced(s.params.catchBlock)
         if (Array.isArray(s.params?.finallyBlock)) collectProduced(s.params.finallyBlock)
+        // Phase 4: switch cases + default
+        if (Array.isArray(s.params?.cases)) {
+          for (const c of s.params.cases) {
+            if (Array.isArray(c.steps)) collectProduced(c.steps)
+          }
+        }
+        if (Array.isArray(s.params?.defaultSteps)) collectProduced(s.params.defaultSteps)
       }
     }
     collectProduced(steps)
@@ -1434,6 +1484,13 @@ export class AutomationEngine {
         if (Array.isArray(step.params?.tryBlock))     validateStepList(step.params.tryBlock, nextParents)
         if (Array.isArray(step.params?.catchBlock))   validateStepList(step.params.catchBlock, nextParents)
         if (Array.isArray(step.params?.finallyBlock)) validateStepList(step.params.finallyBlock, nextParents)
+        // Phase 4: switch cases + default
+        if (Array.isArray(step.params?.cases)) {
+          for (const c of step.params.cases) {
+            if (Array.isArray(c.steps)) validateStepList(c.steps, nextParents)
+          }
+        }
+        if (Array.isArray(step.params?.defaultSteps)) validateStepList(step.params.defaultSteps, nextParents)
       }
     }
 
@@ -1914,6 +1971,9 @@ export class AutomationEngine {
           ...(Object.keys(savedVariables).length > 0 ? { savedVariables } : {})
         }
       } catch (err: any) {
+        // Phase 4: Re-throw flow control signals — they must propagate to the loop handler
+        if (isBreakSignal(err) || isContinueSignal(err)) throw err
+
         lastError = err.message ?? String(err)
         lastErrorCategory = categorizeError(lastError)
 
@@ -2177,14 +2237,21 @@ export class AutomationEngine {
         const times = params.times ?? 1
         const loopSteps: AutomationStep[] = params.steps ?? []
         let iterations = 0
+        let broken = false
         for (let i = 0; i < times; i++) {
           if (control.abort) throw new Error('Workflow stopped')
-          const loopStatus = await this.executeSteps(page, loopSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
-          if (loopStatus === 'stopped') throw new Error('Workflow stopped')
-          if (loopStatus === 'failed') throw new Error(`Loop iteration ${i + 1} failed`)
-          iterations++
+          try {
+            const loopStatus = await this.executeSteps(page, loopSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
+            if (loopStatus === 'stopped') throw new Error('Workflow stopped')
+            if (loopStatus === 'failed') throw new Error(`Loop iteration ${i + 1} failed`)
+            iterations++
+          } catch (err: any) {
+            if (isBreakSignal(err)) { broken = true; break }
+            if (isContinueSignal(err)) { iterations++; continue }
+            throw err
+          }
         }
-        return { iterations, totalSteps: loopSteps.length * times }
+        return { iterations, totalSteps: loopSteps.length * iterations, broken }
       }
 
       // ── Tier 7 RPA: Try / catch / finally block ─────────────────────
@@ -2484,6 +2551,7 @@ export class AutomationEngine {
 
         const errors: { index: number; error: string }[] = []
         let completed = 0
+        let broken = false
         for (let idx = 0; idx < rows.length; idx++) {
           if (control.abort) throw new Error('Workflow stopped')
           const row = rows[idx] ?? {}
@@ -2505,6 +2573,8 @@ export class AutomationEngine {
             if (status === 'failed') throw new Error(`Iteration ${idx + 1} failed`)
             completed++
           } catch (err: any) {
+            if (isBreakSignal(err)) { for (const k of injected) delete variables[k]; broken = true; break }
+            if (isContinueSignal(err)) { for (const k of injected) delete variables[k]; completed++; continue }
             errors.push({ index: idx, error: err.message ?? String(err) })
             if (failFast) {
               // Cleanup injected vars before bailing out
@@ -2522,7 +2592,8 @@ export class AutomationEngine {
           rowCount: rows.length,
           completed,
           failed: errors.length,
-          errors: errors.slice(0, 20) // cap reported errors
+          errors: errors.slice(0, 20), // cap reported errors
+          broken
         }
       }
 
@@ -3708,19 +3779,22 @@ export class AutomationEngine {
             set('value', meta.value)
             set('selector', `[${tagAttr}="${idx}"]`)
 
+            let breakLoop = false
             try {
               const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
               if (status === 'stopped') throw new Error('Workflow stopped')
               if (status === 'failed') throw new Error(`Iteration ${idx} failed`)
               completed++
             } catch (err: any) {
+              if (isBreakSignal(err)) { for (const k of injected) delete variables[k]; breakLoop = true; break }
+              if (isContinueSignal(err)) { for (const k of injected) delete variables[k]; completed++; continue }
               errors.push({ index: idx, error: err.message ?? String(err) })
               if (failFast) {
                 for (const k of injected) delete variables[k]
                 throw err
               }
             } finally {
-              for (const k of injected) delete variables[k]
+              if (!breakLoop) for (const k of injected) delete variables[k]
             }
           }
         } finally {
@@ -3807,6 +3881,7 @@ export class AutomationEngine {
         const loopStart = Date.now()
         const MAX_DURATION_MS = 5 * 60 * 1000  // 5 minutes max total time
 
+        let broken = false
         while (iterations < maxIterations) {
           if (control.abort) throw new Error('Workflow stopped')
 
@@ -3818,20 +3893,28 @@ export class AutomationEngine {
           const shouldRun = await checkCondition()
           if (!shouldRun) break
 
-          const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
-          if (status === 'stopped') throw new Error('Workflow stopped')
-          if (status === 'failed') throw new Error(`whileLoop: iteration ${iterations + 1} failed`)
-          iterations++
+          try {
+            const status = await this.executeSteps(page, innerSteps, control, allResults, variables, undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery)
+            if (status === 'stopped') throw new Error('Workflow stopped')
+            if (status === 'failed') throw new Error(`whileLoop: iteration ${iterations + 1} failed`)
+            iterations++
+          } catch (err: any) {
+            if (isBreakSignal(err)) { broken = true; break }
+            if (isContinueSignal(err)) { iterations++; if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs)); continue }
+            throw err
+          }
 
           if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs))
         }
 
-        const hitMax = iterations >= maxIterations
-        if (hitMax) {
-          throw new Error(`whileLoop exceeded maximum of ${maxIterations} iterations (hard limit)`)
+        if (!broken) {
+          const hitMax = iterations >= maxIterations
+          if (hitMax) {
+            throw new Error(`whileLoop exceeded maximum of ${maxIterations} iterations (hard limit)`)
+          }
         }
 
-        return { iterations, maxIterations, conditionType, invert }
+        return { iterations, maxIterations, conditionType, invert, broken }
       }
 
       case 'waitForRequest': {
@@ -3992,6 +4075,69 @@ export class AutomationEngine {
 
         if (params.saveAs) variables[params.saveAs] = String(pagesVisited)
         return { pages: pagesVisited, reason, nextSelector }
+      }
+
+      // ── Phase 4: Enhanced Flow Control ───────────────────────────────
+
+      case 'break':
+        // Exit the current loop. The BreakSignal propagates up through
+        // executeSteps until it reaches a loop handler (loop, whileLoop,
+        // forEachRow, forEachElement) which catches it and exits cleanly.
+        throw new BreakSignal()
+
+      case 'continue':
+        // Skip to the next iteration of the current loop. The ContinueSignal
+        // propagates up through executeSteps until the loop handler catches it.
+        throw new ContinueSignal()
+
+      case 'switch': {
+        // Multi-way branching. Evaluate an expression or read a variable,
+        // then match against a list of cases. Execute the matching case's
+        // steps, or fall through to defaultSteps if no match.
+        //
+        // Params:
+        //   expression: string  — variable name (resolved from {varName}) or literal
+        //   cases: Array<{ value: string | number, steps: AutomationStep[] }>
+        //   defaultSteps?: AutomationStep[]
+        //
+        // Example:
+        //   { expression: '{status}', cases: [
+        //     { value: 'pending', steps: [...] },
+        //     { value: 'shipped', steps: [...] }
+        //   ], defaultSteps: [...] }
+        const expression = params.expression
+        if (expression === undefined || expression === null) {
+          throw new Error('switch: `expression` is required')
+        }
+        const exprValue = String(expression).trim()
+        const cases: Array<{ value: any; steps: AutomationStep[] }> = params.cases ?? []
+
+        let matched = false
+        for (const c of cases) {
+          if (String(c.value).trim() === exprValue) {
+            matched = true
+            if (c.steps && c.steps.length > 0) {
+              const caseStatus = await this.executeSteps(
+                page, c.steps, control, allResults, variables,
+                undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery
+              )
+              if (caseStatus === 'stopped') throw new Error('Workflow stopped')
+              if (caseStatus === 'failed') throw new Error(`switch case "${c.value}" failed`)
+            }
+            break
+          }
+        }
+
+        if (!matched && params.defaultSteps && params.defaultSteps.length > 0) {
+          const defStatus = await this.executeSteps(
+            page, params.defaultSteps, control, allResults, variables,
+            undefined, undefined, undefined, undefined, typedVars, variableDefinitions, aiRecovery
+          )
+          if (defStatus === 'stopped') throw new Error('Workflow stopped')
+          if (defStatus === 'failed') throw new Error('switch default case failed')
+        }
+
+        return { expression: exprValue, matched, caseCount: cases.length }
       }
 
       default:
