@@ -79,11 +79,12 @@ const api = {
     delete: (id: string)                              => ipcRenderer.invoke('groups:delete', id)
   },
   proxies: {
-    list:        ()                    => ipcRenderer.invoke('proxies:list'),
-    create:      (input: unknown)      => ipcRenderer.invoke('proxies:create', input),
-    delete:      (id: string)          => ipcRenderer.invoke('proxies:delete', id),
-    test:        (id: string)          => ipcRenderer.invoke('proxies:test', id),
-    importBulk:  (lines: string[])     => ipcRenderer.invoke('proxies:importBulk', lines)
+    list:        ()                            => ipcRenderer.invoke('proxies:list'),
+    create:      (input: unknown)              => ipcRenderer.invoke('proxies:create', input),
+    update:      (id: string, patch: unknown)  => ipcRenderer.invoke('proxies:update', id, patch),
+    delete:      (id: string)                  => ipcRenderer.invoke('proxies:delete', id),
+    test:        (id: string)                  => ipcRenderer.invoke('proxies:test', id),
+    importBulk:  (lines: string[])             => ipcRenderer.invoke('proxies:importBulk', lines)
   },
   // Phase 20 — Proxy Provider Marketplace (UI: "Phase 17 — Proxy API Integration")
   proxyProviders: {

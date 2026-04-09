@@ -885,6 +885,29 @@ export function registerIpcHandlers(): void {
     db.deleteProxy(id)
   })
 
+  ipcMain.handle('proxies:update', (_event, id: string, patch: {
+    name?: string
+    type?: 'http' | 'https' | 'socks5'
+    host?: string
+    port?: number
+    username?: string | null
+    password?: string | null
+    country?: string | null
+  }) => {
+    if (!id) throw new ValidationError('Proxy id is required')
+    if (patch.port !== undefined && (!Number.isFinite(patch.port) || patch.port <= 0 || patch.port > 65535)) {
+      throw new ValidationError('Port must be between 1 and 65535')
+    }
+    if (patch.type !== undefined && !['http', 'https', 'socks5'].includes(patch.type)) {
+      throw new ValidationError('Unsupported proxy type')
+    }
+    if (patch.host !== undefined && !patch.host.trim()) {
+      throw new ValidationError('Host is required')
+    }
+    db.updateProxy(id, patch)
+    return db.getProxy(id)
+  })
+
   ipcMain.handle('proxies:importBulk', (_event, lines: string[]) => {
     let imported = 0
     let failed = 0

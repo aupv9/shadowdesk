@@ -6,6 +6,7 @@ export type {
   FingerprintConfig,
   CreateProfileInput,
   CreateProxyInput,
+  UpdateProxyInput,
   User,
   AuthState,
   LoginInput,
