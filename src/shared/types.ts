@@ -861,10 +861,106 @@ export type WorkflowHookEvent =
   | 'before-workflow'
   | 'after-workflow'
   | 'step-error'
+  // Phase 17.H — Platform-Specific Detection Hardening
+  | 'pre-flight-validation'
+  | 'live-adjustment'
 
 export interface WorkflowHook {
   event: WorkflowHookEvent
   handler: (data: any) => void | Promise<void>
+}
+
+// ─── Phase 17.H — Platform-Specific Detection Hardening ────────────────────
+//
+// The pre-flight validator inspects a workflow + profile BEFORE execution and
+// surfaces platform-specific tuning recommendations. When a challenge is
+// encountered during execution (CAPTCHA, rate-limit, slider), the live
+// adjustment engine can emit updated tuning hints so the UI can react.
+
+export type HardenerSeverity = 'info' | 'warning' | 'critical'
+
+export interface HardenerIssue {
+  /** Stable id — `missing-behavior`, `preset-mismatch`, `timing-weak`, etc. */
+  code: string
+  severity: HardenerSeverity
+  /** One-line human-readable message shown in the pre-flight card */
+  message: string
+  /** Optional longer explanation + rationale for the recommendation */
+  detail?: string
+  /** When present, the renderer shows a "Fix it" button that applies the
+   *  recommended config patch (merged into the profile fingerprint). */
+  suggestedFix?: HardenerFix
+}
+
+export interface HardenerFix {
+  /** Human-readable summary of what the fix will change */
+  label: string
+  /** BehaviorConfig fields to merge into profile.fingerprint.behavior */
+  behavior?: Partial<BehaviorConfig>
+  /** TimingConfig fields to merge into profile.fingerprint.timing */
+  timing?: Partial<TimingConfig>
+  /** Apply a full behavior preset by id — takes precedence over partials */
+  applyPreset?: BehaviorPresetId
+  /** Switch the profile to a fingerprint preset (e.g. 'android-pixel-chrome121') */
+  applyFingerprintPreset?: string
+}
+
+/** A tuning hint tailored for a specific SEA platform. */
+export interface PlatformTuningHint {
+  /** Platform id from SEA_PLATFORMS catalog, or `generic` if unknown */
+  platformId: string
+  platformName: string
+  /** When the target URL matched a regional URL, the ISO-3166 country code */
+  detectedRegion?: string
+  /** Short rationale shown at the top of the validator card */
+  summary: string
+  /** Recommended behavior preset id the profile should use */
+  recommendedBehaviorPreset: BehaviorPresetId
+  /** Ideal behavior config values (mouse jitter, scroll inertia, typing) */
+  recommendedBehavior: BehaviorConfig
+  /** Ideal timing config values (rAF jitter, date precision, etc.) */
+  recommendedTiming: TimingConfig
+  /** Recommended fingerprint preset keys for this platform */
+  recommendedFingerprintPresets: string[]
+  /** Free-form tuning tips shown as bullet points in the UI */
+  tips: string[]
+}
+
+/** Full result of the pre-flight validation. */
+export interface PreFlightValidationResult {
+  workflowId: string
+  profileId: string
+  profileName: string
+  /** ISO timestamp when the validation ran */
+  validatedAt: string
+  /** Detected platform (or null when none matched) */
+  platform: PlatformTuningHint | null
+  /** Extracted target URL used for platform detection, if any */
+  targetUrl?: string
+  /** Overall verdict — "ready" = no warnings, "warn" = at least one
+   *  warning, "block" = a critical issue must be fixed before running */
+  verdict: 'ready' | 'warn' | 'block'
+  /** All issues found, sorted by severity (critical → warning → info) */
+  issues: HardenerIssue[]
+  /** Snapshot of the profile's current behavior/timing config, for diffing */
+  currentBehavior?: BehaviorConfig
+  currentTiming?: TimingConfig
+}
+
+/** Payload emitted by the live-adjustment engine while a workflow runs. */
+export interface LiveAdjustmentEvent {
+  workflowId: string
+  profileId: string
+  /** ISO timestamp when the challenge was observed */
+  observedAt: string
+  /** `captcha`, `slider`, `rate-limit`, `step-error`, `selector-miss`… */
+  challengeKind: string
+  /** Short human-readable description of what was detected */
+  description: string
+  /** Recommended fix the renderer can apply in one click */
+  suggestedFix: HardenerFix
+  /** Whether the fix has already been auto-applied by the engine */
+  autoApplied: boolean
 }
 
 export type AssertType =

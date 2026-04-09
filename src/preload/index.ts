@@ -280,7 +280,30 @@ const api = {
       const handler = (_event: any, data: any) => cb(data)
       ipcRenderer.on('automation:step-progress', handler)
       return () => { ipcRenderer.removeListener('automation:step-progress', handler) }
+    },
+    /** Subscribe to pre-flight validator results emitted just before a
+     *  workflow starts executing. Phase 17.H. */
+    onPreFlight: (cb: (result: any) => void): (() => void) => {
+      const handler = (_event: any, data: any) => cb(data)
+      ipcRenderer.on('automation:pre-flight', handler)
+      return () => { ipcRenderer.removeListener('automation:pre-flight', handler) }
+    },
+    /** Subscribe to live-adjustment events emitted when a runtime signal
+     *  indicates the target is challenging the session. Phase 17.H. */
+    onLiveAdjustment: (cb: (event: any) => void): (() => void) => {
+      const handler = (_event: any, data: any) => cb(data)
+      ipcRenderer.on('automation:live-adjustment', handler)
+      return () => { ipcRenderer.removeListener('automation:live-adjustment', handler) }
     }
+  },
+  // Phase 17.H — Platform-Specific Detection Hardening
+  hardener: {
+    validate:        (workflowId: string, profileId: string)    => ipcRenderer.invoke('hardener:validate', workflowId, profileId),
+    detectPlatform:  (url: string)                               => ipcRenderer.invoke('hardener:detectPlatform', url),
+    tuningHints:     ()                                          => ipcRenderer.invoke('hardener:tuningHints'),
+    tuningHint:      (platformId: string)                        => ipcRenderer.invoke('hardener:tuningHint', platformId),
+    applyFix:        (profileId: string, fix: unknown)           => ipcRenderer.invoke('hardener:applyFix', profileId, fix),
+    analyzeSignal:   (signal: unknown)                           => ipcRenderer.invoke('hardener:analyzeSignal', signal)
   },
   apiServer: {
     status: ()                                                         => ipcRenderer.invoke('apiServer:status'),

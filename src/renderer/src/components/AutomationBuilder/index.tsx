@@ -22,6 +22,9 @@ import {
 import { useAutomationStore } from '../../stores/automationStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { useToastStore } from '../../stores/toastStore'
+// Phase 17.H — Platform-Specific Detection Hardening
+import { useHardenerStore } from '../../stores/hardenerStore'
+import { PreFlightValidator } from './PreFlightValidator'
 import { StepEditor } from './StepEditor'
 import { WorkflowCreateModal } from './WorkflowCreateModal'
 import { WorkflowCreationFlow, type WorkflowCreationMethod } from './WorkflowCreationFlow'
@@ -45,6 +48,14 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
 
   const { profiles, activeSessions, fetchActiveSessions } = useProfileStore()
   const pushToast = useToastStore((s) => s.push)
+  // Phase 17.H — Platform-Specific Detection Hardening
+  const preFlight = useHardenerStore((s) => s.preFlight)
+  const liveAdjustment = useHardenerStore((s) => s.liveAdjustment)
+  const setPreFlight = useHardenerStore((s) => s.setPreFlight)
+  const setLiveAdjustment = useHardenerStore((s) => s.setLiveAdjustment)
+  const validateHardener = useHardenerStore((s) => s.validate)
+  const applyHardenerFix = useHardenerStore((s) => s.applyFix)
+  const dismissHardener = useHardenerStore((s) => s.dismiss)
   const [showCreationFlow, setShowCreationFlow] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
@@ -105,6 +116,33 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
     })
     return unsubscribe
   }, [selectedWorkflow?.id])
+
+  // Phase 17.H — Subscribe to pre-flight validator results emitted by main.
+  useEffect(() => {
+    const unsubscribe = window.api.automation.onPreFlight((result: any) => {
+      setPreFlight(result)
+    })
+    return unsubscribe
+  }, [setPreFlight])
+
+  // Phase 17.H — Subscribe to live-adjustment events emitted mid-run. Surface
+  // them as a toast with an "Apply fix" action the user can click to patch
+  // the profile on the fly without aborting the workflow.
+  useEffect(() => {
+    const unsubscribe = window.api.automation.onLiveAdjustment((event: any) => {
+      setLiveAdjustment(event)
+      const label = event?.suggestedFix?.label ?? 'Tune profile'
+      pushToast(
+        `${event.description || 'Detection challenge observed'} · ${label}`,
+        'error'
+      )
+      // Auto-apply when the event is flagged as such (reserved for future use).
+      if (event?.autoApplied && event?.profileId && event?.suggestedFix) {
+        applyHardenerFix(event.profileId, event.suggestedFix).catch(() => { /* toast already shown */ })
+      }
+    })
+    return unsubscribe
+  }, [setLiveAdjustment, applyHardenerFix, pushToast])
 
   // Fetch active sessions on mount and refresh every 3 seconds
   useEffect(() => {
@@ -562,6 +600,21 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
                 {' '}<code className="text-ghost-400 font-mono">{'{profileName}'}</code>
               </div>
 
+              {/* Phase 17.H — Pre-flight validator card */}
+              <PreFlightValidator
+                result={preFlight && preFlight.workflowId === selectedWorkflow.id ? preFlight : null}
+                profileId={preFlight?.profileId ?? (selectedProfileId || null)}
+                onDismiss={dismissHardener}
+                onRunAnyway={() => {
+                  dismissHardener()
+                  handleRun()
+                }}
+                onFixAndRun={() => {
+                  dismissHardener()
+                  handleRun()
+                }}
+              />
+
               {/* Run controls */}
               <div className="mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50 space-y-3">
                 <div className="flex items-center gap-2 text-xs">
@@ -681,19 +734,40 @@ export function AutomationBuilder({ onNavigate }: AutomationBuilderProps = {}) {
                       Stop {parallelMode ? 'all' : ''}
                     </button>
                   ) : (
-                    <button
-                      onClick={handleRun}
-                      disabled={
-                        selectedWorkflow.steps.length === 0 ||
-                        (parallelMode
-                          ? selectedProfileIds.size === 0
-                          : !selectedProfileId || !activeSessions.includes(selectedProfileId))
-                      }
-                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors"
-                    >
-                      <Play className="w-4 h-4" />
-                      Run{parallelMode ? ` × ${selectedProfileIds.size}` : ''}
-                    </button>
+                    <>
+                      {/* Phase 17.H — Pre-flight validator (ad-hoc) */}
+                      {!parallelMode && (
+                        <button
+                          onClick={async () => {
+                            if (!selectedProfileId) return
+                            try {
+                              await validateHardener(selectedWorkflow.id, selectedProfileId)
+                            } catch (e: any) {
+                              pushToast(e?.message ?? 'Pre-flight validation failed', 'error')
+                            }
+                          }}
+                          disabled={!selectedProfileId || selectedWorkflow.steps.length === 0}
+                          className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-200 text-sm font-medium rounded-lg transition-colors"
+                          title="Run the platform-specific detection hardening pre-flight validator"
+                        >
+                          <Bot className="w-4 h-4" />
+                          Pre-flight
+                        </button>
+                      )}
+                      <button
+                        onClick={handleRun}
+                        disabled={
+                          selectedWorkflow.steps.length === 0 ||
+                          (parallelMode
+                            ? selectedProfileIds.size === 0
+                            : !selectedProfileId || !activeSessions.includes(selectedProfileId))
+                        }
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        <Play className="w-4 h-4" />
+                        Run{parallelMode ? ` × ${selectedProfileIds.size}` : ''}
+                      </button>
+                    </>
                   )}
                 </div>
 

@@ -96,6 +96,13 @@ export type {
   ProxyProviderTestResult,
   ProxyGenerationOptions,
   GeneratedProxy,
+  // Phase 17.H — Platform-Specific Detection Hardening
+  HardenerSeverity,
+  HardenerIssue,
+  HardenerFix,
+  PlatformTuningHint,
+  PreFlightValidationResult,
+  LiveAdjustmentEvent,
   // Phase 21 — Behavior Correlation Detector
   BehaviorSample,
   ProfileBehaviorFingerprint,
