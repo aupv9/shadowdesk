@@ -14,7 +14,7 @@
     "category": "sea-ecommerce",
     "steps": [
       {
-        "id": "dfeee77f-85e1-49e6-9373-7694e664be10",
+        "id": "4e4d86db-2246-4479-8828-d2ec78df4cdb",
         "action": "navigate",
         "label": "Open Shopee VN",
         "params": {
@@ -24,7 +24,7 @@
         }
       },
       {
-        "id": "d16225b9-8542-4492-aee3-29a5a88ff0fe",
+        "id": "65bdfd84-56df-440b-8f48-7fc1ed398272",
         "action": "wait",
         "label": "Let hydration finish",
         "params": {
@@ -32,7 +32,7 @@
         }
       },
       {
-        "id": "79e00e8a-10b7-49d8-9825-0e82be972806",
+        "id": "678e3b46-61b8-4eb6-a625-0cdb9b9da11b",
         "action": "waitForSelector",
         "label": "Wait for search bar",
         "params": {
@@ -42,7 +42,7 @@
         }
       },
       {
-        "id": "4f10d611-e3bf-4cf2-8d8a-5be0a13e294f",
+        "id": "4bee9f5c-e841-4141-8d81-536738e8d223",
         "action": "click",
         "label": "Focus search bar",
         "params": {
@@ -50,7 +50,7 @@
         }
       },
       {
-        "id": "74d51569-6c21-4a50-8507-5fa18cf9a3dd",
+        "id": "6d2546ad-29eb-4d59-9dfc-e4c6038c1c6a",
         "action": "type",
         "label": "Type keyword",
         "params": {
@@ -60,7 +60,7 @@
         }
       },
       {
-        "id": "6a491fc1-6ec0-43b0-9597-39dfe48236f3",
+        "id": "888ef0c2-5b85-4aa8-bab8-8c4705a9c5a7",
         "action": "keyPress",
         "label": "Submit search",
         "params": {
@@ -68,7 +68,7 @@
         }
       },
       {
-        "id": "78ba3a79-041c-4d7d-a1b4-da371dbae54a",
+        "id": "ef272d69-556b-4f8a-ad21-ae8b23178de6",
         "action": "waitForNavigation",
         "label": "Wait for results",
         "params": {
@@ -77,7 +77,7 @@
         }
       },
       {
-        "id": "604d3180-8874-4bf3-ac9d-bd04d19a66ab",
+        "id": "e0e5e5c6-00d8-4bdd-94ae-4239b81291df",
         "action": "waitForSelector",
         "label": "Wait for first product card",
         "params": {
@@ -87,14 +87,14 @@
         }
       },
       {
-        "id": "c82965f1-e6f1-46e9-98e5-66557cfcf5e8",
+        "id": "9f11aed1-dd1d-40b4-b8c3-7d2dad6a1af3",
         "action": "loop",
         "label": "Lazy-scroll results",
         "params": {
           "times": 4,
           "steps": [
             {
-              "id": "c514f50b-dd28-4b5f-a512-8f20e1cea407",
+              "id": "0a4e54e9-bccb-42a8-abac-391c00d1b47e",
               "action": "scroll",
               "label": "Scroll down",
               "params": {
@@ -102,7 +102,7 @@
               }
             },
             {
-              "id": "2032ce21-1cde-410c-a770-24373dd2b9e0",
+              "id": "4219cc15-858a-4e5a-b118-f97040a97e9a",
               "action": "wait",
               "label": "Human pause",
               "params": {
@@ -113,7 +113,7 @@
         }
       },
       {
-        "id": "5109558a-1e8e-468f-b738-a6be92ed80a8",
+        "id": "561a7af5-130e-4652-a547-6075592b6cbd",
         "action": "extractText",
         "label": "Extract product titles",
         "params": {
@@ -123,7 +123,7 @@
         }
       },
       {
-        "id": "d4a10014-4c37-4fce-8d82-177347763631",
+        "id": "0e7630b7-724d-48d2-ac8d-f195765548a0",
         "action": "extractText",
         "label": "Extract product prices",
         "params": {
@@ -133,7 +133,7 @@
         }
       },
       {
-        "id": "0c49b5a2-6ce4-4058-a12d-eea3861aa17e",
+        "id": "e0506276-a191-47d4-b8f2-6c1ba4637f1c",
         "action": "screenshot",
         "label": "Screenshot results",
         "params": {
@@ -168,7 +168,7 @@
     "category": "sea-ecommerce",
     "steps": [
       {
-        "id": "408b0aeb-dd78-45f6-bcf7-5fe3d734c032",
+        "id": "33a02bb8-6a73-4ad1-be66-ac5c440f806d",
         "action": "navigate",
         "label": "Open product page",
         "params": {
@@ -178,7 +178,7 @@
         }
       },
       {
-        "id": "c9ddbaed-fe3f-4f3b-a89d-ad3b000001ca",
+        "id": "ab1320a9-7eeb-43d1-97ca-c0cebeb2726f",
         "action": "waitForSelector",
         "label": "Wait for product title",
         "params": {
@@ -188,7 +188,7 @@
         }
       },
       {
-        "id": "03c57d3a-c94f-470d-8a9b-5842571e9f47",
+        "id": "56289b01-d942-4dac-91a7-9011a86a9a3e",
         "action": "wait",
         "label": "Humanise pause",
         "params": {
@@ -196,7 +196,7 @@
         }
       },
       {
-        "id": "9052306d-014c-4515-ab9c-201e1e5a24eb",
+        "id": "30e18212-2a27-4960-9e40-61ed87dcf392",
         "action": "scroll",
         "label": "Scroll to description",
         "params": {
@@ -204,7 +204,7 @@
         }
       },
       {
-        "id": "2f2aadfd-8c14-456b-80ab-2d4e80f8d511",
+        "id": "f018a12f-8da2-4f94-a61b-b80f163680fe",
         "action": "extractText",
         "label": "Extract title",
         "params": {
@@ -213,7 +213,7 @@
         }
       },
       {
-        "id": "27d8a38b-b7b5-4469-972b-29b4d0cbf948",
+        "id": "fd6c0508-0e8d-4913-a837-e7c3ebcd5525",
         "action": "extractText",
         "label": "Extract price",
         "params": {
@@ -222,7 +222,7 @@
         }
       },
       {
-        "id": "d1c6bd67-5f57-458a-bf01-ff073f92c791",
+        "id": "d31d5822-163f-45cd-a89d-06cfc021538b",
         "action": "extractText",
         "label": "Extract seller",
         "params": {
@@ -231,7 +231,7 @@
         }
       },
       {
-        "id": "5ebcf7da-161b-4aa5-bd8e-698f09079865",
+        "id": "b1ea54b0-2167-44f2-833a-7f166d5cae95",
         "action": "extractText",
         "label": "Extract rating",
         "params": {
@@ -240,7 +240,7 @@
         }
       },
       {
-        "id": "30804a1d-f8a5-47cc-817b-80663bcf4f41",
+        "id": "8efd4dc3-4cd2-4852-bba9-6a6ab9aacdf2",
         "action": "screenshot",
         "label": "Full product screenshot",
         "params": {
@@ -275,7 +275,7 @@
     "category": "sea-ecommerce",
     "steps": [
       {
-        "id": "e304123d-c30f-4f21-92a0-79a2923b895a",
+        "id": "6bd52dc7-8c8d-4972-8ffc-f177f83779ed",
         "action": "navigate",
         "label": "Open product page",
         "params": {
@@ -285,7 +285,7 @@
         }
       },
       {
-        "id": "07d2538c-2b64-4f4d-9628-46705dda92a4",
+        "id": "4ea1068e-0968-4f44-800a-0fdc0749b18b",
         "action": "wait",
         "label": "Wait for hydration",
         "params": {
@@ -293,7 +293,7 @@
         }
       },
       {
-        "id": "c746037a-ef21-49b1-832a-457559a5a7db",
+        "id": "f9eb38e8-ffdf-45d9-be65-e7ac0bd5af8c",
         "action": "scroll",
         "label": "Scroll to buy box",
         "params": {
@@ -301,7 +301,7 @@
         }
       },
       {
-        "id": "c60319cf-e5dd-4b14-851c-2cd29e3904bc",
+        "id": "65b09d1b-bd54-4d56-805d-2ff1c708b3f5",
         "action": "waitForSelector",
         "label": "Wait for add-to-cart button",
         "params": {
@@ -311,7 +311,7 @@
         }
       },
       {
-        "id": "96dcc8bd-14dc-41dd-b044-31534a2ed15c",
+        "id": "90fcfa89-7f06-43d2-bee8-f915f57b9bb1",
         "action": "hover",
         "label": "Hover on button (human)",
         "params": {
@@ -319,7 +319,7 @@
         }
       },
       {
-        "id": "0cc223dd-a0b6-40bc-9d7e-a99f187ab00a",
+        "id": "32cf1a81-5cb0-46e2-b2ed-52aee13ba5fa",
         "action": "wait",
         "label": "Pause before click",
         "params": {
@@ -327,7 +327,7 @@
         }
       },
       {
-        "id": "aa073b74-76f0-46ae-b5bd-8a5e10ce34dc",
+        "id": "ccc60107-22a8-4344-933d-54567923b04f",
         "action": "click",
         "label": "Click add to cart",
         "params": {
@@ -335,7 +335,7 @@
         }
       },
       {
-        "id": "a5bf18d7-c245-44a7-8898-fb1eb18982ae",
+        "id": "227464d2-1abe-4ad1-a629-bb12be95d3b2",
         "action": "wait",
         "label": "Wait for cart toast",
         "params": {
@@ -343,7 +343,7 @@
         }
       },
       {
-        "id": "24c66c9b-24cb-49cf-9fa5-0a46317e31aa",
+        "id": "d506d851-a17d-4e2f-9794-a9a9ed07721d",
         "action": "screenshot",
         "label": "Screenshot cart state",
         "params": {
@@ -377,7 +377,7 @@
     "category": "sea-ecommerce",
     "steps": [
       {
-        "id": "c7d16e15-0b28-4cae-b33f-73701fcf2835",
+        "id": "423e127f-9ce1-498c-ac34-b4c3f0623ebf",
         "action": "navigate",
         "label": "Open login page",
         "params": {
@@ -386,7 +386,7 @@
         }
       },
       {
-        "id": "1c9066d4-212e-4e7f-ae89-54b03c5f617a",
+        "id": "0775ec8b-90ff-43b9-89ea-bff2f9020a03",
         "action": "waitForSelector",
         "label": "Wait for login form",
         "params": {
@@ -396,7 +396,7 @@
         }
       },
       {
-        "id": "f2df87d3-e034-4bd2-9135-e6f0cce496de",
+        "id": "b39fde66-5900-4e36-973c-b33e2d9775cf",
         "action": "type",
         "label": "Enter phone / email",
         "params": {
@@ -406,7 +406,7 @@
         }
       },
       {
-        "id": "7e173140-1a7e-4fcc-ace1-c082e094285a",
+        "id": "36b9167d-47b5-490a-aded-8596254b2848",
         "action": "wait",
         "label": "Human pause",
         "params": {
@@ -414,7 +414,7 @@
         }
       },
       {
-        "id": "568d9812-63d6-4fbb-b6c4-2f8372b08ff2",
+        "id": "2e76562a-022e-4ae8-96af-1ea11b20626c",
         "action": "type",
         "label": "Enter password",
         "params": {
@@ -424,7 +424,7 @@
         }
       },
       {
-        "id": "e2772c2d-4cba-4f18-850d-8d9b444982ea",
+        "id": "be81adcb-9fcc-4051-ae49-2a6e71ae3ba3",
         "action": "wait",
         "label": "Pause before submit",
         "params": {
@@ -432,7 +432,7 @@
         }
       },
       {
-        "id": "b2e8f982-d909-4495-be94-80d9b12cfb90",
+        "id": "48c0ec23-9a8a-41f7-bc46-49987659ee48",
         "action": "click",
         "label": "Click login",
         "params": {
@@ -440,7 +440,7 @@
         }
       },
       {
-        "id": "7b3e2c57-95ca-4cf3-9c69-17c2d9193f10",
+        "id": "5430c5be-3233-46ca-ba3d-f292a30924bb",
         "action": "wait",
         "label": "Wait for redirect",
         "params": {
@@ -448,7 +448,7 @@
         }
       },
       {
-        "id": "c95b92ef-7b3b-4eb3-a06f-8247047e8074",
+        "id": "cbb12602-bf09-4e2e-94f4-f3c97af23d67",
         "action": "screenshot",
         "label": "Screenshot post-login state",
         "params": {
@@ -482,7 +482,7 @@
     "category": "sea-ecommerce",
     "steps": [
       {
-        "id": "8a5466d1-b938-49e2-9ced-6d5ba98bdc20",
+        "id": "48b00469-3326-4228-93ad-6f40aa9d7559",
         "action": "navigate",
         "label": "Open Lazada VN",
         "params": {
@@ -492,7 +492,7 @@
         }
       },
       {
-        "id": "916166f9-89ba-4a7c-94b7-3e317eafde64",
+        "id": "36ff5575-e892-4250-8325-fe6c22467dd3",
         "action": "wait",
         "label": "Wait for hydration",
         "params": {
@@ -500,7 +500,7 @@
         }
       },
       {
-        "id": "d15f01a1-16bb-45ac-b8fa-4e57a4bb35f4",
+        "id": "87959a65-ed63-414f-9080-8e489818aa6b",
         "action": "waitForSelector",
         "label": "Wait for search input",
         "params": {
@@ -510,7 +510,7 @@
         }
       },
       {
-        "id": "59452589-aa3a-4653-87d8-da7e3d3c5818",
+        "id": "bfca338e-5433-41ff-826b-dccc403254f9",
         "action": "click",
         "label": "Focus search",
         "params": {
@@ -518,7 +518,7 @@
         }
       },
       {
-        "id": "f5471243-fd5f-4271-8da7-ce1f1142efd3",
+        "id": "1d7d5e19-ebff-4e04-aebd-9f2cf413f4a2",
         "action": "type",
         "label": "Type keyword",
         "params": {
@@ -528,7 +528,7 @@
         }
       },
       {
-        "id": "45872353-e1d4-4a1f-8c8b-a863f601cdfa",
+        "id": "39d0c4ed-2ebd-45c9-975b-aa4a749a012e",
         "action": "keyPress",
         "label": "Submit search",
         "params": {
@@ -536,7 +536,7 @@
         }
       },
       {
-        "id": "35a3b74b-804f-4a9b-a2c2-3a3c9d2590e9",
+        "id": "ad6348de-c65f-40e3-8016-0de314dccc95",
         "action": "waitForNavigation",
         "label": "Wait for results",
         "params": {
@@ -545,7 +545,7 @@
         }
       },
       {
-        "id": "93d4b964-38f1-4e8f-9c16-92088722ddb3",
+        "id": "fe28f0ed-621b-45d4-bb84-ba9c3380e690",
         "action": "waitForSelector",
         "label": "Wait for first product card",
         "params": {
@@ -555,14 +555,14 @@
         }
       },
       {
-        "id": "9dafb65c-611e-40a5-baaf-64458406231f",
+        "id": "706d7c16-04e4-4ad8-8e09-7702a1466954",
         "action": "loop",
         "label": "Lazy-scroll results",
         "params": {
           "times": 4,
           "steps": [
             {
-              "id": "9c5c5c74-46be-4dfd-becf-0d583c56e0ba",
+              "id": "5546ba6c-a3b9-4f93-a42f-580d6068095e",
               "action": "scroll",
               "label": "Scroll down",
               "params": {
@@ -570,7 +570,7 @@
               }
             },
             {
-              "id": "cb2e5f0f-bf07-48e9-8a0e-187b862aad26",
+              "id": "8d2216fd-2c2b-4bc7-b0e0-6421a31ea5d7",
               "action": "wait",
               "label": "Pause",
               "params": {
@@ -581,7 +581,7 @@
         }
       },
       {
-        "id": "c0aab799-f2a3-4700-82e9-b2461a10e991",
+        "id": "056ca6b2-140d-4ecf-a002-27c8aaeb3e9f",
         "action": "extractText",
         "label": "Extract product titles",
         "params": {
@@ -591,7 +591,7 @@
         }
       },
       {
-        "id": "6c5597ca-e1f8-4e5f-80c1-9ec2148a71ba",
+        "id": "910eb76f-313e-4362-836c-7ce1f4f9112e",
         "action": "extractText",
         "label": "Extract product prices",
         "params": {
@@ -601,7 +601,7 @@
         }
       },
       {
-        "id": "944d40a3-581f-4fa9-9309-e16f07c359c7",
+        "id": "7d059986-ca07-4598-b4e9-e76aeca0ab89",
         "action": "screenshot",
         "label": "Screenshot results",
         "params": {
@@ -632,7 +632,7 @@
     "category": "sea-ecommerce",
     "steps": [
       {
-        "id": "2b20790c-b696-46c6-9567-2669d76faff2",
+        "id": "5a25cc47-6398-48cb-a5cb-14fc86c17621",
         "action": "navigate",
         "label": "Open product page",
         "params": {
@@ -642,7 +642,7 @@
         }
       },
       {
-        "id": "e5fd045d-0c72-42b1-99ec-f8d89327a09c",
+        "id": "a5e566c9-241f-4235-ac9a-d4e4e0a018a2",
         "action": "waitForSelector",
         "label": "Wait for title",
         "params": {
@@ -652,7 +652,7 @@
         }
       },
       {
-        "id": "9a349c5b-1f9f-4d91-ab3d-8988c20f5137",
+        "id": "958056ad-3742-4e75-b61c-9c7ac6ba7930",
         "action": "wait",
         "label": "Pause",
         "params": {
@@ -660,7 +660,7 @@
         }
       },
       {
-        "id": "6f51257e-6626-4bbe-bac1-10d50e19e4c5",
+        "id": "671c8dac-cd91-4ca8-b36d-e5216e8a59c8",
         "action": "extractText",
         "label": "Extract title",
         "params": {
@@ -669,7 +669,7 @@
         }
       },
       {
-        "id": "dfa73ea1-6dfd-44ca-bcf4-3e982bfe7f7b",
+        "id": "f83721f0-5226-4810-96af-ba6d9e40ede4",
         "action": "extractText",
         "label": "Extract price",
         "params": {
@@ -678,7 +678,7 @@
         }
       },
       {
-        "id": "5e064165-84d8-4d0d-9d8c-767d604513a2",
+        "id": "3c7b7a2b-f281-4e79-b412-b73ad09b5545",
         "action": "extractText",
         "label": "Extract rating",
         "params": {
@@ -687,7 +687,7 @@
         }
       },
       {
-        "id": "bdf6f679-d0c2-4138-b51b-eff9d1a951a3",
+        "id": "1e666599-6ec8-435d-b77b-ec44e0eb4582",
         "action": "scroll",
         "label": "Scroll to reviews",
         "params": {
@@ -695,7 +695,7 @@
         }
       },
       {
-        "id": "678877a8-35ec-4d8f-a6db-b28fe91fad5d",
+        "id": "e93b0787-de2c-49a2-b72e-5e9e96d78965",
         "action": "screenshot",
         "label": "Full page screenshot",
         "params": {
@@ -726,7 +726,7 @@
     "category": "sea-ecommerce",
     "steps": [
       {
-        "id": "bc920ec4-3340-40f0-8b03-0d266626a93e",
+        "id": "6a61b8c0-79e8-4aac-b3d0-d7f46b51d17f",
         "action": "navigate",
         "label": "Open flash sale",
         "params": {
@@ -735,7 +735,7 @@
         }
       },
       {
-        "id": "4f886c0a-d2f8-4565-b350-2d6760cb25ea",
+        "id": "a8dd9741-fdc4-49a0-9fc1-880552b76ac4",
         "action": "wait",
         "label": "Wait for hydration",
         "params": {
@@ -743,7 +743,7 @@
         }
       },
       {
-        "id": "61c92579-f9cd-45ae-9d76-71f7d680d238",
+        "id": "307069ab-3ba0-4f90-b860-ca834a59d1f9",
         "action": "waitForSelector",
         "label": "Wait for deal grid",
         "params": {
@@ -753,7 +753,7 @@
         }
       },
       {
-        "id": "650e3937-c9a1-48bc-ace0-75c213986e02",
+        "id": "f0f28c37-09ce-4d54-8780-c15cebd4148e",
         "action": "extractText",
         "label": "Extract countdown",
         "params": {
@@ -762,7 +762,7 @@
         }
       },
       {
-        "id": "190a30a2-d044-43c1-9743-3b5b747cf8e4",
+        "id": "4c179c5f-9fae-40e6-bd91-38a7af6ec728",
         "action": "extractText",
         "label": "Extract deal titles",
         "params": {
@@ -772,7 +772,7 @@
         }
       },
       {
-        "id": "47216ee7-0130-46a7-8b5a-800ec83fb4b4",
+        "id": "27bbfcf4-a082-4fd1-a094-8087167a469a",
         "action": "extractText",
         "label": "Extract deal prices",
         "params": {
@@ -782,7 +782,7 @@
         }
       },
       {
-        "id": "3d970579-9a5b-473c-80a4-9629fe53632c",
+        "id": "b038edaa-62c8-41cd-8988-2df62800e94a",
         "action": "screenshot",
         "label": "Screenshot sale page",
         "params": {
@@ -813,7 +813,7 @@
     "category": "sea-ecommerce",
     "steps": [
       {
-        "id": "23b6ff39-9eab-4e85-83ff-0fcf64dd88db",
+        "id": "9f236a37-437e-45e4-9653-11fe57d6c313",
         "action": "navigate",
         "label": "Open TikTok Shop",
         "params": {
@@ -823,7 +823,7 @@
         }
       },
       {
-        "id": "97f93a50-3105-47da-899a-bd96466e7174",
+        "id": "e4fc4c93-5722-47e5-ba17-46c7adc0772f",
         "action": "wait",
         "label": "Wait for hydration",
         "params": {
@@ -831,7 +831,7 @@
         }
       },
       {
-        "id": "41a10a4c-7e42-44db-9401-5be75263e271",
+        "id": "b9308eba-fd47-47fa-ab0b-4ae005a55627",
         "action": "waitForSelector",
         "label": "Wait for product grid",
         "params": {
@@ -841,14 +841,14 @@
         }
       },
       {
-        "id": "36c22823-7a17-4d07-8be3-9c5081ccfb5b",
+        "id": "e0e14510-813b-4413-b9b9-63071e6cbe4b",
         "action": "loop",
         "label": "Scroll feed",
         "params": {
           "times": 6,
           "steps": [
             {
-              "id": "fe796245-ebc6-48dd-bec3-bcca056f5f56",
+              "id": "14ec6ac4-edb9-417d-b6a3-26df1d503a3d",
               "action": "scroll",
               "label": "Scroll down",
               "params": {
@@ -856,7 +856,7 @@
               }
             },
             {
-              "id": "ca43a26f-ce19-4cbf-a4ad-63fea4b9ab21",
+              "id": "cc628215-901c-49f0-be4e-c4c9aa0a3c49",
               "action": "wait",
               "label": "Humanise",
               "params": {
@@ -867,7 +867,7 @@
         }
       },
       {
-        "id": "ecbc6db1-9cd7-49f2-b56f-5a5298dc7312",
+        "id": "a1ee65a6-14ae-48b0-8353-547a764c1bea",
         "action": "extractText",
         "label": "Extract titles",
         "params": {
@@ -877,7 +877,7 @@
         }
       },
       {
-        "id": "77086fd4-da4f-4642-ac63-ecef2d37b3aa",
+        "id": "160b95af-ec2c-4519-a6cb-01e0b77874ed",
         "action": "extractText",
         "label": "Extract prices",
         "params": {
@@ -887,7 +887,7 @@
         }
       },
       {
-        "id": "980e7f75-71ea-43b8-8dd1-c66439843176",
+        "id": "548e0740-f4b6-47d7-a935-d5e1658b5b71",
         "action": "screenshot",
         "label": "Screenshot feed",
         "params": {
@@ -917,7 +917,7 @@
     "category": "sea-ecommerce",
     "steps": [
       {
-        "id": "61206f7a-eba1-4347-945a-efcb54c5498d",
+        "id": "c3351b9d-b8e9-410a-a055-91fa25824905",
         "action": "navigate",
         "label": "Open TikTok Shop",
         "params": {
@@ -926,7 +926,7 @@
         }
       },
       {
-        "id": "867c6046-6245-4692-b228-72f7d50d5f86",
+        "id": "07739629-23f8-4d42-8a8e-b758c2df6a69",
         "action": "wait",
         "label": "Wait for hydration",
         "params": {
@@ -934,7 +934,7 @@
         }
       },
       {
-        "id": "e2b2cbb3-4750-4510-b0e0-3908ad79c6e4",
+        "id": "19b9c0e1-1210-4dde-8206-c4727e594e0c",
         "action": "waitForSelector",
         "label": "Wait for search box",
         "params": {
@@ -944,7 +944,7 @@
         }
       },
       {
-        "id": "b734c8b8-a453-4149-9644-3b86c695dde7",
+        "id": "813560b8-bc55-42da-960c-81e06de18aba",
         "action": "click",
         "label": "Focus search",
         "params": {
@@ -952,7 +952,7 @@
         }
       },
       {
-        "id": "015a8ce0-7225-4b84-8121-d864b43db2af",
+        "id": "8856a32c-73c6-49a3-ba1c-50accf1671b0",
         "action": "type",
         "label": "Type query",
         "params": {
@@ -962,7 +962,7 @@
         }
       },
       {
-        "id": "4cf32782-702d-4354-a933-a5461361376b",
+        "id": "c98edf3c-cd0c-4d45-b4cd-3a04f2e4f02d",
         "action": "keyPress",
         "label": "Press enter",
         "params": {
@@ -970,7 +970,7 @@
         }
       },
       {
-        "id": "da497356-612f-4740-b4e2-4387f30b37be",
+        "id": "8f131ed7-0a5a-42fc-a0a2-8457b5bf7a4d",
         "action": "wait",
         "label": "Wait for results",
         "params": {
@@ -978,7 +978,7 @@
         }
       },
       {
-        "id": "c275f387-a173-4356-8600-32bbe34219fe",
+        "id": "bef3627b-e518-4ab4-8f11-120aa6933e61",
         "action": "waitForSelector",
         "label": "Wait for result cards",
         "params": {
@@ -988,7 +988,7 @@
         }
       },
       {
-        "id": "ce5b9c40-2896-458d-8348-8776bb2add95",
+        "id": "e1eb6b72-929e-4f50-a34d-998edf1702e5",
         "action": "extractText",
         "label": "Extract titles",
         "params": {
@@ -998,7 +998,7 @@
         }
       },
       {
-        "id": "32c2e771-23ae-4e63-8d6b-b912acdb22c6",
+        "id": "acfb420f-7e47-4e82-a942-ab15d923e796",
         "action": "screenshot",
         "label": "Screenshot results",
         "params": {
@@ -1029,7 +1029,7 @@
     "category": "sea-social",
     "steps": [
       {
-        "id": "c1b597cd-27a6-40c2-a600-6963a5c69155",
+        "id": "789c76be-7dcc-4fea-89cc-8abc40f3d882",
         "action": "navigate",
         "label": "Open live stream",
         "params": {
@@ -1039,7 +1039,7 @@
         }
       },
       {
-        "id": "92e1c30b-09d5-4708-8191-0ad92ede3d43",
+        "id": "5a1bd106-f371-4c5d-a3cd-eb17f41aa479",
         "action": "wait",
         "label": "Buffer start",
         "params": {
@@ -1047,7 +1047,7 @@
         }
       },
       {
-        "id": "cce68c62-c0f5-439c-9fe3-6470e51e0f8a",
+        "id": "43adc311-3102-4a36-a053-e44659cebf95",
         "action": "waitForSelector",
         "label": "Wait for live card",
         "params": {
@@ -1057,14 +1057,14 @@
         }
       },
       {
-        "id": "24600f64-98e7-4898-b292-f9b02860972e",
+        "id": "7eded555-bd06-43d9-be74-332f42bc08be",
         "action": "loop",
         "label": "Snapshot viewers + pins x5",
         "params": {
           "times": 5,
           "steps": [
             {
-              "id": "7b7f4c2c-3788-419f-9dda-6ae8822d45e4",
+              "id": "18657615-ea70-4174-926d-36be4651069c",
               "action": "extractText",
               "label": "Viewer count",
               "params": {
@@ -1073,7 +1073,7 @@
               }
             },
             {
-              "id": "a4337bdd-6181-41d5-b1ac-a5264336600d",
+              "id": "32f9e11b-5d28-4e90-9bec-9c5d92e62360",
               "action": "extractText",
               "label": "Pinned product",
               "params": {
@@ -1082,7 +1082,7 @@
               }
             },
             {
-              "id": "66263fd3-3e7c-4099-97fb-34bbd973d06f",
+              "id": "eb1fb5c1-e3d4-4bb2-aa3a-9632481db126",
               "action": "screenshot",
               "label": "Stream snapshot",
               "params": {
@@ -1090,7 +1090,7 @@
               }
             },
             {
-              "id": "16f68261-20e6-4985-b40a-fb4f0d42cb03",
+              "id": "846ee299-c4bc-490c-b7ca-52d5a4f4ace5",
               "action": "wait",
               "label": "Inter-snapshot",
               "params": {
@@ -1124,7 +1124,7 @@
     "category": "sea-ecommerce",
     "steps": [
       {
-        "id": "2af9bc6b-79f4-4333-94d7-1b1f681552a0",
+        "id": "d7104b94-bc48-4c0e-9e2c-88bfd88d67f4",
         "action": "navigate",
         "label": "Open Tiki",
         "params": {
@@ -1133,7 +1133,7 @@
         }
       },
       {
-        "id": "6b7e2e3e-9dd9-499b-beb8-f69b2b2f7ae8",
+        "id": "f52dd5f6-488f-41da-bf0a-464744366937",
         "action": "wait",
         "label": "Wait for hydration",
         "params": {
@@ -1141,7 +1141,7 @@
         }
       },
       {
-        "id": "097031b0-4931-4b2f-8ca4-af296e39cae8",
+        "id": "c7ed2bfc-349f-4790-8aab-7897e2282f40",
         "action": "waitForSelector",
         "label": "Wait for search input",
         "params": {
@@ -1151,7 +1151,7 @@
         }
       },
       {
-        "id": "17861757-330d-457d-8ba3-728dfb9e9d8f",
+        "id": "faf4a55e-ee12-4c67-aed6-efb95078b1e3",
         "action": "click",
         "label": "Focus search",
         "params": {
@@ -1159,7 +1159,7 @@
         }
       },
       {
-        "id": "089dada6-4543-4eda-8550-cdfe30f532f6",
+        "id": "3f3b9e96-9114-4262-bdb5-88d2e8305dce",
         "action": "type",
         "label": "Type keyword",
         "params": {
@@ -1169,7 +1169,7 @@
         }
       },
       {
-        "id": "5dfbf7b9-df4a-4e12-af83-a07c120a4cd8",
+        "id": "ffa30cbe-af06-4fe2-91b3-0276fa66074e",
         "action": "keyPress",
         "label": "Submit",
         "params": {
@@ -1177,7 +1177,7 @@
         }
       },
       {
-        "id": "07548a5d-c096-49f6-bfd9-68b7cbf3c659",
+        "id": "d0fa6413-fb1b-40fb-a601-4295b9356f75",
         "action": "waitForNavigation",
         "label": "Wait for results",
         "params": {
@@ -1185,7 +1185,7 @@
         }
       },
       {
-        "id": "33935b5f-a60d-4838-b3e8-6f1d5f53a11c",
+        "id": "9794e8ee-541a-4679-abe0-9124a5f256be",
         "action": "waitForSelector",
         "label": "Wait for product card",
         "params": {
@@ -1195,7 +1195,7 @@
         }
       },
       {
-        "id": "0c39e701-3455-4247-91d2-9de331de3972",
+        "id": "ecdf51f1-b98e-462c-a2d0-0fa8860c5403",
         "action": "extractText",
         "label": "Extract titles",
         "params": {
@@ -1205,7 +1205,7 @@
         }
       },
       {
-        "id": "fc29fb84-d44c-4a2f-8c10-6c3d079c57c7",
+        "id": "377616de-a713-427c-bb3a-8bab4bb79692",
         "action": "extractText",
         "label": "Extract prices",
         "params": {
@@ -1215,7 +1215,7 @@
         }
       },
       {
-        "id": "8c43b172-521e-4a6d-80a4-3da741f80397",
+        "id": "34d8e6fa-cf7d-42fe-8320-504e5669b27d",
         "action": "screenshot",
         "label": "Screenshot results",
         "params": {
@@ -1246,7 +1246,7 @@
     "category": "sea-ecommerce",
     "steps": [
       {
-        "id": "564ba68b-8d7a-4003-86b8-9f346aa6f150",
+        "id": "e1c873f0-60aa-47a5-b1a2-c8d56cde55ba",
         "action": "navigate",
         "label": "Open flash deals",
         "params": {
@@ -1255,7 +1255,7 @@
         }
       },
       {
-        "id": "0f1c365c-4148-4395-aed7-bfcbb89a5515",
+        "id": "415aaace-ceec-41d8-a284-8806485fd576",
         "action": "wait",
         "label": "Hydration pause",
         "params": {
@@ -1263,7 +1263,7 @@
         }
       },
       {
-        "id": "20b2c1b6-c941-488b-9398-c35206d986a5",
+        "id": "397b306b-5141-434c-97f4-edf0ef2d9485",
         "action": "scroll",
         "label": "Scroll to deals",
         "params": {
@@ -1271,7 +1271,7 @@
         }
       },
       {
-        "id": "05f744b4-dcde-4405-aca3-7266c8961d9f",
+        "id": "73a2b101-68cc-4013-8fc2-518d97b43b30",
         "action": "extractText",
         "label": "Deal titles",
         "params": {
@@ -1281,7 +1281,7 @@
         }
       },
       {
-        "id": "875efc85-dbfe-461c-b06b-70a833a24e44",
+        "id": "ea912d93-8fb2-4927-a991-bb445b380020",
         "action": "extractText",
         "label": "Stock badges",
         "params": {
@@ -1291,7 +1291,7 @@
         }
       },
       {
-        "id": "f24eff15-e9c0-4327-97fc-4daace90623f",
+        "id": "9e18854c-63ee-4d03-a0e7-16a7cd795e44",
         "action": "screenshot",
         "label": "Screenshot deals",
         "params": {
@@ -1323,7 +1323,7 @@
     "category": "sea-payments",
     "steps": [
       {
-        "id": "208d2d6b-56a6-46a4-9181-c31513485d34",
+        "id": "e4904206-694b-44db-b133-a53697e27f3d",
         "action": "navigate",
         "label": "Open sandbox gateway",
         "params": {
@@ -1333,7 +1333,7 @@
         }
       },
       {
-        "id": "b572d33d-897f-4f8d-91ad-7f6db6d30fb8",
+        "id": "136651a0-799f-4fc9-9be9-48b6ad5bb890",
         "action": "wait",
         "label": "Wait for gateway",
         "params": {
@@ -1341,7 +1341,7 @@
         }
       },
       {
-        "id": "16b21300-b352-4c29-9b46-87d49e556c9d",
+        "id": "f4f393e1-3477-4742-bc16-fbfa361abb09",
         "action": "waitForSelector",
         "label": "Wait for bank grid",
         "params": {
@@ -1351,7 +1351,7 @@
         }
       },
       {
-        "id": "87dbd867-730e-4835-83a1-07b14a1c1a37",
+        "id": "aed76a01-c2c5-4edb-b35b-3029c3c15016",
         "action": "click",
         "label": "Pick test bank (NCB)",
         "params": {
@@ -1359,7 +1359,7 @@
         }
       },
       {
-        "id": "12aa1092-6ab7-4c2f-8a08-3bad03d1d903",
+        "id": "8982b90b-0767-40b7-8a31-f8ea9cbf0c6f",
         "action": "wait",
         "label": "Wait for card form",
         "params": {
@@ -1367,7 +1367,7 @@
         }
       },
       {
-        "id": "499a59ea-e315-4461-aabc-69e8e2250121",
+        "id": "6e1a54b3-2001-4342-9bae-a6e273c4bba1",
         "action": "waitForSelector",
         "label": "Wait for card number field",
         "params": {
@@ -1377,7 +1377,7 @@
         }
       },
       {
-        "id": "ea3c67d6-341a-4fd7-91b6-6c5862e3c602",
+        "id": "7138d299-e8d9-414d-ac23-757abbb30460",
         "action": "type",
         "label": "Card number",
         "params": {
@@ -1387,7 +1387,7 @@
         }
       },
       {
-        "id": "6be5a954-64d7-4d89-97b8-1d4753436e7f",
+        "id": "c63bb8fd-04a0-4cca-8b7f-11819dac8c1f",
         "action": "type",
         "label": "Card holder",
         "params": {
@@ -1397,7 +1397,7 @@
         }
       },
       {
-        "id": "435425c7-70dd-427e-b7d6-f7de9897ee03",
+        "id": "7b08ccb6-50bd-4e3b-a7b3-51218a08d6df",
         "action": "type",
         "label": "Issue date",
         "params": {
@@ -1407,7 +1407,7 @@
         }
       },
       {
-        "id": "cb22e38f-722f-438e-a864-f093fe874dab",
+        "id": "47f48bbf-ef68-4f0c-a7cc-4aaa735c6d46",
         "action": "click",
         "label": "Submit card",
         "params": {
@@ -1415,7 +1415,7 @@
         }
       },
       {
-        "id": "1f3a3d85-648b-4295-9d3e-a2c4b579be6d",
+        "id": "69e2bfd2-392f-4eb7-83b1-0998c954156e",
         "action": "wait",
         "label": "Wait for OTP screen",
         "params": {
@@ -1423,7 +1423,7 @@
         }
       },
       {
-        "id": "30eda295-bdb2-4cd8-ba9b-ff9f1093088e",
+        "id": "c7c6a780-508c-4686-8f53-4d42355cfb69",
         "action": "screenshot",
         "label": "OTP step screenshot",
         "params": {
@@ -1452,7 +1452,7 @@
     "category": "sea-payments",
     "steps": [
       {
-        "id": "a64e5467-1e4e-4931-b47a-320b9de3909e",
+        "id": "103cddc8-e357-49b1-8041-ce748a0c1710",
         "action": "navigate",
         "label": "Open VNPay redirect",
         "params": {
@@ -1461,7 +1461,7 @@
         }
       },
       {
-        "id": "61c898be-aa35-451e-a036-2e076c43174f",
+        "id": "2f10492e-a91f-4ec5-bae6-8287383c8905",
         "action": "wait",
         "label": "Wait for bank screen",
         "params": {
@@ -1469,7 +1469,7 @@
         }
       },
       {
-        "id": "70b54fc8-bc22-4d12-b9e2-9cad259673b5",
+        "id": "ad90a8ef-0712-46c7-9ee5-16a0e94d7e02",
         "action": "extractText",
         "label": "Extract transaction ref",
         "params": {
@@ -1478,7 +1478,7 @@
         }
       },
       {
-        "id": "5f5c7f29-d68f-4205-a199-6224a80fb15f",
+        "id": "a5b1b951-5697-4dc7-9476-20ec3a400720",
         "action": "extractText",
         "label": "Extract amount",
         "params": {
@@ -1487,7 +1487,7 @@
         }
       },
       {
-        "id": "7dd08abc-a042-4fe7-85ef-355f229b5a5d",
+        "id": "05cd17fd-ddfa-4270-8720-393da9d85e6e",
         "action": "screenshot",
         "label": "Redirect screenshot",
         "params": {
@@ -1517,7 +1517,7 @@
     "category": "sea-ecommerce",
     "steps": [
       {
-        "id": "6d4e9584-659a-4074-93f5-4f2fb3465c9d",
+        "id": "e87f646b-155b-4712-ae04-0124d1e9d641",
         "action": "navigate",
         "label": "Open GrabFood VN",
         "params": {
@@ -1527,7 +1527,7 @@
         }
       },
       {
-        "id": "3c2364ca-a1d5-466b-b64a-e3f8bbb448a5",
+        "id": "b2c7dbfe-6653-4cbf-b03e-26de73a6a8d6",
         "action": "wait",
         "label": "Hydration",
         "params": {
@@ -1535,7 +1535,7 @@
         }
       },
       {
-        "id": "d590184a-5d55-42ea-bdfb-cf1a22070436",
+        "id": "989c9c07-0dc6-4f6a-b593-150cd6d73399",
         "action": "waitForSelector",
         "label": "Wait for address input",
         "params": {
@@ -1545,7 +1545,7 @@
         }
       },
       {
-        "id": "8a37467b-12e1-452f-bc7c-bbe0bbf61bc4",
+        "id": "e7583e66-4798-4df5-a3f6-20dea122780f",
         "action": "click",
         "label": "Focus address input",
         "params": {
@@ -1553,7 +1553,7 @@
         }
       },
       {
-        "id": "f5b5edc7-1098-4c22-b44f-524f5d190e64",
+        "id": "4936217c-7aa0-4daf-893a-084dbab21591",
         "action": "type",
         "label": "Enter address",
         "params": {
@@ -1563,7 +1563,7 @@
         }
       },
       {
-        "id": "e636c8f4-67a1-4b2f-95e5-a9ea2c7e5e9b",
+        "id": "08c8b48a-eff6-4aa2-9e61-266b12377d9c",
         "action": "wait",
         "label": "Wait for suggestions",
         "params": {
@@ -1571,7 +1571,7 @@
         }
       },
       {
-        "id": "5a54286b-c5f6-40ea-9dcf-89ace0e4dbab",
+        "id": "fbaeaff0-6d94-42a4-99a4-88a3951011c0",
         "action": "keyPress",
         "label": "Arrow down",
         "params": {
@@ -1579,7 +1579,7 @@
         }
       },
       {
-        "id": "ab54cdd8-1e31-4192-b1f6-0e3094b3409c",
+        "id": "01b60484-1b23-48f9-93a9-20de7277c05b",
         "action": "keyPress",
         "label": "Select first suggestion",
         "params": {
@@ -1587,7 +1587,7 @@
         }
       },
       {
-        "id": "cd137001-2657-4ae9-a6c2-7ed3a7f786e2",
+        "id": "d2e64700-681b-41ff-8b5a-f5dba1fa1a4e",
         "action": "wait",
         "label": "Wait for restaurants",
         "params": {
@@ -1595,7 +1595,7 @@
         }
       },
       {
-        "id": "0c826036-020f-4540-b9c0-6cdc37978340",
+        "id": "53c5e539-ebad-4a03-a523-03d729489d94",
         "action": "waitForSelector",
         "label": "Wait for restaurant card",
         "params": {
@@ -1605,7 +1605,7 @@
         }
       },
       {
-        "id": "a3bfee83-a893-4259-a6cf-68077ef81bf9",
+        "id": "11c19ae3-32e9-4866-8dfd-5f93c6639eff",
         "action": "extractText",
         "label": "Extract restaurant names",
         "params": {
@@ -1615,7 +1615,7 @@
         }
       },
       {
-        "id": "a1bb33aa-ee64-40b9-8187-cc4242a18e78",
+        "id": "9ee63fa1-522d-4923-942b-fd5f34ec8271",
         "action": "screenshot",
         "label": "Screenshot restaurant list",
         "params": {

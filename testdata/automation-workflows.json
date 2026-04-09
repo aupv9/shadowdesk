@@ -1,14 +1,14 @@
 [
   {
-    "id": "738237be-9fe0-4a25-b40f-a3266b3ac859",
+    "id": "27cd50a4-bb78-4e4e-a0ad-642ce051cbcb",
     "name": "Simple Page Navigation",
     "description": "Navigate to a website and take screenshot",
     "profileIds": [
-      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb"
+      "824c0946-ef21-40ec-ae97-f09b5e589dab"
     ],
     "steps": [
       {
-        "id": "8f69243e-e408-4a0b-936b-b6af17e252a9",
+        "id": "978ac53d-4f9c-48b9-9112-a7656c267d4c",
         "type": "navigate",
         "name": "Navigate to Example",
         "description": "Open example.com",
@@ -18,7 +18,7 @@
         "timeout": 10000
       },
       {
-        "id": "0cc6bf40-4ca0-4e0a-941f-74074917a2ab",
+        "id": "45d700e1-c393-4989-9f8c-548970bd2c25",
         "type": "wait",
         "name": "Wait for Page Load",
         "params": {
@@ -28,7 +28,7 @@
         "timeout": 5000
       },
       {
-        "id": "75b08ba7-6679-4dad-8337-82331b0bc438",
+        "id": "a0c022ce-d2bb-40b0-9f90-20779266e314",
         "type": "screenshot",
         "name": "Capture Screenshot",
         "params": {
@@ -37,7 +37,7 @@
         }
       },
       {
-        "id": "c07b9e5b-43e2-4da4-9f05-8bc99961ace4",
+        "id": "3f2d7581-6494-4e3b-bb71-407d12b32048",
         "type": "log",
         "name": "Log Success",
         "params": {
@@ -45,19 +45,19 @@
         }
       }
     ],
-    "created_at": "2026-04-08T07:53:12.407Z",
-    "updated_at": "2026-04-08T07:53:12.407Z"
+    "created_at": "2026-04-08T08:07:27.226Z",
+    "updated_at": "2026-04-08T08:07:27.227Z"
   },
   {
-    "id": "bde8519a-ca9e-4764-b41c-ad96f7ca4920",
+    "id": "bb5908a2-e9bb-4449-80da-1ed634aa1324",
     "name": "Form Filling & Submission",
     "description": "Fill and submit a test form with validation",
     "profileIds": [
-      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb"
+      "824c0946-ef21-40ec-ae97-f09b5e589dab"
     ],
     "steps": [
       {
-        "id": "440da350-3957-4bc0-820a-17fdf4c52683",
+        "id": "959b2c1a-9762-429d-9ca7-d894811cd8b4",
         "type": "navigate",
         "name": "Navigate to Form",
         "params": {
@@ -66,7 +66,7 @@
         "timeout": 10000
       },
       {
-        "id": "19c2da01-33a5-4833-b553-b3b883843574",
+        "id": "390e9652-e438-4160-a7d5-1d8713b1764b",
         "type": "fill",
         "name": "Fill Name Field",
         "selector": "input[name=\"custname\"]",
@@ -77,7 +77,7 @@
         "timeout": 5000
       },
       {
-        "id": "3d5f168c-9793-4917-8144-80934416483f",
+        "id": "fa2fc102-52eb-4d50-982a-d7c23350d8de",
         "type": "fill",
         "name": "Fill Phone Field",
         "selector": "input[name=\"custtel\"]",
@@ -87,14 +87,14 @@
         "timeout": 5000
       },
       {
-        "id": "cc071df1-5be2-401d-92ce-430d82ae6651",
+        "id": "2b184a52-4c6b-4909-9bd5-c08e7c02b782",
         "type": "click",
         "name": "Select Pizza Option",
         "selector": "input[name=\"size\"][value=\"small\"]",
         "timeout": 5000
       },
       {
-        "id": "bac25753-818a-42e6-b9e2-565edd3b4677",
+        "id": "405e4307-359f-4677-a3bf-4412e45fc2cb",
         "type": "fill",
         "name": "Add Special Instructions",
         "selector": "textarea[name=\"comments\"]",
@@ -104,7 +104,7 @@
         "timeout": 5000
       },
       {
-        "id": "ac546c0d-4ff6-4f3e-91ef-c07fd658bbca",
+        "id": "67981aa4-ea19-483e-bdc6-245104e07b31",
         "type": "screenshot",
         "name": "Screenshot Filled Form",
         "params": {
@@ -112,7 +112,7 @@
         }
       },
       {
-        "id": "4da2756d-4dc1-43d8-99e4-166f1c8460e9",
+        "id": "6591a5d3-ee48-42d5-9207-eb127b255e23",
         "type": "click",
         "name": "Submit Form",
         "selector": "button[type=\"submit\"]",
@@ -120,7 +120,7 @@
         "retries": 2
       },
       {
-        "id": "acec8e9e-dcd8-48e0-bf27-4c3e1fcb5d9a",
+        "id": "4bd5e23f-46b4-4133-8299-a8e40b4b70f1",
         "type": "wait",
         "name": "Wait for Success Page",
         "params": {
@@ -130,20 +130,20 @@
         "timeout": 10000
       }
     ],
-    "created_at": "2026-04-08T07:53:12.408Z",
-    "updated_at": "2026-04-08T07:53:12.408Z"
+    "created_at": "2026-04-08T08:07:27.227Z",
+    "updated_at": "2026-04-08T08:07:27.227Z"
   },
   {
-    "id": "fd8072d2-0ea6-46d4-ab23-e334aa819ff3",
+    "id": "3847704f-52de-4404-9344-d0f0309f50cc",
     "name": "Conditional Login Flow",
     "description": "Check if logged in, if not then login",
     "profileIds": [
-      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb",
-      "b119a771-c805-4677-871d-5c8696529927"
+      "824c0946-ef21-40ec-ae97-f09b5e589dab",
+      "2529d0d6-4d23-41b8-a7d3-00e772616714"
     ],
     "steps": [
       {
-        "id": "86784a2b-258a-4c7c-9a2a-bcdf3226a87b",
+        "id": "1ce7220f-ec34-42aa-93f4-3f1260eb1e8e",
         "type": "navigate",
         "name": "Navigate to Dashboard",
         "params": {
@@ -152,7 +152,7 @@
         "timeout": 10000
       },
       {
-        "id": "449a0f52-11a8-414a-b551-c7b572849a65",
+        "id": "0cccdc23-bfcf-40d3-af10-f6131f402be2",
         "type": "condition",
         "name": "Check If Logged In",
         "params": {
@@ -160,7 +160,7 @@
           "type": "exists",
           "then": [
             {
-              "id": "8498210b-c0fb-4edc-a762-58c3243f5601",
+              "id": "4db821be-8304-45f7-89e4-2829e01dcc58",
               "type": "log",
               "name": "Already Logged In",
               "params": {
@@ -170,7 +170,7 @@
           ],
           "else": [
             {
-              "id": "70399088-9c9f-43b9-bdc8-6db7ca79f398",
+              "id": "e31a5373-2655-4fd5-a337-9f7525f13dbf",
               "type": "navigate",
               "name": "Go to Login Page",
               "params": {
@@ -178,7 +178,7 @@
               }
             },
             {
-              "id": "cbcc0893-6457-4a7f-a217-caf8bda04e83",
+              "id": "edb7855b-1dd1-4ee9-b41a-eefc20d1b27a",
               "type": "fill",
               "name": "Enter Email",
               "selector": "input[type=\"email\"]",
@@ -187,7 +187,7 @@
               }
             },
             {
-              "id": "bdb9c27d-aa9d-4aae-ad0b-93e835128dc0",
+              "id": "c7edf761-0cf5-47b2-9b25-4d229bd638d1",
               "type": "fill",
               "name": "Enter Password",
               "selector": "input[type=\"password\"]",
@@ -196,7 +196,7 @@
               }
             },
             {
-              "id": "c1dee9fc-83b1-40a9-a9f2-5cea191408c1",
+              "id": "972575a9-851f-4ff4-8def-bd46a9decdec",
               "type": "click",
               "name": "Click Login Button",
               "selector": "button[type=\"submit\"]"
@@ -205,7 +205,7 @@
         }
       },
       {
-        "id": "ed4400f8-6bee-40e4-93a8-45e8a0001026",
+        "id": "4dfa3caa-892b-4665-8b40-348fc82f057a",
         "type": "screenshot",
         "name": "Final Screenshot",
         "params": {
@@ -213,19 +213,19 @@
         }
       }
     ],
-    "created_at": "2026-04-08T07:53:12.408Z",
-    "updated_at": "2026-04-08T07:53:12.408Z"
+    "created_at": "2026-04-08T08:07:27.228Z",
+    "updated_at": "2026-04-08T08:07:27.228Z"
   },
   {
-    "id": "16e31b63-1383-4c71-9f9c-30f03aa63ff6",
+    "id": "4f483a59-3563-4c53-873b-c6e283519c14",
     "name": "Loop - Scrape Product List",
     "description": "Loop through products and extract data",
     "profileIds": [
-      "b119a771-c805-4677-871d-5c8696529927"
+      "2529d0d6-4d23-41b8-a7d3-00e772616714"
     ],
     "steps": [
       {
-        "id": "00569c45-3834-4dcc-aeac-20dd8511ee4a",
+        "id": "335a72d7-960f-4f7f-863b-9a952d7e54d6",
         "type": "navigate",
         "name": "Navigate to Products",
         "params": {
@@ -234,14 +234,14 @@
         "timeout": 10000
       },
       {
-        "id": "a9405b31-020b-400d-bd10-f250c9b86915",
+        "id": "c41d1efc-9e7e-4084-84be-b0073156ff3b",
         "type": "loop",
         "name": "Extract Product Information",
         "params": {
           "selector": ".product-card",
           "actions": [
             {
-              "id": "9fffdedf-9d4d-496b-8298-ae708e59470a",
+              "id": "86af10c1-1fc6-42b4-ab43-e592b6b8dc4e",
               "type": "extract",
               "name": "Get Product Title",
               "selector": ".product-title",
@@ -250,7 +250,7 @@
               }
             },
             {
-              "id": "5eed6d27-19ac-4e3f-8419-08c3a982e546",
+              "id": "69ef6c06-a3f7-408f-9bb3-93c5149ba6bc",
               "type": "extract",
               "name": "Get Product Price",
               "selector": ".product-price",
@@ -260,7 +260,7 @@
               }
             },
             {
-              "id": "ee45230c-bef0-455c-9f31-e7949386bd0b",
+              "id": "0bbc6f67-2475-4a57-8a5f-15f31adc54f0",
               "type": "extract",
               "name": "Get Product Link",
               "selector": "a.product-link",
@@ -269,7 +269,7 @@
               }
             },
             {
-              "id": "852e2c20-503c-4a34-baea-ce9d9004b089",
+              "id": "83e4cb2d-5dc2-48a1-a8fc-1f694db392d8",
               "type": "log",
               "name": "Log Product Data",
               "params": {
@@ -280,20 +280,20 @@
         }
       }
     ],
-    "created_at": "2026-04-08T07:53:12.408Z",
-    "updated_at": "2026-04-08T07:53:12.408Z"
+    "created_at": "2026-04-08T08:07:27.228Z",
+    "updated_at": "2026-04-08T08:07:27.228Z"
   },
   {
-    "id": "08f0e2c2-e7b1-44c3-b8b7-76d496697251",
+    "id": "1ba3eccf-e529-4d03-a4b7-79cd38cb31c3",
     "name": "Multi-Step Search & Filter",
     "description": "Search for items and apply filters",
     "profileIds": [
-      "b119a771-c805-4677-871d-5c8696529927",
-      "3f995308-9f90-431a-a728-d1e1e9536572"
+      "2529d0d6-4d23-41b8-a7d3-00e772616714",
+      "742c2f80-8e81-44e6-85ef-6386f1d8292e"
     ],
     "steps": [
       {
-        "id": "7a6e8043-ebf2-48b7-91b4-466a6b04cf45",
+        "id": "698bf79c-2e3a-4daf-a10b-116d49d53ee1",
         "type": "navigate",
         "name": "Go to Search Page",
         "params": {
@@ -302,7 +302,7 @@
         "timeout": 10000
       },
       {
-        "id": "69f15bb1-77a0-41df-8dc2-1a116ee5e776",
+        "id": "1688ccad-1b63-44f1-b570-a95a29a89ab5",
         "type": "fill",
         "name": "Enter Search Query",
         "selector": "input[name=\"q\"]",
@@ -313,7 +313,7 @@
         "timeout": 5000
       },
       {
-        "id": "e306e265-9977-4f05-ad8b-4f8630fe4c50",
+        "id": "f1407e5a-28d2-4cdd-adf8-bc4f5f41f8c4",
         "type": "keyboard",
         "name": "Press Enter",
         "params": {
@@ -321,7 +321,7 @@
         }
       },
       {
-        "id": "3e789661-5a22-40da-80ca-21ee3cd2941a",
+        "id": "aee958c1-3200-4d0c-a9e3-d8629f961143",
         "type": "wait",
         "name": "Wait for Results",
         "params": {
@@ -331,21 +331,21 @@
         "timeout": 10000
       },
       {
-        "id": "bf2ef7e9-00ef-4c72-b779-9fdee26fcb89",
+        "id": "3e2b7e88-c44f-4dfe-9b83-42838ed613b2",
         "type": "click",
         "name": "Apply Price Filter",
         "selector": "input[data-filter=\"price-1000-2000\"]",
         "timeout": 5000
       },
       {
-        "id": "b908a483-84c4-493e-a34a-4dbcdb8d0f0d",
+        "id": "c74393e4-68d7-4463-ba41-ba10c8ee47cb",
         "type": "click",
         "name": "Apply Brand Filter",
         "selector": "input[data-filter=\"brand-dell\"]",
         "timeout": 5000
       },
       {
-        "id": "1a7db75b-156d-4dd2-9b03-d6b72196796d",
+        "id": "0a8ae445-e2ec-4282-a422-d8a695b7a6c2",
         "type": "wait",
         "name": "Wait for Filtered Results",
         "params": {
@@ -355,7 +355,7 @@
         "timeout": 10000
       },
       {
-        "id": "0ca8f590-747f-4271-b2e8-315ebcab665d",
+        "id": "8b0cea0f-1a4f-4121-99c0-b3522ba1a630",
         "type": "extract",
         "name": "Count Results",
         "selector": ".search-results .item",
@@ -364,7 +364,7 @@
         }
       },
       {
-        "id": "9264a7b2-7723-4384-ae05-1884c0005140",
+        "id": "bdf63764-65a0-4cd3-98eb-fefc514f6826",
         "type": "screenshot",
         "name": "Capture Filtered Results",
         "params": {
@@ -372,19 +372,19 @@
         }
       }
     ],
-    "created_at": "2026-04-08T07:53:12.408Z",
-    "updated_at": "2026-04-08T07:53:12.408Z"
+    "created_at": "2026-04-08T08:07:27.228Z",
+    "updated_at": "2026-04-08T08:07:27.228Z"
   },
   {
-    "id": "f37241fb-5dc8-4c4f-8797-7e46388ec8af",
+    "id": "38e28b94-fde0-4561-92ad-01da3e0c3785",
     "name": "API Call & Data Processing",
     "description": "Make API call and process response",
     "profileIds": [
-      "3f995308-9f90-431a-a728-d1e1e9536572"
+      "742c2f80-8e81-44e6-85ef-6386f1d8292e"
     ],
     "steps": [
       {
-        "id": "f38bf48a-44e8-4cd6-a667-ce0dfea9e847",
+        "id": "c3b80793-645a-4286-b65f-290fd1316e90",
         "type": "api_call",
         "name": "Fetch User Data",
         "params": {
@@ -397,7 +397,7 @@
         "timeout": 10000
       },
       {
-        "id": "75c0c33a-ee38-474e-9c4f-28455356fbbe",
+        "id": "a5fb599b-46fd-4ad8-89f9-39dc5108a144",
         "type": "js_execute",
         "name": "Process API Response",
         "params": {
@@ -405,7 +405,7 @@
         }
       },
       {
-        "id": "851bd6d4-4fe4-4368-a424-e89994199044",
+        "id": "e8675ff5-8447-4d6c-a6ee-07b14410a6e1",
         "type": "navigate",
         "name": "Navigate to Form",
         "params": {
@@ -414,7 +414,7 @@
         "timeout": 10000
       },
       {
-        "id": "b1ed1ba1-54cf-471f-9510-f076bb5d2265",
+        "id": "db7c7771-42af-4a3d-987d-646b2d86927f",
         "type": "fill",
         "name": "Fill with API Data",
         "selector": "input[name=\"name\"]",
@@ -423,7 +423,7 @@
         }
       },
       {
-        "id": "98699ed5-29e4-48dc-a0d4-8bbe699a155f",
+        "id": "b585d8d0-770d-47a7-a1cc-23df11e26a11",
         "type": "fill",
         "name": "Fill Email",
         "selector": "input[name=\"email\"]",
@@ -432,25 +432,25 @@
         }
       },
       {
-        "id": "3534b834-c71b-42ff-aea5-d662aef65564",
+        "id": "f2a5397f-82a4-4651-8da2-67607959bafc",
         "type": "click",
         "name": "Submit",
         "selector": "button[type=\"submit\"]"
       }
     ],
-    "created_at": "2026-04-08T07:53:12.408Z",
-    "updated_at": "2026-04-08T07:53:12.408Z"
+    "created_at": "2026-04-08T08:07:27.229Z",
+    "updated_at": "2026-04-08T08:07:27.229Z"
   },
   {
-    "id": "26a6a746-3244-4027-becf-5a6001728675",
+    "id": "0b199f34-0479-47d0-96bb-9003843ed930",
     "name": "Error Handling & Retry",
     "description": "Handle errors gracefully with retries",
     "profileIds": [
-      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb"
+      "824c0946-ef21-40ec-ae97-f09b5e589dab"
     ],
     "steps": [
       {
-        "id": "b8dbcee3-c522-47bd-86b6-9f66257aea1d",
+        "id": "51f2d56d-70a7-4894-bae8-f1c1b0a5a5f8",
         "type": "navigate",
         "name": "Navigate to Unreliable Service",
         "params": {
@@ -461,7 +461,7 @@
         "skipOnError": false
       },
       {
-        "id": "6dd24f26-bcb9-4976-8e33-7176798cbea3",
+        "id": "f91c8dbe-7093-4cc5-90e2-201cc83e73e1",
         "type": "wait",
         "name": "Wait for Element",
         "params": {
@@ -473,7 +473,7 @@
         "skipOnError": true
       },
       {
-        "id": "e7949e0f-dc68-4326-a676-ac8c3edb1a86",
+        "id": "4e6f93bf-b73b-43bc-9c92-20f9dabadb66",
         "type": "condition",
         "name": "Check If Retries Exhausted",
         "params": {
@@ -481,7 +481,7 @@
           "expression": "context.lastError !== null",
           "then": [
             {
-              "id": "37b7def7-fcb7-4261-a85f-d5587fb9e3b3",
+              "id": "2c1fdd67-7b59-4ca6-aa61-00b11716511c",
               "type": "log",
               "name": "Log Error",
               "params": {
@@ -489,7 +489,7 @@
               }
             },
             {
-              "id": "f0ebf8a6-e476-4097-b9e8-c6fcf1b14270",
+              "id": "db1f7d15-d0b7-4d58-a0e3-d1c4a58f574c",
               "type": "api_call",
               "name": "Send Error Report",
               "params": {
@@ -505,21 +505,21 @@
         }
       }
     ],
-    "created_at": "2026-04-08T07:53:12.408Z",
-    "updated_at": "2026-04-08T07:53:12.408Z"
+    "created_at": "2026-04-08T08:07:27.229Z",
+    "updated_at": "2026-04-08T08:07:27.229Z"
   },
   {
-    "id": "f5bad674-6a88-40cd-b6f1-1ace39da3858",
+    "id": "abca5427-733f-4e4c-9a4c-0a538d4a53f5",
     "name": "Social Media Follow & Like",
     "description": "Follow users and like posts",
     "profileIds": [
-      "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb",
-      "b119a771-c805-4677-871d-5c8696529927",
-      "3f995308-9f90-431a-a728-d1e1e9536572"
+      "824c0946-ef21-40ec-ae97-f09b5e589dab",
+      "2529d0d6-4d23-41b8-a7d3-00e772616714",
+      "742c2f80-8e81-44e6-85ef-6386f1d8292e"
     ],
     "steps": [
       {
-        "id": "71823a5c-07d1-4449-a7c5-e0841b868987",
+        "id": "4b1fd6ad-45fa-416e-a4dd-cf233b945bdd",
         "type": "navigate",
         "name": "Go to Social Media",
         "params": {
@@ -528,7 +528,7 @@
         "timeout": 10000
       },
       {
-        "id": "9609a08d-65c7-4af8-b2f4-0cb5814c605e",
+        "id": "0db61ab8-8794-47b0-bf00-b475286f4642",
         "type": "scroll",
         "name": "Scroll Down",
         "params": {
@@ -537,7 +537,7 @@
         }
       },
       {
-        "id": "530f42ab-8e80-4c13-a070-f056969f7a1b",
+        "id": "2f69c7cb-a496-460a-ba13-033258e494a4",
         "type": "loop",
         "name": "Like Posts",
         "params": {
@@ -545,13 +545,13 @@
           "maxIterations": 5,
           "actions": [
             {
-              "id": "33651955-3d2c-4f09-a17d-9c065cce5db9",
+              "id": "3b5d4667-21e5-4f3d-a584-5f75a41ecaf2",
               "type": "click",
               "name": "Click Like Button",
               "selector": ".like-button"
             },
             {
-              "id": "58150b28-7f1b-45ac-a79a-70030e014e11",
+              "id": "af0c5936-aaf4-4c92-9fa5-aae07d23b5d8",
               "type": "wait",
               "name": "Wait for Animation",
               "params": {
@@ -563,7 +563,7 @@
         }
       },
       {
-        "id": "9add817c-546a-4d41-bc6b-38cf58c1e963",
+        "id": "8babc63e-21ca-4f4d-8d5a-a74bfd3b6814",
         "type": "loop",
         "name": "Follow Users",
         "params": {
@@ -571,13 +571,13 @@
           "maxIterations": 3,
           "actions": [
             {
-              "id": "49a94493-1aaf-4928-869c-d66d5050514c",
+              "id": "5f7cc075-7d4c-484a-8dad-93124841b4a2",
               "type": "click",
               "name": "Click Follow",
               "selector": ".follow-button"
             },
             {
-              "id": "5670835d-0115-46d8-b8a2-4069f67d9352",
+              "id": "0e911487-589c-481d-ac92-2d637bce12ce",
               "type": "wait",
               "name": "Wait for Follow",
               "params": {
@@ -589,19 +589,19 @@
         }
       }
     ],
-    "created_at": "2026-04-08T07:53:12.409Z",
-    "updated_at": "2026-04-08T07:53:12.409Z"
+    "created_at": "2026-04-08T08:07:27.229Z",
+    "updated_at": "2026-04-08T08:07:27.229Z"
   },
   {
-    "id": "6541394c-3402-47cb-8a44-09f22127eb03",
+    "id": "ebab61c1-c969-4bee-9ff5-09e376005429",
     "name": "Data Entry & Validation",
     "description": "Fill multiple fields with validation",
     "profileIds": [
-      "b119a771-c805-4677-871d-5c8696529927"
+      "2529d0d6-4d23-41b8-a7d3-00e772616714"
     ],
     "steps": [
       {
-        "id": "0d6cbf40-2b22-4852-b7da-9e4962e67bae",
+        "id": "78b62b10-5e9b-4e55-9464-86c80307e414",
         "type": "navigate",
         "name": "Open Registration Form",
         "params": {
@@ -610,7 +610,7 @@
         "timeout": 10000
       },
       {
-        "id": "1c6b2460-792f-469f-8a9d-7c9e85d81007",
+        "id": "5a25c713-b032-4cfc-bdff-177fa55b1c54",
         "type": "fill",
         "name": "Enter Username",
         "selector": "input[name=\"username\"]",
@@ -619,7 +619,7 @@
         }
       },
       {
-        "id": "039a6ea7-ceb3-49ed-b31b-5027eaa11c49",
+        "id": "cf61d155-f471-4756-ba64-114bb022d208",
         "type": "fill",
         "name": "Enter Email",
         "selector": "input[name=\"email\"]",
@@ -628,7 +628,7 @@
         }
       },
       {
-        "id": "584ed64a-7326-4080-8fa9-a10103754f25",
+        "id": "d5d85de5-466c-42ef-970e-cdc93b886b15",
         "type": "fill",
         "name": "Enter Password",
         "selector": "input[name=\"password\"]",
@@ -637,7 +637,7 @@
         }
       },
       {
-        "id": "dff4a897-76ef-4cd2-8d88-681f3c548a23",
+        "id": "9514ecd5-6cb4-4f21-9215-d5ba0bc96b25",
         "type": "fill",
         "name": "Confirm Password",
         "selector": "input[name=\"confirmPassword\"]",
@@ -646,13 +646,13 @@
         }
       },
       {
-        "id": "7a8a629e-027b-4552-9f1a-be552a286746",
+        "id": "36209c3f-5584-4663-afb4-ae00dc3beafb",
         "type": "click",
         "name": "Accept Terms",
         "selector": "input[name=\"terms\"]"
       },
       {
-        "id": "29bbf77c-24a8-4a88-9978-b83de6f92848",
+        "id": "9045a7ad-c469-4f34-8dee-1e59282fd5fd",
         "type": "assert",
         "name": "Validate Submit Button",
         "params": {
@@ -663,13 +663,13 @@
         }
       },
       {
-        "id": "00dfe021-8054-44e8-b546-b34f635b92ee",
+        "id": "4ec6c97d-07d2-4afe-803a-2739882a6c39",
         "type": "click",
         "name": "Submit Registration",
         "selector": "button[type=\"submit\"]"
       },
       {
-        "id": "59cb75cb-49d5-44d5-a8bf-bb8b95d95700",
+        "id": "3576950e-c271-41b4-b707-d6becefd877c",
         "type": "wait",
         "name": "Wait for Confirmation",
         "params": {
@@ -679,7 +679,7 @@
         "timeout": 10000
       }
     ],
-    "created_at": "2026-04-08T07:53:12.409Z",
-    "updated_at": "2026-04-08T07:53:12.409Z"
+    "created_at": "2026-04-08T08:07:27.229Z",
+    "updated_at": "2026-04-08T08:07:27.229Z"
   }
 ]

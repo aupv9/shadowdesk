@@ -1,6 +1,6 @@
 [
   {
-    "id": "88456660-80de-400d-b846-8a8e9fea4d5b",
+    "id": "d51360a0-bb33-4d42-b48c-4925c182351a",
     "name": "USA - New York",
     "type": "http",
     "host": "proxy-ny.example.com",
@@ -8,13 +8,13 @@
     "username": "user_ny",
     "password": "pass_ny_123",
     "country": "US",
-    "latency_ms": 116,
+    "latency_ms": 119,
     "is_healthy": true,
-    "last_checked_at": "2026-04-08T07:36:42.221Z",
-    "created_at": "2026-04-08T07:36:42.221Z"
+    "last_checked_at": "2026-04-08T08:07:22.940Z",
+    "created_at": "2026-04-08T08:07:22.940Z"
   },
   {
-    "id": "30d91fd1-1db5-4a1c-be60-f236e54d32b9",
+    "id": "ca8f91df-dca6-469f-8166-5947f107d596",
     "name": "UK - London",
     "type": "http",
     "host": "proxy-london.example.com",
@@ -22,13 +22,13 @@
     "username": "user_london",
     "password": "pass_london_456",
     "country": "GB",
-    "latency_ms": 114,
+    "latency_ms": 76,
     "is_healthy": true,
-    "last_checked_at": "2026-04-08T07:36:42.221Z",
-    "created_at": "2026-04-08T07:36:42.221Z"
+    "last_checked_at": "2026-04-08T08:07:22.940Z",
+    "created_at": "2026-04-08T08:07:22.940Z"
   },
   {
-    "id": "30de710d-5f7c-4ed3-b6ef-06b35943142e",
+    "id": "61a2fa7c-b880-4b08-ab3f-ba936bbfcb07",
     "name": "Vietnam - Ho Chi Minh",
     "type": "http",
     "host": "proxy-hcm.example.com",
@@ -36,13 +36,13 @@
     "username": "user_hcm",
     "password": "pass_hcm_789",
     "country": "VN",
-    "latency_ms": 59,
+    "latency_ms": 64,
     "is_healthy": true,
-    "last_checked_at": "2026-04-08T07:36:42.221Z",
-    "created_at": "2026-04-08T07:36:42.221Z"
+    "last_checked_at": "2026-04-08T08:07:22.940Z",
+    "created_at": "2026-04-08T08:07:22.940Z"
   },
   {
-    "id": "df7ae525-7373-4fc4-a33c-e86aaf208c5e",
+    "id": "a2330e80-8b31-4760-8299-63ffe5e4dd73",
     "name": "Thailand - Bangkok",
     "type": "http",
     "host": "proxy-bkk.example.com",
@@ -50,13 +50,13 @@
     "username": "user_bkk",
     "password": "pass_bkk_321",
     "country": "TH",
-    "latency_ms": 57,
+    "latency_ms": 44,
     "is_healthy": true,
-    "last_checked_at": "2026-04-08T07:36:42.221Z",
-    "created_at": "2026-04-08T07:36:42.221Z"
+    "last_checked_at": "2026-04-08T08:07:22.940Z",
+    "created_at": "2026-04-08T08:07:22.940Z"
   },
   {
-    "id": "a25768d9-a6bb-4168-b64e-39774b2d1cca",
+    "id": "1f45a091-227f-4d42-a20e-4a14da265531",
     "name": "Indonesia - Jakarta",
     "type": "http",
     "host": "proxy-jkt.example.com",
@@ -64,9 +64,9 @@
     "username": "user_jkt",
     "password": "pass_jkt_654",
     "country": "ID",
-    "latency_ms": 54,
+    "latency_ms": 42,
     "is_healthy": true,
-    "last_checked_at": "2026-04-08T07:36:42.221Z",
-    "created_at": "2026-04-08T07:36:42.221Z"
+    "last_checked_at": "2026-04-08T08:07:22.940Z",
+    "created_at": "2026-04-08T08:07:22.940Z"
   }
 ]

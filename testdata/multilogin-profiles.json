@@ -1,8 +1,8 @@
 [
   {
-    "id": "4fd515eb-1802-4f4a-8d5d-6bfdf70f67cb",
+    "id": "824c0946-ef21-40ec-ae97-f09b5e589dab",
     "name": "WIN10 CHROME120 - Account 1",
-    "group_id": "1d7f1a72-619f-4b90-988c-4f984a099331",
+    "group_id": "ad763a58-e090-4253-9f8e-ccde28f131eb",
     "fingerprint": {
       "preset": "win10-chrome120",
       "os": {
@@ -88,15 +88,15 @@
         "mode": "filter"
       }
     },
-    "proxy_id": "88456660-80de-400d-b846-8a8e9fea4d5b",
+    "proxy_id": "d51360a0-bb33-4d42-b48c-4925c182351a",
     "notes": "Test account #1 - US-based Gmail account\nProxy: USA - New York\nCreated for multi-login testing",
     "status": "active",
-    "created_at": "2026-04-08T07:36:42.221Z"
+    "created_at": "2026-04-08T08:07:22.940Z"
   },
   {
-    "id": "b119a771-c805-4677-871d-5c8696529927",
+    "id": "2529d0d6-4d23-41b8-a7d3-00e772616714",
     "name": "WIN11 CHROME121 - Account 2",
-    "group_id": "c76608cc-e288-478f-87b4-c602207b0e27",
+    "group_id": "ec258428-c572-4f96-b476-2b864ca03905",
     "fingerprint": {
       "preset": "win11-chrome121",
       "os": {
@@ -182,15 +182,15 @@
         "mode": "filter"
       }
     },
-    "proxy_id": "30d91fd1-1db5-4a1c-be60-f236e54d32b9",
+    "proxy_id": "ca8f91df-dca6-469f-8166-5947f107d596",
     "notes": "Test account #2 - UK-based Outlook account\nProxy: UK - London\nCreated for multi-login testing",
     "status": "active",
-    "created_at": "2026-04-08T07:36:42.221Z"
+    "created_at": "2026-04-08T08:07:22.940Z"
   },
   {
-    "id": "3f995308-9f90-431a-a728-d1e1e9536572",
+    "id": "742c2f80-8e81-44e6-85ef-6386f1d8292e",
     "name": "MAC SONOMA CHROME121 - Account 3",
-    "group_id": "8f716463-16ac-4770-8f96-95dcdcfff1e7",
+    "group_id": "2bee5718-e71e-47e1-8f13-a8ea4c2630bf",
     "fingerprint": {
       "preset": "mac-sonoma-chrome121",
       "os": {
@@ -267,15 +267,15 @@
         "mode": "filter"
       }
     },
-    "proxy_id": "30de710d-5f7c-4ed3-b6ef-06b35943142e",
+    "proxy_id": "61a2fa7c-b880-4b08-ab3f-ba936bbfcb07",
     "notes": "Test account #3 - Vietnam-based Gmail account\nProxy: Vietnam - Ho Chi Minh\nCreated for multi-login testing",
     "status": "active",
-    "created_at": "2026-04-08T07:36:42.221Z"
+    "created_at": "2026-04-08T08:07:22.940Z"
   },
   {
-    "id": "6b998489-7761-4f10-842f-97e71b1c6c09",
+    "id": "1dde88cf-ace8-4e4d-887b-248fc04ff801",
     "name": "LINUX UBUNTU CHROME120 - Account 4",
-    "group_id": "1d7f1a72-619f-4b90-988c-4f984a099331",
+    "group_id": "ad763a58-e090-4253-9f8e-ccde28f131eb",
     "fingerprint": {
       "preset": "linux-ubuntu-chrome120",
       "os": {
@@ -352,15 +352,15 @@
         "mode": "filter"
       }
     },
-    "proxy_id": "df7ae525-7373-4fc4-a33c-e86aaf208c5e",
+    "proxy_id": "a2330e80-8b31-4760-8299-63ffe5e4dd73",
     "notes": "Test account #4 - Thailand-based account\nProxy: Thailand - Bangkok\nCreated for multi-login testing",
     "status": "active",
-    "created_at": "2026-04-08T07:36:42.221Z"
+    "created_at": "2026-04-08T08:07:22.940Z"
   },
   {
-    "id": "f13b6d83-4c79-427c-b3a7-34c951688982",
+    "id": "240c32dc-9311-4de1-a7bb-309b19d8e81e",
     "name": "ANDROID SAMSUNG CHROME120 - Account 5",
-    "group_id": "c76608cc-e288-478f-87b4-c602207b0e27",
+    "group_id": "ec258428-c572-4f96-b476-2b864ca03905",
     "fingerprint": {
       "preset": "android-samsung-chrome120",
       "os": {
@@ -435,9 +435,9 @@
         "mode": "filter"
       }
     },
-    "proxy_id": "a25768d9-a6bb-4168-b64e-39774b2d1cca",
+    "proxy_id": "1f45a091-227f-4d42-a20e-4a14da265531",
     "notes": "Test account #5 - Indonesia-based account\nProxy: Indonesia - Jakarta\nCreated for multi-login testing",
     "status": "active",
-    "created_at": "2026-04-08T07:36:42.221Z"
+    "created_at": "2026-04-08T08:07:22.940Z"
   }
 ]
