@@ -1,70 +1,32 @@
 import { Router } from 'express'
+import { teamController } from './team.controller'
+import { asyncHandler } from '../../utils/async-handler'
 
 const router = Router()
 
-// Team CRUD
-router.post('/', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Team creation coming soon' })
-})
+// ── Team CRUD ────────────────────────────────────────────────────────────
+router.post('/', asyncHandler(teamController.createTeam.bind(teamController)))
+router.get('/', asyncHandler(teamController.getTeam.bind(teamController)))
+router.put('/', asyncHandler(teamController.updateTeamName.bind(teamController)))
+router.delete('/', asyncHandler(teamController.deleteTeam.bind(teamController)))
 
-router.get('/', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Team fetch coming soon' })
-})
+// ── Members ──────────────────────────────────────────────────────────────
+router.get('/members', asyncHandler(teamController.getMembers.bind(teamController)))
+router.put('/members/:userId', asyncHandler(teamController.updateMemberRole.bind(teamController)))
+router.delete('/members/:userId', asyncHandler(teamController.removeMember.bind(teamController)))
 
-router.put('/', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Team update coming soon' })
-})
+// ── Invitations ──────────────────────────────────────────────────────────
+router.post('/invites', asyncHandler(teamController.sendInvite.bind(teamController)))
+router.get('/invites', asyncHandler(teamController.getInvites.bind(teamController)))
+router.delete('/invites/:inviteId', asyncHandler(teamController.cancelInvite.bind(teamController)))
+router.post('/invites/:inviteId/accept', asyncHandler(teamController.acceptInvite.bind(teamController)))
 
-router.delete('/', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Team deletion coming soon' })
-})
+// ── Shared Profiles ──────────────────────────────────────────────────────
+router.post('/profiles/share', asyncHandler(teamController.shareProfile.bind(teamController)))
+router.get('/profiles/shared', asyncHandler(teamController.getSharedProfiles.bind(teamController)))
+router.delete('/profiles/share', asyncHandler(teamController.unshareProfile.bind(teamController)))
 
-// Members
-router.get('/members', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Members listing coming soon' })
-})
-
-router.put('/members/:userId', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Member update coming soon' })
-})
-
-router.delete('/members/:userId', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Member removal coming soon' })
-})
-
-// Invites
-router.post('/invites', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Invite creation coming soon' })
-})
-
-router.get('/invites', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Invite listing coming soon' })
-})
-
-router.delete('/invites/:inviteId', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Invite cancellation coming soon' })
-})
-
-router.post('/invites/:inviteId/accept', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Invite acceptance coming soon' })
-})
-
-// Shared profiles
-router.post('/profiles/share', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Profile sharing coming soon' })
-})
-
-router.get('/profiles/shared', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Shared profiles listing coming soon' })
-})
-
-router.delete('/profiles/share', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Profile unsharing coming soon' })
-})
-
-// Audit log
-router.get('/audit', (req, res) => {
-  res.status(501).json({ error: 'not_implemented', message: 'Audit log coming soon' })
-})
+// ── Audit Log ────────────────────────────────────────────────────────────
+router.get('/audit', asyncHandler(teamController.getAuditLog.bind(teamController)))
 
 export default router

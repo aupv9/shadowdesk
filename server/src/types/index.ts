@@ -52,6 +52,11 @@ export interface SharedProfile {
   shared_at: string
 }
 
+export interface TeamMemberWithUser extends TeamMember {
+  user_email?: string
+  user_name?: string
+}
+
 // License types
 export interface License {
   id: string

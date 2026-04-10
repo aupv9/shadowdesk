@@ -58,6 +58,25 @@ export const shareProfileSchema = Joi.object({
   permission: Joi.string().valid('read', 'write').default('read')
 })
 
+export const unshareProfileSchema = Joi.object({
+  profile_id: Joi.string().required(),
+  member_id: uuidSchema
+})
+
+// Pagination helpers
+export const paginationSchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20)
+})
+
+// Audit query
+export const auditQuerySchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(50),
+  user_id: Joi.string().uuid().optional(),
+  action: Joi.string().optional()
+})
+
 // Sync validators
 export const pushSyncSchema = Joi.object({
   data: Joi.string().required(),
