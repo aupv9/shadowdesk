@@ -443,6 +443,34 @@ const api = {
     status:       () => ipcRenderer.invoke('cleanup:status'),
     retryFailed:  () => ipcRenderer.invoke('cleanup:retryFailed'),
     clearFailed:  () => ipcRenderer.invoke('cleanup:clearFailed')
+  },
+
+  // Phase 17 — Mobile Workflow Engine
+  mobileWorkflow: {
+    list:      ()                                          => ipcRenderer.invoke('mobileWorkflow:list'),
+    get:       (id: string)                                => ipcRenderer.invoke('mobileWorkflow:get', id),
+    create:    (input: any)                                => ipcRenderer.invoke('mobileWorkflow:create', input),
+    update:    (id: string, updates: any)                  => ipcRenderer.invoke('mobileWorkflow:update', id, updates),
+    delete:    (id: string)                                => ipcRenderer.invoke('mobileWorkflow:delete', id),
+    duplicate: (id: string)                                => ipcRenderer.invoke('mobileWorkflow:duplicate', id),
+    execute:   (workflowId: string, profileIds: string[])  => ipcRenderer.invoke('mobileWorkflow:execute', workflowId, profileIds)
+  },
+
+  mobileExecution: {
+    logs:   (workflowId?: string, limit?: number) => ipcRenderer.invoke('mobileExecution:logs', workflowId, limit),
+    get:    (id: string)                          => ipcRenderer.invoke('mobileExecution:get', id),
+    delete: (id: string)                          => ipcRenderer.invoke('mobileExecution:delete', id)
+  },
+
+  mobileBehavior: {
+    list: ()              => ipcRenderer.invoke('mobileBehavior:list'),
+    get:  (id: string)    => ipcRenderer.invoke('mobileBehavior:get', id)
+  },
+
+  gestureTemplate: {
+    list:   ()              => ipcRenderer.invoke('gestureTemplate:list'),
+    create: (input: any)    => ipcRenderer.invoke('gestureTemplate:create', input),
+    delete: (id: string)    => ipcRenderer.invoke('gestureTemplate:delete', id)
   }
 }
 

@@ -1984,3 +1984,177 @@ export interface ImportRecordEntry {
   error_message: string | null
   created_at: string
 }
+
+// ── Phase 17: Mobile Workflow Types ──────────────────────────────────────────
+
+export type MobileGestureAction =
+  | 'tapPoint'
+  | 'tapElement'
+  | 'swipe'
+  | 'longPress'
+  | 'doubleTap'
+  | 'pinch'
+  | 'dragDrop'
+
+export type MobileSensorAction =
+  | 'setLocation'
+  | 'setAccelerometer'
+  | 'setGyroscope'
+  | 'setBattery'
+  | 'setNetworkInfo'
+
+export type MobileDeviceAction =
+  | 'rotateDevice'
+  | 'setViewport'
+
+export type MobileAction = MobileGestureAction | MobileSensorAction | MobileDeviceAction
+
+/** A single step inside a mobile workflow */
+export interface MobileAutomationStep {
+  id: string
+  /** Desktop actions (navigate, click, type, wait, etc.) are also valid here */
+  action: MobileAction | AutomationStep['action']
+  label: string
+  params: Record<string, any>
+  /** Optional: tie step to a specific profile preset */
+  deviceProfile?: string
+  /** Optional: run anti-bot pre-check before executing this step */
+  detectiveMode?: boolean
+  retryCount?: number
+  timeout?: number
+}
+
+export interface MobileDeviceConfig {
+  targetProfiles: string[]
+  executionMode: 'single' | 'parallel' | 'sequential'
+  delayBetweenProfiles?: number
+  stopOnError: boolean
+  timeoutPerStep?: number
+}
+
+export interface MobileWorkflow {
+  id: string
+  name: string
+  description: string
+  steps: MobileAutomationStep[]
+  deviceConfig: MobileDeviceConfig
+  behaviorPattern?: string
+  isTemplate?: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface CreateMobileWorkflowInput {
+  name: string
+  description?: string
+  steps: MobileAutomationStep[]
+  deviceConfig: MobileDeviceConfig
+  behaviorPattern?: string
+  isTemplate?: boolean
+}
+
+export interface UpdateMobileWorkflowInput {
+  name?: string
+  description?: string
+  steps?: MobileAutomationStep[]
+  deviceConfig?: MobileDeviceConfig
+  behaviorPattern?: string
+}
+
+export interface SensorState {
+  location?: { latitude: number; longitude: number; accuracy: number; altitude?: number }
+  accelerometer?: { x: number; y: number; z: number }
+  gyroscope?: { x: number; y: number; z: number }
+  battery?: { level: number; charging: boolean }
+  networkInfo?: { type: string; downlink?: number; rtt?: number }
+}
+
+export interface MobileExecutionMetrics {
+  tapCount: number
+  swipeCount: number
+  scrollCount: number
+  longPressCount: number
+  pinchCount: number
+  totalDuration: number
+  averageStepDuration: number
+}
+
+export interface MobileStepResult {
+  stepId: string
+  action: string
+  success: boolean
+  duration: number
+  error?: string
+}
+
+export interface MobileExecutionResult {
+  executionId: string
+  workflowId: string
+  profileId: string
+  deviceName: string
+  success: boolean
+  duration: number
+  steps: MobileStepResult[]
+  metrics: MobileExecutionMetrics
+  sensorState?: SensorState
+  error?: string
+}
+
+export interface MobileBatchExecutionResult {
+  executionId: string
+  workflowId: string
+  executionMode: 'parallel' | 'sequential'
+  total: number
+  successCount: number
+  failCount: number
+  results: MobileExecutionResult[]
+}
+
+export type MobileBehaviorArchetypeId =
+  | 'casual_browser'
+  | 'power_user'
+  | 'bot_evasion'
+  | 'rapid_interactor'
+  | 'mobile_native'
+  | 'careful_shopper'
+  | 'bulk_operator'
+  | 'social_lurker'
+  | 'form_filler'
+  | 'idler'
+
+export interface MobileBehaviorArchetype {
+  id: MobileBehaviorArchetypeId
+  name: string
+  description: string
+  tapDelayRange: [number, number]
+  swipeDurationRange: [number, number]
+  pauseRange: [number, number]
+  scrollDistanceRange: [number, number]
+  missRate: number
+  retapRate: number
+}
+
+export interface MobileExecutionLog {
+  id: string
+  workflow_id: string
+  workflow_name?: string
+  profile_id: string
+  device_name: string
+  started_at: string
+  ended_at?: string
+  duration_ms: number
+  status: 'running' | 'success' | 'failed' | 'timeout' | 'cancelled'
+  error_message?: string
+  step_results: string
+  metrics: string
+  sensor_state?: string
+}
+
+export interface GestureTemplate {
+  id: string
+  name: string
+  gesture_type: string
+  description: string
+  config: Record<string, any>
+  created_at?: string
+}

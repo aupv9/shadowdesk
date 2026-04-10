@@ -608,6 +608,52 @@ export class Database {
       CREATE INDEX IF NOT EXISTS idx_behavior_sessions_timestamp ON behavior_sessions(timestamp);
     `)
 
+    // Phase 17 — Mobile Workflow Engine: workflows, execution logs, gesture templates
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS mobile_workflows (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        steps TEXT NOT NULL DEFAULT '[]',
+        device_config TEXT NOT NULL DEFAULT '{}',
+        behavior_pattern TEXT,
+        is_template INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_mobile_workflows_template ON mobile_workflows(is_template);
+
+      CREATE TABLE IF NOT EXISTS mobile_execution_logs (
+        id TEXT PRIMARY KEY,
+        workflow_id TEXT NOT NULL,
+        profile_id TEXT NOT NULL,
+        device_name TEXT,
+        started_at TEXT DEFAULT (datetime('now')),
+        ended_at TEXT,
+        duration_ms INTEGER DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'running',
+        error_message TEXT,
+        step_results TEXT DEFAULT '[]',
+        metrics TEXT DEFAULT '{}',
+        sensor_state TEXT,
+        FOREIGN KEY(workflow_id) REFERENCES mobile_workflows(id) ON DELETE CASCADE,
+        FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_mobile_exec_workflow ON mobile_execution_logs(workflow_id);
+      CREATE INDEX IF NOT EXISTS idx_mobile_exec_profile ON mobile_execution_logs(profile_id);
+      CREATE INDEX IF NOT EXISTS idx_mobile_exec_status  ON mobile_execution_logs(status);
+
+      CREATE TABLE IF NOT EXISTS gesture_templates (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        gesture_type TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        config TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_gesture_templates_type ON gesture_templates(gesture_type);
+    `)
+
     // Backfill fingerprint_hash for existing profiles that don't have one
     try {
       const rows = this.queryAll(`SELECT id, fingerprint FROM profiles WHERE fingerprint_hash IS NULL AND status = 'active'`)
@@ -2717,5 +2763,154 @@ export class Database {
       factors,
       calculatedAt: new Date().toISOString(),
     }
+  }
+
+  // ── Phase 17: Mobile Workflows ──────────────────────────────────────────────
+
+  createMobileWorkflow(w: {
+    id: string
+    name: string
+    description?: string
+    steps: any[]
+    deviceConfig: any
+    behaviorPattern?: string
+    isTemplate?: boolean
+  }): void {
+    this.run(
+      `INSERT INTO mobile_workflows (id, name, description, steps, device_config, behavior_pattern, is_template)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        w.id,
+        w.name,
+        w.description ?? '',
+        JSON.stringify(w.steps),
+        JSON.stringify(w.deviceConfig),
+        w.behaviorPattern ?? null,
+        w.isTemplate ? 1 : 0
+      ]
+    )
+  }
+
+  updateMobileWorkflow(id: string, updates: Record<string, any>): void {
+    const fields: string[] = []
+    const values: any[] = []
+    if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+    if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description) }
+    if (updates.steps !== undefined) { fields.push('steps = ?'); values.push(JSON.stringify(updates.steps)) }
+    if (updates.deviceConfig !== undefined) { fields.push('device_config = ?'); values.push(JSON.stringify(updates.deviceConfig)) }
+    if (updates.behaviorPattern !== undefined) { fields.push('behavior_pattern = ?'); values.push(updates.behaviorPattern) }
+    if (fields.length === 0) return
+    fields.push("updated_at = datetime('now')")
+    values.push(id)
+    this.run(`UPDATE mobile_workflows SET ${fields.join(', ')} WHERE id = ?`, values)
+  }
+
+  getMobileWorkflow(id: string): any {
+    const row = this.queryOne('SELECT * FROM mobile_workflows WHERE id = ?', [id])
+    if (!row) return null
+    return this.parseMobileWorkflowRow(row)
+  }
+
+  getAllMobileWorkflows(): any[] {
+    return this.queryAll('SELECT * FROM mobile_workflows ORDER BY updated_at DESC')
+      .map((r) => this.parseMobileWorkflowRow(r))
+  }
+
+  deleteMobileWorkflow(id: string): void {
+    this.run('DELETE FROM mobile_workflows WHERE id = ?', [id])
+  }
+
+  private parseMobileWorkflowRow(row: any): any {
+    return {
+      ...row,
+      steps: JSON.parse(row.steps || '[]'),
+      deviceConfig: JSON.parse(row.device_config || '{}'),
+      isTemplate: row.is_template === 1
+    }
+  }
+
+  // ── Phase 17: Mobile Execution Logs ─────────────────────────────────────────
+
+  addMobileExecutionLog(log: {
+    id: string
+    workflow_id: string
+    profile_id: string
+    device_name?: string
+    status?: string
+  }): void {
+    this.run(
+      `INSERT INTO mobile_execution_logs (id, workflow_id, profile_id, device_name, status)
+       VALUES (?, ?, ?, ?, ?)`,
+      [log.id, log.workflow_id, log.profile_id, log.device_name ?? '', log.status ?? 'running']
+    )
+  }
+
+  updateMobileExecutionLog(id: string, updates: {
+    status?: string
+    error_message?: string
+    step_results?: any[]
+    metrics?: any
+    sensor_state?: any
+    duration_ms?: number
+  }): void {
+    const fields: string[] = []
+    const values: any[] = []
+    if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status) }
+    if (updates.error_message !== undefined) { fields.push('error_message = ?'); values.push(updates.error_message) }
+    if (updates.step_results !== undefined) { fields.push('step_results = ?'); values.push(JSON.stringify(updates.step_results)) }
+    if (updates.metrics !== undefined) { fields.push('metrics = ?'); values.push(JSON.stringify(updates.metrics)) }
+    if (updates.sensor_state !== undefined) { fields.push('sensor_state = ?'); values.push(JSON.stringify(updates.sensor_state)) }
+    if (updates.duration_ms !== undefined) { fields.push('duration_ms = ?'); values.push(updates.duration_ms) }
+    if (updates.status === 'success' || updates.status === 'failed' || updates.status === 'timeout') {
+      fields.push("ended_at = datetime('now')")
+    }
+    if (fields.length === 0) return
+    values.push(id)
+    this.run(`UPDATE mobile_execution_logs SET ${fields.join(', ')} WHERE id = ?`, values)
+  }
+
+  getMobileExecutionLogs(workflowId?: string, limit: number = 50): any[] {
+    if (workflowId) {
+      return this.queryAll(
+        'SELECT * FROM mobile_execution_logs WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?',
+        [workflowId, limit]
+      )
+    }
+    return this.queryAll(
+      'SELECT * FROM mobile_execution_logs ORDER BY started_at DESC LIMIT ?',
+      [limit]
+    )
+  }
+
+  getMobileExecutionLog(id: string): any {
+    return this.queryOne('SELECT * FROM mobile_execution_logs WHERE id = ?', [id])
+  }
+
+  deleteMobileExecutionLog(id: string): void {
+    this.run('DELETE FROM mobile_execution_logs WHERE id = ?', [id])
+  }
+
+  // ── Phase 17: Gesture Templates ─────────────────────────────────────────────
+
+  createGestureTemplate(t: {
+    id: string
+    name: string
+    gesture_type: string
+    description?: string
+    config: any
+  }): void {
+    this.run(
+      `INSERT INTO gesture_templates (id, name, gesture_type, description, config) VALUES (?, ?, ?, ?, ?)`,
+      [t.id, t.name, t.gesture_type, t.description ?? '', JSON.stringify(t.config)]
+    )
+  }
+
+  getAllGestureTemplates(): any[] {
+    return this.queryAll('SELECT * FROM gesture_templates ORDER BY created_at DESC')
+      .map((r) => ({ ...r, config: JSON.parse(r.config || '{}') }))
+  }
+
+  deleteGestureTemplate(id: string): void {
+    this.run('DELETE FROM gesture_templates WHERE id = ?', [id])
   }
 }
