@@ -2341,4 +2341,105 @@ export function registerIpcHandlers(): void {
     db.deleteGestureTemplate(id)
     return { success: true }
   })
+
+  // ── Phase 18: Real Device Management ────────────────────────────────────────
+
+  ipcMain.handle('mobileDevice:listAndroid', async () => {
+    const { AdbConnector } = require('../adb-connector')
+    const connector = AdbConnector.getInstance()
+    return await connector.discoverDevices()
+  })
+
+  ipcMain.handle('mobileDevice:listIos', async () => {
+    const { IosConnector } = require('../ios-connector')
+    const connector = IosConnector.getInstance()
+    return await connector.discoverDevices()
+  })
+
+  ipcMain.handle('mobileDevice:checkHealth', async (_event, deviceId: string, type: 'android' | 'ios') => {
+    try {
+      if (type === 'android') {
+        const { AdbConnector } = require('../adb-connector')
+        const connector = AdbConnector.getInstance()
+        return await connector.checkDeviceHealth(deviceId)
+      } else {
+        const { IosConnector } = require('../ios-connector')
+        const connector = IosConnector.getInstance()
+        return await connector.checkDeviceHealth(deviceId)
+      }
+    } catch {
+      return false
+    }
+  })
+
+  ipcMain.handle('mobileDevice:enableWebDriver', async (_event, deviceId: string, type: 'android' | 'ios') => {
+    try {
+      if (type === 'android') {
+        const { AdbConnector } = require('../adb-connector')
+        const connector = AdbConnector.getInstance()
+        await connector.enableWebDriver(deviceId)
+        return { success: true }
+      } else {
+        throw new Error('iOS WebDriver setup via Appium requires manual configuration')
+      }
+    } catch (err: any) {
+      throw new Error(err.message)
+    }
+  })
+
+  ipcMain.handle('mobileDevice:launchChrome', async (_event, deviceId: string, type: 'android' | 'ios', url?: string) => {
+    try {
+      if (type === 'android') {
+        const { AdbConnector } = require('../adb-connector')
+        const connector = AdbConnector.getInstance()
+        await connector.launchChrome(deviceId, url)
+        return { success: true }
+      } else {
+        const { IosConnector } = require('../ios-connector')
+        const connector = IosConnector.getInstance()
+        await connector.launchApp(deviceId, 'com.apple.mobilesafari', url)
+        return { success: true }
+      }
+    } catch (err: any) {
+      throw new Error(err.message)
+    }
+  })
+
+  ipcMain.handle('mobileDevice:closeChrome', async (_event, deviceId: string, type: 'android' | 'ios') => {
+    try {
+      if (type === 'android') {
+        const { AdbConnector } = require('../adb-connector')
+        const connector = AdbConnector.getInstance()
+        await connector.closeChrome(deviceId)
+      } else {
+        const { IosConnector } = require('../ios-connector')
+        const connector = IosConnector.getInstance()
+        await connector.closeApp(deviceId, 'com.apple.mobilesafari')
+      }
+      return { success: true }
+    } catch (err: any) {
+      throw new Error(err.message)
+    }
+  })
+
+  ipcMain.handle('mobileDevice:getCdpEndpoint', (_event, deviceId: string, type: 'android' | 'ios') => {
+    if (type === 'android') {
+      const { AdbConnector } = require('../adb-connector')
+      const connector = AdbConnector.getInstance()
+      return connector.getCdpEndpoint(deviceId)
+    } else {
+      const { IosConnector } = require('../ios-connector')
+      const connector = IosConnector.getInstance()
+      return `http://localhost:${connector.getWebDriverPort(deviceId)}`
+    }
+  })
+
+  ipcMain.handle('mobileNetwork:setProfile', async (_event, pageId: string, profileType: string) => {
+    const { MobileNetworkSimulator } = require('../mobile-network-simulator')
+    const simulator = MobileNetworkSimulator.getInstance()
+    // Note: In real implementation, would need to track active pages
+    // For now, just return profile info
+    const profile = simulator.getSeaRegionProfile()
+    return profile
+  })
 }

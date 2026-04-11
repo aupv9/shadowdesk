@@ -471,6 +471,21 @@ const api = {
     list:   ()              => ipcRenderer.invoke('gestureTemplate:list'),
     create: (input: any)    => ipcRenderer.invoke('gestureTemplate:create', input),
     delete: (id: string)    => ipcRenderer.invoke('gestureTemplate:delete', id)
+  },
+
+  // Phase 18 — Real Device Management
+  mobileDevice: {
+    listAndroid:    ()                                              => ipcRenderer.invoke('mobileDevice:listAndroid'),
+    listIos:        ()                                              => ipcRenderer.invoke('mobileDevice:listIos'),
+    checkHealth:    (deviceId: string, type: string)               => ipcRenderer.invoke('mobileDevice:checkHealth', deviceId, type),
+    enableWebDriver:(deviceId: string, type: string)               => ipcRenderer.invoke('mobileDevice:enableWebDriver', deviceId, type),
+    launchChrome:   (deviceId: string, type: string, url?: string) => ipcRenderer.invoke('mobileDevice:launchChrome', deviceId, type, url),
+    closeChrome:    (deviceId: string, type: string)               => ipcRenderer.invoke('mobileDevice:closeChrome', deviceId, type),
+    getCdpEndpoint: (deviceId: string, type: string)               => ipcRenderer.invoke('mobileDevice:getCdpEndpoint', deviceId, type)
+  },
+
+  mobileNetwork: {
+    setProfile: (pageId: string, profileType: string) => ipcRenderer.invoke('mobileNetwork:setProfile', pageId, profileType)
   }
 }
 

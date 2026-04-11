@@ -89,7 +89,8 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Automate',
     items: [
       { key: 'automation',       icon: Bot,        label: 'Automation' },
-      { key: 'mobile-workflows', icon: Smartphone, label: 'Mobile' },
+      { key: 'mobile-workflows', icon: Smartphone, label: 'Mobile Workflows' },
+      { key: 'mobile-devices',   icon: Smartphone, label: 'Mobile Devices' },
       { key: 'runs',             icon: Activity,   label: 'Runs' },
       { key: 'ai',               icon: Sparkles,   label: 'AI Assistant' },
       { key: 'smart-warmup',     icon: Flame,      label: 'Warm-Up' }

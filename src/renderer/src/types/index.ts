@@ -148,7 +148,14 @@ export type {
   SensorState,
   GestureTemplate,
   CreateMobileWorkflowInput,
-  UpdateMobileWorkflowInput
+  UpdateMobileWorkflowInput,
+  // Phase 18 — Real Device Manager
+  RealAndroidDevice,
+  RealIosDevice,
+  RealDevice,
+  RealDeviceExecutionConfig,
+  NetworkType,
+  NetworkProfile
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
@@ -174,6 +181,7 @@ export type NavSection =
   | 'smart-warmup'   // Smart Warm-Up Engine (7-day ramp)
   | 'correlation'    // Phase 21 — Behavior Correlation Detector
   | 'mobile-workflows' // Phase 17 — Mobile Workflow Engine
+  | 'mobile-devices' // Phase 18 — Real Device Manager (ADB & Appium)
 
 export interface Toast {
   id: string

@@ -2158,3 +2158,55 @@ export interface GestureTemplate {
   config: Record<string, any>
   created_at?: string
 }
+
+// ── Phase 18: Real Device Support ────────────────────────────────────────────
+
+export type RealDeviceType = 'android' | 'ios'
+
+export interface RealAndroidDevice {
+  type: 'android'
+  id: string
+  name: string
+  model: string
+  androidVersion: string
+  isConnected: boolean
+  isEmulator: boolean
+  webdriverPort: number
+  lastHealthCheck?: number
+  error?: string
+}
+
+export interface RealIosDevice {
+  type: 'ios'
+  id: string
+  name: string
+  model: string
+  osVersion: string
+  isConnected: boolean
+  udid: string
+  webdriverPort: number
+  bundleId?: string
+  lastHealthCheck?: number
+  error?: string
+}
+
+export type RealDevice = RealAndroidDevice | RealIosDevice
+
+export interface RealDeviceExecutionConfig {
+  deviceId: string
+  deviceType: RealDeviceType
+  cdpEndpoint: string
+  networkProfile?: 'sea' | '4g' | '5g' | 'wifi'
+  enableMobileCdpEvasion?: boolean
+}
+
+export type NetworkType = '2g' | '3g' | '4g' | '5g' | 'wifi' | 'ethernet'
+
+export interface NetworkProfile {
+  type: NetworkType
+  downloadSpeed: number
+  uploadSpeed: number
+  latency: number
+  packetLoss: number
+  jitterMs: number
+}
