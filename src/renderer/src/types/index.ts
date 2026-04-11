@@ -129,7 +129,33 @@ export type {
   ProfileBehaviorFingerprint,
   BehaviorCorrelationPair,
   BehaviorCorrelationReport,
-  BehaviorCorrelationOptions
+  BehaviorCorrelationOptions,
+  // Phase 17 — Mobile Workflow Engine
+  MobileWorkflow,
+  MobileAutomationStep,
+  MobileDeviceConfig,
+  MobileAction,
+  MobileGestureAction,
+  MobileSensorAction,
+  MobileDeviceAction,
+  MobileExecutionResult,
+  MobileBatchExecutionResult,
+  MobileExecutionMetrics,
+  MobileStepResult,
+  MobileExecutionLog,
+  MobileBehaviorArchetype,
+  MobileBehaviorArchetypeId,
+  SensorState,
+  GestureTemplate,
+  CreateMobileWorkflowInput,
+  UpdateMobileWorkflowInput,
+  // Phase 18 — Real Device Manager
+  RealAndroidDevice,
+  RealIosDevice,
+  RealDevice,
+  RealDeviceExecutionConfig,
+  NetworkType,
+  NetworkProfile
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
@@ -154,6 +180,8 @@ export type NavSection =
   | 'sea-platforms'  // Phase 17 — SEA Platform Templates
   | 'smart-warmup'   // Smart Warm-Up Engine (7-day ramp)
   | 'correlation'    // Phase 21 — Behavior Correlation Detector
+  | 'mobile-workflows' // Phase 17 — Mobile Workflow Engine
+  | 'mobile-devices' // Phase 18 — Real Device Manager (ADB & Appium)
 
 export interface Toast {
   id: string

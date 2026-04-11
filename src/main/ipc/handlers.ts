@@ -2198,4 +2198,248 @@ export function registerIpcHandlers(): void {
     cleanupWorker.clearFailedCleanups()
     return { success: true }
   })
+
+  // ── Phase 17: Mobile Workflow Engine ────────────────────────────────────────
+
+  ipcMain.handle('mobileWorkflow:list', () => {
+    return db.getAllMobileWorkflows()
+  })
+
+  ipcMain.handle('mobileWorkflow:get', (_event, id: string) => {
+    const wf = db.getMobileWorkflow(id)
+    if (!wf) throw new NotFoundError('Mobile workflow not found')
+    return wf
+  })
+
+  ipcMain.handle('mobileWorkflow:create', (_event, input: any) => {
+    if (!input?.name) throw new ValidationError('Name is required')
+    if (!input?.steps || !Array.isArray(input.steps)) throw new ValidationError('Steps array is required')
+    const id = uuidv4()
+    db.createMobileWorkflow({
+      id,
+      name: input.name,
+      description: input.description,
+      steps: input.steps,
+      deviceConfig: input.deviceConfig ?? { targetProfiles: [], executionMode: 'sequential', stopOnError: false },
+      behaviorPattern: input.behaviorPattern,
+      isTemplate: input.isTemplate
+    })
+    return db.getMobileWorkflow(id)
+  })
+
+  ipcMain.handle('mobileWorkflow:update', (_event, id: string, updates: any) => {
+    const existing = db.getMobileWorkflow(id)
+    if (!existing) throw new NotFoundError('Mobile workflow not found')
+    db.updateMobileWorkflow(id, updates)
+    return db.getMobileWorkflow(id)
+  })
+
+  ipcMain.handle('mobileWorkflow:delete', (_event, id: string) => {
+    db.deleteMobileWorkflow(id)
+    return { success: true }
+  })
+
+  ipcMain.handle('mobileWorkflow:duplicate', (_event, id: string) => {
+    const wf = db.getMobileWorkflow(id)
+    if (!wf) throw new NotFoundError('Mobile workflow not found')
+    const newId = uuidv4()
+    db.createMobileWorkflow({
+      id: newId,
+      name: `${wf.name} (Copy)`,
+      description: wf.description,
+      steps: wf.steps,
+      deviceConfig: wf.deviceConfig,
+      behaviorPattern: wf.behaviorPattern
+    })
+    return db.getMobileWorkflow(newId)
+  })
+
+  ipcMain.handle('mobileWorkflow:execute', async (_event, workflowId: string, profileIds: string[]) => {
+    const wf = db.getMobileWorkflow(workflowId)
+    if (!wf) throw new NotFoundError('Mobile workflow not found')
+    if (!profileIds || profileIds.length === 0) throw new ValidationError('At least one profile is required')
+
+    const { MobileWorkflowEngine } = require('../mobile-workflow-engine')
+    const { MobileOrchestrator } = require('../mobile-orchestrator')
+
+    if (profileIds.length === 1) {
+      const engine = MobileWorkflowEngine.getInstance()
+      const bm = BrowserManager.getInstance()
+      const profile = db.getProfile(profileIds[0])
+      if (!profile) throw new NotFoundError('Profile not found')
+
+      // Ensure profile is launched
+      const sessions = bm.getActiveSessions()
+      let session = sessions.find((s: any) => s.profileId === profileIds[0])
+      if (!session) {
+        await bm.launchProfile(profile)
+        const updated = bm.getActiveSessions()
+        session = updated.find((s: any) => s.profileId === profileIds[0])
+      }
+      if (!session?.page) throw new Error('Could not get page for profile')
+
+      return await engine.executeWorkflow(wf, profileIds[0], session.page)
+    }
+
+    // Multi-profile: use orchestrator
+    const orchestrator = MobileOrchestrator.getInstance()
+    return await orchestrator.executeBatch(wf, profileIds)
+  })
+
+  // ── Phase 17: Mobile Execution Logs ─────────────────────────────────────────
+
+  ipcMain.handle('mobileExecution:logs', (_event, workflowId?: string, limit?: number) => {
+    return db.getMobileExecutionLogs(workflowId, limit ?? 50)
+  })
+
+  ipcMain.handle('mobileExecution:get', (_event, id: string) => {
+    const log = db.getMobileExecutionLog(id)
+    if (!log) throw new NotFoundError('Execution log not found')
+    return log
+  })
+
+  ipcMain.handle('mobileExecution:delete', (_event, id: string) => {
+    db.deleteMobileExecutionLog(id)
+    return { success: true }
+  })
+
+  // ── Phase 17: Mobile Behavior Archetypes ────────────────────────────────────
+
+  ipcMain.handle('mobileBehavior:list', () => {
+    const { getMobileBehaviorArchetypes } = require('../mobile-behavior')
+    return getMobileBehaviorArchetypes()
+  })
+
+  ipcMain.handle('mobileBehavior:get', (_event, id: string) => {
+    const { getMobileBehaviorArchetype } = require('../mobile-behavior')
+    const archetype = getMobileBehaviorArchetype(id)
+    if (!archetype) throw new NotFoundError('Behavior archetype not found')
+    return archetype
+  })
+
+  // ── Phase 17: Gesture Templates ─────────────────────────────────────────────
+
+  ipcMain.handle('gestureTemplate:list', () => {
+    return db.getAllGestureTemplates()
+  })
+
+  ipcMain.handle('gestureTemplate:create', (_event, input: any) => {
+    if (!input?.name) throw new ValidationError('Name is required')
+    if (!input?.gesture_type) throw new ValidationError('Gesture type is required')
+    const id = uuidv4()
+    db.createGestureTemplate({
+      id,
+      name: input.name,
+      gesture_type: input.gesture_type,
+      description: input.description,
+      config: input.config ?? {}
+    })
+    return { id }
+  })
+
+  ipcMain.handle('gestureTemplate:delete', (_event, id: string) => {
+    db.deleteGestureTemplate(id)
+    return { success: true }
+  })
+
+  // ── Phase 18: Real Device Management ────────────────────────────────────────
+
+  ipcMain.handle('mobileDevice:listAndroid', async () => {
+    const { AdbConnector } = require('../adb-connector')
+    const connector = AdbConnector.getInstance()
+    return await connector.discoverDevices()
+  })
+
+  ipcMain.handle('mobileDevice:listIos', async () => {
+    const { IosConnector } = require('../ios-connector')
+    const connector = IosConnector.getInstance()
+    return await connector.discoverDevices()
+  })
+
+  ipcMain.handle('mobileDevice:checkHealth', async (_event, deviceId: string, type: 'android' | 'ios') => {
+    try {
+      if (type === 'android') {
+        const { AdbConnector } = require('../adb-connector')
+        const connector = AdbConnector.getInstance()
+        return await connector.checkDeviceHealth(deviceId)
+      } else {
+        const { IosConnector } = require('../ios-connector')
+        const connector = IosConnector.getInstance()
+        return await connector.checkDeviceHealth(deviceId)
+      }
+    } catch {
+      return false
+    }
+  })
+
+  ipcMain.handle('mobileDevice:enableWebDriver', async (_event, deviceId: string, type: 'android' | 'ios') => {
+    try {
+      if (type === 'android') {
+        const { AdbConnector } = require('../adb-connector')
+        const connector = AdbConnector.getInstance()
+        await connector.enableWebDriver(deviceId)
+        return { success: true }
+      } else {
+        throw new Error('iOS WebDriver setup via Appium requires manual configuration')
+      }
+    } catch (err: any) {
+      throw new Error(err.message)
+    }
+  })
+
+  ipcMain.handle('mobileDevice:launchChrome', async (_event, deviceId: string, type: 'android' | 'ios', url?: string) => {
+    try {
+      if (type === 'android') {
+        const { AdbConnector } = require('../adb-connector')
+        const connector = AdbConnector.getInstance()
+        await connector.launchChrome(deviceId, url)
+        return { success: true }
+      } else {
+        const { IosConnector } = require('../ios-connector')
+        const connector = IosConnector.getInstance()
+        await connector.launchApp(deviceId, 'com.apple.mobilesafari', url)
+        return { success: true }
+      }
+    } catch (err: any) {
+      throw new Error(err.message)
+    }
+  })
+
+  ipcMain.handle('mobileDevice:closeChrome', async (_event, deviceId: string, type: 'android' | 'ios') => {
+    try {
+      if (type === 'android') {
+        const { AdbConnector } = require('../adb-connector')
+        const connector = AdbConnector.getInstance()
+        await connector.closeChrome(deviceId)
+      } else {
+        const { IosConnector } = require('../ios-connector')
+        const connector = IosConnector.getInstance()
+        await connector.closeApp(deviceId, 'com.apple.mobilesafari')
+      }
+      return { success: true }
+    } catch (err: any) {
+      throw new Error(err.message)
+    }
+  })
+
+  ipcMain.handle('mobileDevice:getCdpEndpoint', (_event, deviceId: string, type: 'android' | 'ios') => {
+    if (type === 'android') {
+      const { AdbConnector } = require('../adb-connector')
+      const connector = AdbConnector.getInstance()
+      return connector.getCdpEndpoint(deviceId)
+    } else {
+      const { IosConnector } = require('../ios-connector')
+      const connector = IosConnector.getInstance()
+      return `http://localhost:${connector.getWebDriverPort(deviceId)}`
+    }
+  })
+
+  ipcMain.handle('mobileNetwork:setProfile', async (_event, pageId: string, profileType: string) => {
+    const { MobileNetworkSimulator } = require('../mobile-network-simulator')
+    const simulator = MobileNetworkSimulator.getInstance()
+    // Note: In real implementation, would need to track active pages
+    // For now, just return profile info
+    const profile = simulator.getSeaRegionProfile()
+    return profile
+  })
 }

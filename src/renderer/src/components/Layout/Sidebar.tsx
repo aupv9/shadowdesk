@@ -21,7 +21,8 @@ import {
   Radar,
   ChevronLeft,
   ChevronDown,
-  FileUp
+  FileUp,
+  Smartphone
 } from 'lucide-react'
 import type { NavSection } from '../../types'
 import type { User as UserType, LicensePlan } from '../../types'
@@ -87,10 +88,12 @@ const NAV_GROUPS: NavGroup[] = [
     key: 'automate',
     label: 'Automate',
     items: [
-      { key: 'automation',   icon: Bot,      label: 'Automation' },
-      { key: 'runs',         icon: Activity, label: 'Runs' },
-      { key: 'ai',           icon: Sparkles, label: 'AI Assistant' },
-      { key: 'smart-warmup', icon: Flame,    label: 'Warm-Up' }
+      { key: 'automation',       icon: Bot,        label: 'Automation' },
+      { key: 'mobile-workflows', icon: Smartphone, label: 'Mobile Workflows' },
+      { key: 'mobile-devices',   icon: Smartphone, label: 'Mobile Devices' },
+      { key: 'runs',             icon: Activity,   label: 'Runs' },
+      { key: 'ai',               icon: Sparkles,   label: 'AI Assistant' },
+      { key: 'smart-warmup',     icon: Flame,      label: 'Warm-Up' }
     ]
   },
   {

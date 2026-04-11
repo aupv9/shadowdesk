@@ -18,6 +18,8 @@ import { SEAPlatforms } from './components/SEAPlatforms'
 import { SmartWarmUp } from './components/SmartWarmUp'
 import { ImportHistory } from './components/ImportHistory'
 import { ImportWizard } from './components/ImportWizard'
+import { MobileWorkflowBuilder } from './components/MobileWorkflowBuilder'
+import { MobileDeviceManager } from './components/MobileDeviceManager'
 import { ErrorBoundary } from './components/UI/ErrorBoundary'
 import { ToastContainer } from './components/UI/Toast'
 import { ConfirmDialog } from './components/UI/ConfirmDialog'
@@ -123,6 +125,12 @@ export default function App() {
         </ErrorBoundary>
         <ErrorBoundary section="Smart Warm-Up">
           {section === 'smart-warmup' && <SmartWarmUp />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Mobile Workflows">
+          {section === 'mobile-workflows' && <MobileWorkflowBuilder />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Mobile Devices">
+          {section === 'mobile-devices' && <MobileDeviceManager />}
         </ErrorBoundary>
       </main>
       <ToastContainer />
