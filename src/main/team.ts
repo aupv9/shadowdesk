@@ -94,7 +94,7 @@ export async function unshareProfile(profileId: string, memberId: string): Promi
   })
 }
 
-// ── Audit Log ────────────────────────────────────────────────────────────────
+// ── Audit Log (Common SaaS /api/v1/audit) ───────────────────────────────────
 
 export async function getAuditLog(params?: {
   page?: number
@@ -109,5 +109,42 @@ export async function getAuditLog(params?: {
   if (params?.action) query.set('action', params.action)
 
   const qs = query.toString()
-  return apiRequest(`/team/audit${qs ? `?${qs}` : ''}`)
+  return apiRequest(`/audit${qs ? `?${qs}` : ''}`)
+}
+
+/**
+ * Post an audit entry to the Common SaaS audit service.
+ * Fire-and-forget — failures are logged locally but never block the caller.
+ */
+export async function postAuditEntry(entry: {
+  action: string
+  target_id?: string
+  target_name?: string
+  metadata?: Record<string, unknown>
+}): Promise<void> {
+  try {
+    await apiRequest('/audit', {
+      method: 'POST',
+      body: entry
+    })
+  } catch {
+    // Audit logging is best-effort — store locally via the existing
+    // database audit_log table as a fallback.
+    try {
+      const { Database } = require('./database')
+      const db = Database.getInstance()
+      db.run(
+        'INSERT INTO audit_log (id, user_id, user_name, action, target_id, target_name, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          require('crypto').randomBytes(8).toString('hex'),
+          '', '', entry.action,
+          entry.target_id ?? null,
+          entry.target_name ?? null,
+          new Date().toISOString()
+        ]
+      )
+    } catch {
+      // Double-fault — give up silently.
+    }
+  }
 }

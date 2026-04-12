@@ -22,10 +22,13 @@ import {
 } from '../auth'
 import {
   fetchLicense, activateLicense, deactivateLicense, getCurrentLicense, checkProfileLimit,
-  getUsage, getMachineId, getLicenseStatus, listLicenseDevices, deactivateDevice
+  getUsage, getMachineId, getLicenseStatus, listLicenseDevices, deactivateDevice,
+  fetchPricingPlans, fetchInvoices
 } from '../license'
 import * as team from '../team'
 import * as apiKeys from '../api-keys'
+import * as userProfile from '../user-profile'
+import * as notifications from '../notification-service'
 import {
   pushProfiles, pullProfiles, getSyncState, getSyncManifest, getSyncHistory, getSyncDiff,
   markPendingChange, enableSyncDaemon, disableSyncDaemon, isDaemonEnabled
@@ -1242,6 +1245,52 @@ export function registerIpcHandlers(): void {
   // current machine — that path goes through license:deactivate.
   ipcMain.handle('license:deactivateDevice', async (_event, machineId: string) => {
     return deactivateDevice(machineId)
+  })
+
+  ipcMain.handle('license:pricingPlans', async () => {
+    return fetchPricingPlans()
+  })
+
+  ipcMain.handle('license:invoices', async (_event, params?: { page?: number; limit?: number }) => {
+    return fetchInvoices(params)
+  })
+
+  // ── User Profile (Common SaaS) ──────────────────────────────────────────
+
+  ipcMain.handle('userProfile:get', async (_event, userId: string) => {
+    return userProfile.getUserProfile(userId)
+  })
+
+  ipcMain.handle('userProfile:update', async (_event, userId: string, data: Partial<userProfile.UserProfile>) => {
+    return userProfile.updateUserProfile(userId, data)
+  })
+
+  ipcMain.handle('userProfile:uploadAvatar', async (_event, userId: string, imageBuffer: Buffer, filename: string) => {
+    return userProfile.uploadAvatar(userId, imageBuffer, filename)
+  })
+
+  // ── Notifications (Common SaaS) ─────────────────────────────────────────
+
+  ipcMain.handle('notifications:list', async (_event, params?: { page?: number; limit?: number; unread_only?: boolean }) => {
+    return notifications.listNotifications(params)
+  })
+
+  ipcMain.handle('notifications:markRead', async (_event, notificationId: string) => {
+    return notifications.markAsRead(notificationId)
+  })
+
+  ipcMain.handle('notifications:markAllRead', async () => {
+    return notifications.markAllAsRead()
+  })
+
+  ipcMain.handle('notifications:delete', async (_event, notificationId: string) => {
+    return notifications.deleteNotification(notificationId)
+  })
+
+  // ── Audit (Common SaaS) ─────────────────────────────────────────────────
+
+  ipcMain.handle('audit:post', async (_event, entry: { action: string; target_id?: string; target_name?: string; metadata?: Record<string, unknown> }) => {
+    return team.postAuditEntry(entry)
   })
 
   // ── Team ─────────────────────────────────────────────────────────────────

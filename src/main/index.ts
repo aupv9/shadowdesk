@@ -5,6 +5,7 @@ import { BrowserManager } from './browser-manager'
 import { registerIpcHandlers } from './ipc/handlers'
 import { initAutoUpdater } from './auto-updater'
 import { initSyncWindow } from './sync'
+import { startNotificationPolling, stopNotificationPolling } from './notification-service'
 import { ApiServer } from './api-server'
 import { getSettings } from './settings'
 import { resolveFingerprint } from './fingerprint/presets'
@@ -88,6 +89,7 @@ app.whenReady().then(async () => {
   // Initialize sync window reference for status notifications
   if (mainWindow) {
     initSyncWindow(mainWindow)
+    startNotificationPolling(mainWindow)
   }
 
   // Phase 10.2 — start the workflow scheduler poller
@@ -138,6 +140,7 @@ app.on('before-quit', async () => {
   WorkflowScheduler.getInstance().stop()
   SmartWarmUpScheduler.getInstance().stop()
   CleanupWorker.getInstance().stop()
+  stopNotificationPolling()
   await ApiServer.getInstance().stop()
 })
 
