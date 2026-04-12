@@ -545,14 +545,17 @@ export interface UpdateProxyInput {
 export interface User {
   id: string
   email: string
+  /** Display name — mapped from server's `full_name` field. */
   name: string
   avatar_url?: string
   team_id?: string
   role?: TeamRole
   created_at: string
-  // D4: email verification (backend may or may not populate — UI degrades gracefully)
+  /** Email verification status from server. */
   email_verified?: boolean
   email_verified_at?: string | null
+  /** Server status: active | suspended | deleted */
+  status?: string
 }
 
 export interface AuthTokens {
@@ -578,33 +581,49 @@ export interface RegisterInput {
   name: string
 }
 
-// ─── Common SaaS API Types ──────────────────────────────────────────────────
+// ─── Server API Types ───────────────────────────────────────────────────────
 
-/** Standard error body returned by the Common SaaS API. */
-export interface CommonApiError {
-  code: string
+/**
+ * Server error response format:
+ * { error: "code", message: "...", code: 400, timestamp: "..." }
+ */
+export interface ServerApiError {
+  error: string
   message: string
-  details?: Record<string, unknown>
+  code: number
+  timestamp: string
+  requestId?: string
 }
 
-/** Standard envelope returned by all Common SaaS API endpoints. */
+// Keep legacy aliases for backward compatibility with renderer code
+export type CommonApiError = ServerApiError
 export interface CommonApiResponse<T> {
-  success: boolean
   data?: T
-  error?: CommonApiError
-  meta?: {
-    pagination?: { page: number; limit: number; total: number }
-    timestamp?: string
-  }
+  total?: number
+  page?: number
+  limit?: number
+  pages?: number
 }
 
-/** Shape returned by POST /api/v1/auth/login and /register after envelope unwrap. */
+/**
+ * Server auth response for login/register:
+ * { user: {...}, tokens: { access_token, refresh_token, expires_at } }
+ */
 export interface CommonAuthResponse {
-  user_id: string
-  email?: string
-  access_token: string
-  refresh_token: string
-  expires_at?: number
+  user: {
+    id: string
+    email: string
+    full_name: string | null
+    email_verified: boolean
+    status: string
+    created_at: string
+    updated_at: string
+  }
+  tokens: {
+    access_token: string
+    refresh_token: string
+    expires_at: number
+  }
 }
 
 /** API Key as returned by the Common SaaS API. */
@@ -2262,4 +2281,204 @@ export interface NetworkProfile {
   latency: number
   packetLoss: number
   jitterMs: number
+}
+
+// ── Phase 2 Integration — Analytics Types ──────────────────────────────────
+
+export interface AnalyticsDashboardData {
+  total_profiles: number
+  active_sessions: number
+  avg_detection_score: number | null
+  detection_trend: Array<{ date: string; score: number }>
+  feature_usage: Array<{ feature: string; count: number }>
+  profile_creation_trend: Array<{ date: string; count: number }>
+  proxy_health: { healthy: number; unhealthy: number; untested: number }
+  top_presets: Array<{ preset: string; count: number }>
+}
+
+// ── Phase 2 Integration — Billing Types ────────────────────────────────────
+
+export interface BillingOverview {
+  subscription_id: string | null
+  plan_id: string | null
+  plan_name: string | null
+  status: 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'none'
+  current_period_start: string | null
+  current_period_end: string | null
+  cancel_at_period_end: boolean
+  trial_end: string | null
+  payment_method: PaymentMethodSummary | null
+  upcoming_invoice: UpcomingInvoice | null
+}
+
+export interface PaymentMethodSummary {
+  type: 'card' | 'bank_transfer' | 'paypal'
+  last4?: string
+  brand?: string
+  exp_month?: number
+  exp_year?: number
+}
+
+export interface UpcomingInvoice {
+  amount_due: number
+  currency: string
+  next_payment_date: string
+  line_items: Array<{
+    description: string
+    quantity: number
+    unit_amount: number
+    amount: number
+  }>
+}
+
+export interface BillingInvoice {
+  id: string
+  number: string
+  status: 'draft' | 'open' | 'paid' | 'void' | 'uncollectible'
+  amount_due: number
+  amount_paid: number
+  currency: string
+  created_at: string
+  paid_at: string | null
+  pdf_url: string | null
+  hosted_url: string | null
+}
+
+export interface BillingPricingPlan {
+  id: string
+  name: string
+  description: string
+  price_monthly: number
+  price_yearly: number
+  currency: string
+  features: Record<string, unknown>
+  limits: {
+    max_profiles: number
+    max_team_members: number
+    max_workflows: number
+    cloud_sync: boolean
+    api_access: boolean
+    priority_support: boolean
+  }
+  popular?: boolean
+}
+
+export interface UsageMeter {
+  meter_id: string
+  name: string
+  current_usage: number
+  limit: number | null
+  unit: string
+  reset_at: string | null
+}
+
+// ── Phase 2 Integration — Remote Config Types ──────────────────────────────
+
+export interface FeatureFlag {
+  key: string
+  enabled: boolean
+  variant?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface RemoteConfig {
+  flags: FeatureFlag[]
+  settings: Record<string, unknown>
+  announcements: Announcement[]
+  minimum_version: string | null
+  fetched_at: string
+}
+
+export interface Announcement {
+  id: string
+  type: 'info' | 'warning' | 'critical' | 'maintenance'
+  title: string
+  message: string
+  action_url?: string
+  action_label?: string
+  dismissible: boolean
+  starts_at: string
+  ends_at?: string | null
+}
+
+// ── Phase 2 Integration — Cloud Profile Types ──────────────────────────────
+
+export interface CloudProfile {
+  id: string
+  local_id: string | null
+  name: string
+  fingerprint_hash: string
+  preset: string
+  proxy_config: { type: string; country?: string } | null
+  tags: string[]
+  notes: string | null
+  backed_up_at: string
+  updated_at: string
+  size_bytes: number
+}
+
+export interface CloudProfileListResult {
+  profiles: CloudProfile[]
+  total: number
+  storage_used_bytes: number
+  storage_limit_bytes: number
+}
+
+// ── Phase 2 Integration — Support Ticket Types ─────────────────────────────
+
+export type TicketCategory =
+  | 'bug'
+  | 'feature_request'
+  | 'billing'
+  | 'account'
+  | 'detection'
+  | 'proxy'
+  | 'general'
+
+export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent'
+export type TicketStatus = 'open' | 'in_progress' | 'waiting_reply' | 'resolved' | 'closed'
+
+export interface SupportTicket {
+  id: string
+  subject: string
+  category: TicketCategory
+  priority: TicketPriority
+  status: TicketStatus
+  created_at: string
+  updated_at: string
+  last_reply_at: string | null
+  message_count: number
+}
+
+export interface TicketMessage {
+  id: string
+  ticket_id: string
+  author_type: 'user' | 'support' | 'system'
+  author_name: string
+  content: string
+  attachments: TicketAttachment[]
+  created_at: string
+}
+
+export interface TicketAttachment {
+  id: string
+  filename: string
+  size_bytes: number
+  content_type: string
+  url: string
+}
+
+export interface CreateTicketInput {
+  subject: string
+  category: TicketCategory
+  priority?: TicketPriority
+  message: string
+  include_diagnostics?: boolean
+}
+
+export interface FeedbackInput {
+  type: 'feature_request' | 'improvement' | 'praise' | 'other'
+  message: string
+  rating?: number
+  context?: string
 }

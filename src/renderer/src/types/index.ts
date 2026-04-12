@@ -162,7 +162,28 @@ export type {
   ApiKeyUsage,
   CommonApiError,
   CommonApiResponse,
-  CommonAuthResponse
+  CommonAuthResponse,
+  // Phase 2 Integration
+  AnalyticsDashboardData,
+  BillingOverview,
+  PaymentMethodSummary,
+  UpcomingInvoice,
+  BillingInvoice,
+  BillingPricingPlan,
+  UsageMeter,
+  FeatureFlag,
+  RemoteConfig,
+  Announcement,
+  CloudProfile,
+  CloudProfileListResult,
+  SupportTicket,
+  TicketMessage,
+  TicketAttachment,
+  TicketCategory,
+  TicketPriority,
+  TicketStatus,
+  CreateTicketInput,
+  FeedbackInput
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
@@ -189,6 +210,9 @@ export type NavSection =
   | 'correlation'    // Phase 21 — Behavior Correlation Detector
   | 'mobile-workflows' // Phase 17 — Mobile Workflow Engine
   | 'mobile-devices' // Phase 18 — Real Device Manager (ADB & Appium)
+  | 'analytics'      // Phase 2 Integration — Analytics Dashboard
+  | 'billing'        // Phase 2 Integration — Billing Portal
+  | 'support'        // Phase 2 Integration — Support Center
 
 export interface Toast {
   id: string

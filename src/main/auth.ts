@@ -1,53 +1,101 @@
 import { apiRequest, saveTokens, clearTokens, loadTokens, decodeJwtExpiry } from './api-client'
-import type { User, LoginInput, RegisterInput, AuthTokens, CommonAuthResponse } from '../shared/types'
+import type { User, LoginInput, RegisterInput, AuthTokens } from '../shared/types'
 
 let currentUser: User | null = null
 
 /**
- * Save tokens from a Common SaaS auth response.
- * The backend may or may not include `expires_at`; when absent we decode the
- * JWT `exp` claim so the token-refresh logic still works.
+ * Server login/register response shape:
+ * {
+ *   user: { id, email, full_name, email_verified, status, created_at, updated_at },
+ *   tokens: { access_token, refresh_token, expires_at }
+ * }
  */
-function persistTokens(data: CommonAuthResponse): void {
-  const expiresAt = data.expires_at ?? decodeJwtExpiry(data.access_token)
+interface ServerAuthResponse {
+  user: {
+    id: string
+    email: string
+    full_name: string | null
+    email_verified: boolean
+    status: string
+    created_at: string
+    updated_at: string
+  }
+  tokens: {
+    access_token: string
+    refresh_token: string
+    expires_at: number
+  }
+}
+
+/** Map server user to client User type. */
+function mapUser(serverUser: ServerAuthResponse['user']): User {
+  return {
+    id: serverUser.id,
+    email: serverUser.email,
+    name: serverUser.full_name ?? serverUser.email.split('@')[0],
+    email_verified: serverUser.email_verified,
+    created_at: serverUser.created_at
+  }
+}
+
+/** Save tokens from a server auth response. */
+function persistTokens(tokens: ServerAuthResponse['tokens']): void {
+  const expiresAt = tokens.expires_at ?? decodeJwtExpiry(tokens.access_token)
   saveTokens({
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
     expires_at: expiresAt
   })
 }
 
+/**
+ * POST /auth/login
+ * Request: { email, password }
+ * Response: { user, tokens }
+ */
 export async function login(input: LoginInput): Promise<User> {
-  const res = await apiRequest<CommonAuthResponse>('/auth/login', {
+  const res = await apiRequest<ServerAuthResponse>('/auth/login', {
     method: 'POST',
     body: input,
     authenticated: false
   })
-  persistTokens(res)
-
-  // Common SaaS login returns tokens + user_id but not the full user
-  // object — fetch the profile in a second call.
-  const user = await apiRequest<User>('/auth/me')
-  currentUser = user
-  return user
+  persistTokens(res.tokens)
+  currentUser = mapUser(res.user)
+  return currentUser
 }
 
+/**
+ * POST /auth/register
+ * Request: { email, password, full_name }
+ * Response: { user, tokens }
+ */
 export async function register(input: RegisterInput): Promise<User> {
-  const res = await apiRequest<CommonAuthResponse>('/auth/register', {
+  const res = await apiRequest<ServerAuthResponse>('/auth/register', {
     method: 'POST',
-    body: input,
+    body: {
+      email: input.email,
+      password: input.password,
+      full_name: input.name
+    },
     authenticated: false
   })
-  persistTokens(res)
-
-  const user = await apiRequest<User>('/auth/me')
-  currentUser = user
-  return user
+  persistTokens(res.tokens)
+  currentUser = mapUser(res.user)
+  return currentUser
 }
 
+/**
+ * POST /auth/logout
+ * Request: { refresh_token }
+ * Response: 204 No Content
+ */
 export async function logout(): Promise<void> {
   try {
-    await apiRequest('/auth/logout', { method: 'POST' })
+    const tokens = loadTokens()
+    await apiRequest('/auth/logout', {
+      method: 'POST',
+      body: { refresh_token: tokens?.refresh_token }
+    })
   } catch {
     // Best effort — clear local tokens regardless
   }
@@ -55,6 +103,10 @@ export async function logout(): Promise<void> {
   clearTokens()
 }
 
+/**
+ * GET /auth/me
+ * Response: { id, email, full_name, email_verified, status, created_at, updated_at }
+ */
 export async function getCurrentUser(): Promise<User | null> {
   if (currentUser) return currentUser
 
@@ -62,14 +114,19 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!tokens?.access_token) return null
 
   try {
-    const user = await apiRequest<User>('/auth/me')
-    currentUser = user
-    return user
+    const serverUser = await apiRequest<ServerAuthResponse['user']>('/auth/me')
+    currentUser = mapUser(serverUser)
+    return currentUser
   } catch {
     return null
   }
 }
 
+/**
+ * PUT /auth/password
+ * Request: { current_password, new_password }
+ * Response: 204 No Content
+ */
 export async function updatePassword(currentPassword: string, newPassword: string): Promise<void> {
   await apiRequest('/auth/password', {
     method: 'PUT',
@@ -77,21 +134,26 @@ export async function updatePassword(currentPassword: string, newPassword: strin
   })
 }
 
-// D4: Re-send verification email. Backend should rate-limit; the renderer
-// also enforces a 60-second cooldown so users don't spam.
+/**
+ * POST /auth/verify-email/resend
+ * Response: 204 No Content
+ */
 export async function resendVerificationEmail(): Promise<void> {
   await apiRequest('/auth/verify-email/resend', { method: 'POST' })
 }
 
-// E3: GDPR data export. Returns a JSON blob containing the user's
-// personal data so the renderer can let them download it.
+/**
+ * POST /auth/me/export
+ * Response: { user, exported_at }
+ */
 export async function exportUserData(): Promise<unknown> {
   return apiRequest<unknown>('/auth/me/export', { method: 'POST' })
 }
 
-// E3: Permanent account deletion. The backend signs the user out by
-// invalidating the refresh token; we still call clearTokens() locally
-// in case the request succeeded but the response was lost.
+/**
+ * DELETE /auth/me
+ * Response: 204 No Content
+ */
 export async function deleteAccount(): Promise<void> {
   try {
     await apiRequest('/auth/me', { method: 'DELETE' })

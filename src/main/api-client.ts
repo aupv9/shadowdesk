@@ -1,10 +1,25 @@
 import { app } from 'electron'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join } from 'path'
-import type { AuthTokens, CommonApiResponse, CommonApiError } from '../shared/types'
+import type { AuthTokens } from '../shared/types'
+
+/**
+ * Ghost Browser API Client
+ *
+ * Communicates with the Ghost Browser server (Express, no version prefix).
+ *
+ * Server response format:
+ *   Success → raw JSON (no envelope)
+ *   Error   → { error: "code", message: "...", code: 400, timestamp: "..." }
+ *
+ * Routes:
+ *   /auth/*            — Authentication
+ *   /licenses/*        — License management
+ *   /team/*            — Team collaboration
+ *   /profiles/sync/*   — Cloud sync
+ */
 
 const API_BASE_URL = process.env.GHOST_API_URL || 'https://api.ghostbrowser.app'
-const API_VERSION_PREFIX = '/api/v1'
 const MAX_RATE_LIMIT_RETRIES = 3
 
 let tokens: AuthTokens | null = null
@@ -66,21 +81,24 @@ function isTokenExpired(): boolean {
   return Date.now() >= tokens.expires_at * 1000
 }
 
+/**
+ * Refresh the access token using the stored refresh token.
+ * Server endpoint: POST /auth/refresh
+ * Server response: { access_token, refresh_token, expires_at }
+ */
 async function refreshAccessToken(): Promise<boolean> {
   const current = loadTokens()
   if (!current?.refresh_token) return false
 
   try {
-    const res = await fetch(`${API_BASE_URL}${API_VERSION_PREFIX}/auth/refresh`, {
+    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: current.refresh_token })
     })
     if (!res.ok) return false
 
-    const json = await res.json()
-    // Common SaaS wraps in { success, data } envelope
-    const data = json?.success && json.data ? json.data : json
+    const data = await res.json()
     const accessToken = data.access_token
     const expiresAt = data.expires_at ?? decodeJwtExpiry(accessToken)
     saveTokens({
@@ -98,17 +116,21 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+/**
+ * Make an authenticated API request to the Ghost Browser server.
+ *
+ * The server returns data directly (no { success, data } envelope).
+ * Errors come as { error: "code", message: "...", code: 400, timestamp: "..." }.
+ */
 export async function apiRequest<T>(
   path: string,
   options: {
     method?: string
     body?: unknown
     authenticated?: boolean
-    /** Skip /api/v1 prefix (e.g. for health checks) */
-    rawPath?: boolean
   } = {}
 ): Promise<T> {
-  const { method = 'GET', body, authenticated = true, rawPath = false } = options
+  const { method = 'GET', body, authenticated = true } = options
 
   if (authenticated && !apiKey && isTokenExpired()) {
     const refreshed = await refreshAccessToken()
@@ -133,12 +155,11 @@ export async function apiRequest<T>(
     }
   }
 
-  const fullPath = rawPath ? path : `${API_VERSION_PREFIX}${path}`
   let res: Response | undefined
   let rateLimitRetries = 0
 
   while (rateLimitRetries <= MAX_RATE_LIMIT_RETRIES) {
-    res = await fetch(`${API_BASE_URL}${fullPath}`, {
+    res = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined
@@ -155,52 +176,41 @@ export async function apiRequest<T>(
 
   if (!res) throw new Error('No response received')
 
+  // 401 — attempt token refresh once
   if (res.status === 401) {
     if (authenticated && !apiKey) {
       const refreshed = await refreshAccessToken()
       if (refreshed) {
-        return apiRequest<T>(path, { method, body, authenticated, rawPath })
+        return apiRequest<T>(path, { method, body, authenticated })
       }
     }
     throw new Error('AUTH_EXPIRED')
   }
 
+  // 429 — rate limited after retries exhausted
   if (res.status === 429) {
-    const err = await res.json().catch(() => ({})) as Partial<CommonApiResponse<unknown>>
-    const retryAfter = err?.error?.details?.retry_after_seconds ?? 60
+    const resetHeader = res.headers.get('X-RateLimit-Reset')
+    const retryAfter = resetHeader ? Math.max(1, Math.ceil((parseInt(resetHeader) * 1000 - Date.now()) / 1000)) : 60
     throw new Error(`RATE_LIMIT: retry after ${retryAfter}s`)
   }
 
+  // Other errors — parse server error format: { error, message, code, timestamp }
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({ message: res!.statusText }))
-    // Parse Common SaaS error envelope
-    if (errBody?.success === false && errBody.error) {
-      const apiErr = errBody.error as CommonApiError
-      const msg = apiErr.message || `API error ${res.status}`
-      const error = new Error(msg) as Error & { code?: string; details?: unknown }
-      error.code = apiErr.code
-      error.details = apiErr.details
-      throw error
-    }
-    throw new Error(errBody.message || `API error ${res.status}`)
+    const msg = errBody.message || `API error ${res.status}`
+    const error = new Error(msg) as Error & { code?: string; statusCode?: number }
+    error.code = errBody.error ?? 'unknown'
+    error.statusCode = errBody.code ?? res.status
+    throw error
   }
 
+  // 204 No Content
   if (res.status === 204) return undefined as T
 
-  const json = await res.json()
-
-  // Unwrap Common SaaS { success, data } envelope
-  if (json && typeof json === 'object' && json.success === true && 'data' in json) {
-    return json.data as T
-  }
-
-  return json as T
+  // Server returns data directly — no envelope unwrapping needed
+  return res.json() as Promise<T>
 }
 
 export function getApiBaseUrl(): string {
   return API_BASE_URL
-}
-
-export function getApiVersionPrefix(): string {
-  return API_VERSION_PREFIX
 }
