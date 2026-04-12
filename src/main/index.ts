@@ -6,6 +6,9 @@ import { registerIpcHandlers } from './ipc/handlers'
 import { initAutoUpdater } from './auto-updater'
 import { initSyncWindow } from './sync'
 import { startNotificationPolling, stopNotificationPolling } from './notification-service'
+import { startReplayWorker, stopReplayWorker } from './request-queue'
+import { flushPendingSync } from './profile-sync'
+import { checkApiHealth } from './health-check'
 import { ApiServer } from './api-server'
 import { getSettings } from './settings'
 import { resolveFingerprint } from './fingerprint/presets'
@@ -92,6 +95,18 @@ app.whenReady().then(async () => {
     startNotificationPolling(mainWindow)
   }
 
+  // Common SaaS — start offline request queue replay worker
+  startReplayWorker()
+
+  // Common SaaS — log API health on startup (non-blocking)
+  checkApiHealth().then((h) => {
+    if (h.api_reachable) {
+      console.log(`[Common SaaS] API reachable (${h.latency_ms}ms)`)
+    } else {
+      console.warn('[Common SaaS] API unreachable — running in offline mode')
+    }
+  }).catch(() => {})
+
   // Phase 10.2 — start the workflow scheduler poller
   WorkflowScheduler.getInstance().start()
 
@@ -141,6 +156,8 @@ app.on('before-quit', async () => {
   SmartWarmUpScheduler.getInstance().stop()
   CleanupWorker.getInstance().stop()
   stopNotificationPolling()
+  stopReplayWorker()
+  await flushPendingSync()
   await ApiServer.getInstance().stop()
 })
 

@@ -29,6 +29,9 @@ import * as team from '../team'
 import * as apiKeys from '../api-keys'
 import * as userProfile from '../user-profile'
 import * as notifications from '../notification-service'
+import { onProfileCreated, onProfileUpdated, onProfileDeleted, onProfilesBulkDeleted, getPendingSyncCount } from '../profile-sync'
+import { checkApiHealth, checkApiReady } from '../health-check'
+import { getQueueDepth, forceReplay } from '../request-queue'
 import {
   pushProfiles, pullProfiles, getSyncState, getSyncManifest, getSyncHistory, getSyncDiff,
   markPendingChange, enableSyncDaemon, disableSyncDaemon, isDaemonEnabled
@@ -283,6 +286,7 @@ export function registerIpcHandlers(): void {
     })
 
     markPendingChange()
+    onProfileCreated(id, input.name)
     return db.getProfile(id)
   })
 
@@ -300,6 +304,7 @@ export function registerIpcHandlers(): void {
 
     db.updateProfile(id, data)
     markPendingChange()
+    onProfileUpdated(id, (existing as any).name, Object.keys(data))
     return db.getProfile(id)
   })
 
@@ -323,6 +328,7 @@ export function registerIpcHandlers(): void {
     })
 
     markPendingChange()
+    onProfileCreated(newId, `${source.name} (Copy)`)
     return db.getProfile(newId)
   })
 
@@ -372,9 +378,11 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('profiles:delete', async (_event, id: string) => {
+    const profile = db.getProfile(id) as any
     await bm.closeProfile(id).catch(() => {})
     db.deleteProfile(id)
     markPendingChange()
+    onProfileDeleted(id, profile?.name)
     // Remove Chromium user-data directory for this profile
     const { rm } = await import('fs/promises')
     const profileDataPath = join(app.getPath('userData'), 'profiles', id)
@@ -396,6 +404,7 @@ export function registerIpcHandlers(): void {
     // Mark as archived in database
     const count = db.bulkDeleteProfiles(profileIds)
     markPendingChange()
+    onProfilesBulkDeleted(profileIds)
 
     // Phase 4.3: Enqueue cleanup with 10s delay (undo window)
     // Users can cancel the delete within this window via profiles:bulk-restore.
@@ -1291,6 +1300,28 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('audit:post', async (_event, entry: { action: string; target_id?: string; target_name?: string; metadata?: Record<string, unknown> }) => {
     return team.postAuditEntry(entry)
+  })
+
+  // ── Health Check & Connectivity ─────────────────────────────────────────
+
+  ipcMain.handle('health:check', async () => {
+    return checkApiHealth()
+  })
+
+  ipcMain.handle('health:ready', async () => {
+    return checkApiReady()
+  })
+
+  ipcMain.handle('queue:depth', () => {
+    return getQueueDepth()
+  })
+
+  ipcMain.handle('queue:replay', async () => {
+    return forceReplay()
+  })
+
+  ipcMain.handle('profileSync:pendingCount', () => {
+    return getPendingSyncCount()
   })
 
   // ── Team ─────────────────────────────────────────────────────────────────

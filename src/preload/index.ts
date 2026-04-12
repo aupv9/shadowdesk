@@ -203,6 +203,17 @@ const api = {
   audit: {
     post: (entry: { action: string; target_id?: string; target_name?: string; metadata?: Record<string, unknown> }) => ipcRenderer.invoke('audit:post', entry)
   },
+  health: {
+    check: ()         => ipcRenderer.invoke('health:check'),
+    ready: ()         => ipcRenderer.invoke('health:ready')
+  },
+  queue: {
+    depth:  ()        => ipcRenderer.invoke('queue:depth'),
+    replay: ()        => ipcRenderer.invoke('queue:replay')
+  },
+  profileSync: {
+    pendingCount: ()  => ipcRenderer.invoke('profileSync:pendingCount')
+  },
   apiKeys: {
     list:    (userId: string)                                                 => ipcRenderer.invoke('apiKeys:list', userId),
     create:  (userId: string, input: { name: string; scopes: string[]; expires_in?: number }) => ipcRenderer.invoke('apiKeys:create', userId, input),
