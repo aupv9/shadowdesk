@@ -29,9 +29,13 @@ import {
   pushProfiles, pullProfiles, getSyncState, getSyncManifest, getSyncHistory, getSyncDiff,
   markPendingChange, enableSyncDaemon, disableSyncDaemon, isDaemonEnabled
 } from '../sync'
-import type { CreateProfileInput, CreateProxyInput, TeamRole, CreateWorkflowInput, UpdateWorkflowInput, ApiServerConfig } from '../../shared/types'
+import type { CreateProfileInput, CreateProxyInput, TeamRole, CreateWorkflowInput, UpdateWorkflowInput, ApiServerConfig, CreateBatchTestInput, CreateSyncGroupInput } from '../../shared/types'
 import { parseNetscapeCookies, toNetscapeFormat } from '../utils/cookies'
 import { DetectionTestRunner } from '../detection-test'
+import { BatchTestService } from '../batch-test-service'
+import { MLGestureOptimizer } from '../ml-gesture-optimizer'
+import { CrossProfileSyncService } from '../cross-profile-sync'
+import { NetworkSimulator } from '../network-simulator'
 // Phase 4.2: Input validation + structured error handling
 import {
   validateCreateProfileInput,
@@ -2198,4 +2202,89 @@ export function registerIpcHandlers(): void {
     cleanupWorker.clearFailedCleanups()
     return { success: true }
   })
+
+  // ── Phase 19: Batch Testing + ML Optimization ─────────────────────────────
+
+  // 19.1 — Batch Test Runs
+  const batchService = BatchTestService.getInstance()
+
+  ipcMain.handle('batch:create', async (_e, input: CreateBatchTestInput) =>
+    batchService.createAndRun(input)
+  )
+  ipcMain.handle('batch:list', (_e, limit?: number) =>
+    batchService.list(limit)
+  )
+  ipcMain.handle('batch:get', (_e, id: string) =>
+    batchService.get(id)
+  )
+  ipcMain.handle('batch:progress', (_e, id: string) =>
+    batchService.getProgress(id)
+  )
+  ipcMain.handle('batch:cancel', (_e, id: string) => {
+    batchService.cancel(id)
+    return { success: true }
+  })
+  ipcMain.handle('batch:delete', (_e, id: string) => {
+    batchService.delete(id)
+    return { success: true }
+  })
+
+  // 19.2 — ML Gesture Optimization
+  const mlOptimizer = MLGestureOptimizer.getInstance()
+
+  ipcMain.handle('ml:recordTraining', (_e, input: {
+    profileId: string; testResultId: string; archetypeId: string;
+    vectorScores: Record<string, boolean>; gestureConfig: any; detectionScore: number
+  }) => mlOptimizer.recordTrainingData(input))
+
+  ipcMain.handle('ml:optimize', (_e, profileId?: string) =>
+    mlOptimizer.optimize(profileId)
+  )
+  ipcMain.handle('ml:stats', () => mlOptimizer.getStats())
+
+  // 19.3 — Cross-Profile Behavior Sync
+  const syncService = CrossProfileSyncService.getInstance()
+
+  ipcMain.handle('profileSync:createGroup', (_e, input: CreateSyncGroupInput) =>
+    syncService.createGroup(input)
+  )
+  ipcMain.handle('profileSync:listGroups', () =>
+    syncService.listGroups()
+  )
+  ipcMain.handle('profileSync:getGroup', (_e, id: string) =>
+    syncService.getGroup(id)
+  )
+  ipcMain.handle('profileSync:updateGroup', (_e, id: string, patch: any) =>
+    syncService.updateGroup(id, patch)
+  )
+  ipcMain.handle('profileSync:deleteGroup', (_e, id: string) => {
+    syncService.deleteGroup(id)
+    return { success: true }
+  })
+  ipcMain.handle('profileSync:sync', async (_e, groupId: string, sourceProfileId: string) =>
+    syncService.syncGroup(groupId, sourceProfileId)
+  )
+  ipcMain.handle('profileSync:history', (_e, groupId: string, limit?: number) =>
+    syncService.getSyncHistory(groupId, limit)
+  )
+
+  // 19.4 — Network Condition Simulation
+  const netSim = NetworkSimulator.getInstance()
+
+  ipcMain.handle('network:apply', async (_e, profileId: string, preset: string) =>
+    netSim.apply(profileId, preset as any)
+  )
+  ipcMain.handle('network:clear', async (_e, profileId: string) => {
+    await netSim.clear(profileId)
+    return { success: true }
+  })
+  ipcMain.handle('network:status', (_e, profileId: string) =>
+    netSim.getStatus(profileId)
+  )
+  ipcMain.handle('network:listActive', () =>
+    netSim.listActive()
+  )
+  ipcMain.handle('network:presets', () =>
+    netSim.listPresets()
+  )
 }

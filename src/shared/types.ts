@@ -1984,3 +1984,159 @@ export interface ImportRecordEntry {
   error_message: string | null
   created_at: string
 }
+
+// ─── Phase 19: Batch Testing + ML Optimization ──────────────────────────────
+
+// ── 19.1 Batch Test Runs ─────────────────────────────────────────────────────
+
+export type BatchTestType = 'detection' | 'workflow'
+
+export type BatchTestRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+
+export interface BatchTestRun {
+  id: string
+  name: string
+  status: BatchTestRunStatus
+  test_type: BatchTestType
+  profile_ids: string[]
+  total_profiles: number
+  completed_count: number
+  failed_count: number
+  avg_score: number
+  started_at: string
+  completed_at: string | null
+  results_summary: BatchResultsSummary | null
+}
+
+export interface BatchResultsSummary {
+  avgScore: number
+  minScore: number
+  maxScore: number
+  passedCount: number
+  warningCount: number
+  failedCount: number
+  vectorFailRates: Record<string, number>
+  topFailingVectors: string[]
+}
+
+export interface BatchTestProgress {
+  batchId: string
+  completed: number
+  total: number
+  currentProfileId: string | null
+  currentProfileName: string | null
+}
+
+export interface CreateBatchTestInput {
+  name: string
+  profileIds: string[]
+  testType: BatchTestType
+}
+
+// ── 19.2 ML Gesture Optimization ────────────────────────────────────────────
+
+export interface GestureTrainingData {
+  id: string
+  profile_id: string
+  test_result_id: string
+  archetype_id: string
+  vector_scores: Record<string, boolean>
+  gesture_config: GestureTimingConfig
+  detection_score: number
+  timestamp: string
+}
+
+export interface GestureTimingConfig {
+  tapDelayMin: number
+  tapDelayMax: number
+  swipeDurationMin: number
+  swipeDurationMax: number
+  pauseMin: number
+  pauseMax: number
+  scrollDistanceMin: number
+  scrollDistanceMax: number
+  missRate: number
+  retapRate: number
+}
+
+export interface GestureOptimizationResult {
+  profileId: string
+  currentScore: number
+  predictedScore: number
+  recommendations: GestureRecommendation[]
+  optimizedConfig: GestureTimingConfig
+}
+
+export interface GestureRecommendation {
+  id: string
+  vector_name: string
+  issue: string
+  fix: string
+  confidence: number
+  applied: boolean
+}
+
+export interface MLModelStats {
+  trainingDataPoints: number
+  lastTrainedAt: string | null
+  featureImportance: Record<string, number>
+  avgPredictionAccuracy: number
+}
+
+// ── 19.3 Cross-Profile Behavior Sync ────────────────────────────────────────
+
+export type SyncStrategyType = 'cookie_share' | 'behavior_mirror' | 'detection_share'
+
+export interface CrossProfileSyncGroup {
+  id: string
+  name: string
+  profile_ids: string[]
+  strategy: SyncStrategyType
+  enabled: boolean
+  last_synced_at: string | null
+  created_at: string
+}
+
+export interface SyncEvent {
+  id: string
+  group_id: string
+  source_profile_id: string
+  target_profile_ids: string[]
+  strategy: SyncStrategyType
+  data_synced: string
+  synced_at: string
+}
+
+export interface CreateSyncGroupInput {
+  name: string
+  profileIds: string[]
+  strategy: SyncStrategyType
+}
+
+// ── 19.4 Network Condition Simulation ───────────────────────────────────────
+
+export type NetworkConditionPreset = '2g' | '3g' | '4g' | '5g' | 'wifi' | 'satellite' | 'custom'
+
+export interface NetworkCondition {
+  preset: NetworkConditionPreset
+  label: string
+  downloadThroughput: number
+  uploadThroughput: number
+  latency: number
+  packetLoss: number
+  jitter: number
+}
+
+export interface NetworkSimulationConfig {
+  profileId: string
+  condition: NetworkCondition
+  enabled: boolean
+}
+
+export interface NetworkSimulationResult {
+  profileId: string
+  preset: NetworkConditionPreset
+  applied: boolean
+  effectiveLatency: number
+  effectiveThroughput: number
+}

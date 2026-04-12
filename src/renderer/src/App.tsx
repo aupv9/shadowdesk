@@ -17,6 +17,7 @@ import { AIAssistant } from './components/AIAssistant'
 import { SEAPlatforms } from './components/SEAPlatforms'
 import { SmartWarmUp } from './components/SmartWarmUp'
 import { ImportHistory } from './components/ImportHistory'
+import { BatchTestDashboard } from './components/BatchTestDashboard'
 import { ImportWizard } from './components/ImportWizard'
 import { ErrorBoundary } from './components/UI/ErrorBoundary'
 import { ToastContainer } from './components/UI/Toast'
@@ -123,6 +124,9 @@ export default function App() {
         </ErrorBoundary>
         <ErrorBoundary section="Smart Warm-Up">
           {section === 'smart-warmup' && <SmartWarmUp />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Batch Testing">
+          {section === 'batch-testing' && <BatchTestDashboard />}
         </ErrorBoundary>
       </main>
       <ToastContainer />

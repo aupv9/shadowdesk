@@ -443,6 +443,40 @@ const api = {
     status:       () => ipcRenderer.invoke('cleanup:status'),
     retryFailed:  () => ipcRenderer.invoke('cleanup:retryFailed'),
     clearFailed:  () => ipcRenderer.invoke('cleanup:clearFailed')
+  },
+
+  // Phase 19 — Batch Testing + ML Optimization
+  batch: {
+    create:   (input: { name: string; profileIds: string[]; testType: string }) => ipcRenderer.invoke('batch:create', input),
+    list:     (limit?: number)                    => ipcRenderer.invoke('batch:list', limit),
+    get:      (id: string)                        => ipcRenderer.invoke('batch:get', id),
+    progress: (id: string)                        => ipcRenderer.invoke('batch:progress', id),
+    cancel:   (id: string)                        => ipcRenderer.invoke('batch:cancel', id),
+    delete:   (id: string)                        => ipcRenderer.invoke('batch:delete', id)
+  },
+  ml: {
+    recordTraining: (input: {
+      profileId: string; testResultId: string; archetypeId: string;
+      vectorScores: Record<string, boolean>; gestureConfig: any; detectionScore: number
+    }) => ipcRenderer.invoke('ml:recordTraining', input),
+    optimize: (profileId?: string)                => ipcRenderer.invoke('ml:optimize', profileId),
+    stats:    ()                                  => ipcRenderer.invoke('ml:stats')
+  },
+  profileSync: {
+    createGroup:  (input: { name: string; profileIds: string[]; strategy: string }) => ipcRenderer.invoke('profileSync:createGroup', input),
+    listGroups:   ()                              => ipcRenderer.invoke('profileSync:listGroups'),
+    getGroup:     (id: string)                    => ipcRenderer.invoke('profileSync:getGroup', id),
+    updateGroup:  (id: string, patch: any)        => ipcRenderer.invoke('profileSync:updateGroup', id, patch),
+    deleteGroup:  (id: string)                    => ipcRenderer.invoke('profileSync:deleteGroup', id),
+    sync:         (groupId: string, sourceProfileId: string) => ipcRenderer.invoke('profileSync:sync', groupId, sourceProfileId),
+    history:      (groupId: string, limit?: number) => ipcRenderer.invoke('profileSync:history', groupId, limit)
+  },
+  network: {
+    apply:       (profileId: string, preset: string) => ipcRenderer.invoke('network:apply', profileId, preset),
+    clear:       (profileId: string)               => ipcRenderer.invoke('network:clear', profileId),
+    status:      (profileId: string)               => ipcRenderer.invoke('network:status', profileId),
+    listActive:  ()                                => ipcRenderer.invoke('network:listActive'),
+    presets:     ()                                 => ipcRenderer.invoke('network:presets')
   }
 }
 

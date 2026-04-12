@@ -129,7 +129,27 @@ export type {
   ProfileBehaviorFingerprint,
   BehaviorCorrelationPair,
   BehaviorCorrelationReport,
-  BehaviorCorrelationOptions
+  BehaviorCorrelationOptions,
+  // Phase 19 — Batch Testing + ML Optimization
+  BatchTestType,
+  BatchTestRunStatus,
+  BatchTestRun,
+  BatchResultsSummary,
+  BatchTestProgress,
+  CreateBatchTestInput,
+  GestureTrainingData,
+  GestureTimingConfig,
+  GestureOptimizationResult,
+  GestureRecommendation,
+  MLModelStats,
+  SyncStrategyType,
+  CrossProfileSyncGroup,
+  SyncEvent,
+  CreateSyncGroupInput,
+  NetworkConditionPreset,
+  NetworkCondition,
+  NetworkSimulationConfig,
+  NetworkSimulationResult
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'
@@ -154,6 +174,7 @@ export type NavSection =
   | 'sea-platforms'  // Phase 17 — SEA Platform Templates
   | 'smart-warmup'   // Smart Warm-Up Engine (7-day ramp)
   | 'correlation'    // Phase 21 — Behavior Correlation Detector
+  | 'batch-testing'  // Phase 19 — Batch Testing + ML Optimization
 
 export interface Toast {
   id: string

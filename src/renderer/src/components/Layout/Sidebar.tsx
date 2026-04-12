@@ -19,6 +19,7 @@ import {
   Sliders,
   Flame,
   Radar,
+  FlaskConical,
   ChevronLeft,
   ChevronDown,
   FileUp
@@ -80,7 +81,8 @@ const NAV_GROUPS: NavGroup[] = [
       { key: 'behavior',    icon: Sliders,     label: 'Behavior' },
       { key: 'patches',     icon: Cpu,         label: 'Patches' },
       { key: 'detection',   icon: Shield,      label: 'Detection' },
-      { key: 'correlation', icon: Radar,       label: 'Correlation' }
+      { key: 'correlation', icon: Radar,       label: 'Correlation' },
+      { key: 'batch-testing', icon: FlaskConical, label: 'Batch Testing' }
     ]
   },
   {

@@ -608,6 +608,64 @@ export class Database {
       CREATE INDEX IF NOT EXISTS idx_behavior_sessions_timestamp ON behavior_sessions(timestamp);
     `)
 
+    // Phase 19 — Batch Testing + ML Optimization
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS batch_test_runs (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'queued',
+        test_type TEXT NOT NULL DEFAULT 'detection',
+        profile_ids TEXT NOT NULL DEFAULT '[]',
+        total_profiles INTEGER NOT NULL DEFAULT 0,
+        completed_count INTEGER NOT NULL DEFAULT 0,
+        failed_count INTEGER NOT NULL DEFAULT 0,
+        avg_score INTEGER NOT NULL DEFAULT 0,
+        started_at TEXT DEFAULT (datetime('now')),
+        completed_at TEXT,
+        results_summary TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_batch_test_runs_status ON batch_test_runs(status);
+      CREATE INDEX IF NOT EXISTS idx_batch_test_runs_started ON batch_test_runs(started_at DESC);
+
+      CREATE TABLE IF NOT EXISTS gesture_training_data (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        test_result_id TEXT,
+        archetype_id TEXT NOT NULL DEFAULT 'casual_browser',
+        vector_scores TEXT NOT NULL DEFAULT '{}',
+        gesture_config TEXT NOT NULL DEFAULT '{}',
+        detection_score INTEGER NOT NULL DEFAULT 0,
+        timestamp TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_gesture_training_profile ON gesture_training_data(profile_id);
+      CREATE INDEX IF NOT EXISTS idx_gesture_training_score ON gesture_training_data(detection_score);
+
+      CREATE TABLE IF NOT EXISTS cross_profile_sync_groups (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        profile_ids TEXT NOT NULL DEFAULT '[]',
+        strategy TEXT NOT NULL DEFAULT 'detection_share',
+        enabled INTEGER NOT NULL DEFAULT 1,
+        last_synced_at TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_sync_groups_enabled ON cross_profile_sync_groups(enabled);
+
+      CREATE TABLE IF NOT EXISTS cross_profile_sync_events (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL,
+        source_profile_id TEXT NOT NULL,
+        target_profile_ids TEXT NOT NULL DEFAULT '[]',
+        strategy TEXT NOT NULL,
+        data_synced TEXT NOT NULL DEFAULT '',
+        synced_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY(group_id) REFERENCES cross_profile_sync_groups(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_sync_events_group ON cross_profile_sync_events(group_id);
+      CREATE INDEX IF NOT EXISTS idx_sync_events_synced ON cross_profile_sync_events(synced_at DESC);
+    `)
+
     // Backfill fingerprint_hash for existing profiles that don't have one
     try {
       const rows = this.queryAll(`SELECT id, fingerprint FROM profiles WHERE fingerprint_hash IS NULL AND status = 'active'`)
@@ -2717,5 +2775,174 @@ export class Database {
       factors,
       calculatedAt: new Date().toISOString(),
     }
+  }
+
+  // ── Phase 19: Batch Test Runs ─────────────────────────────────────────────
+
+  createBatchTestRun(batch: {
+    id: string
+    name: string
+    status: string
+    test_type: string
+    profile_ids: string[]
+    total_profiles: number
+  }): void {
+    this.run(
+      `INSERT INTO batch_test_runs (id, name, status, test_type, profile_ids, total_profiles)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [batch.id, batch.name, batch.status, batch.test_type,
+       JSON.stringify(batch.profile_ids), batch.total_profiles]
+    )
+  }
+
+  updateBatchTestRun(id: string, patch: Record<string, any>): void {
+    const keys = Object.keys(patch)
+    if (keys.length === 0) return
+    const sets = keys.map((k) => `${k} = ?`).join(', ')
+    const vals = keys.map((k) => patch[k])
+    this.run(`UPDATE batch_test_runs SET ${sets} WHERE id = ?`, [...vals, id])
+  }
+
+  getBatchTestRun(id: string): any {
+    const row = this.queryOne('SELECT * FROM batch_test_runs WHERE id = ?', [id])
+    if (!row) return null
+    return this.parseBatchRow(row)
+  }
+
+  listBatchTestRuns(limit: number = 50): any[] {
+    return this.queryAll(
+      'SELECT * FROM batch_test_runs ORDER BY started_at DESC LIMIT ?',
+      [limit]
+    ).map((r) => this.parseBatchRow(r))
+  }
+
+  deleteBatchTestRun(id: string): void {
+    this.run('DELETE FROM batch_test_runs WHERE id = ?', [id])
+  }
+
+  private parseBatchRow(row: any): any {
+    return {
+      ...row,
+      profile_ids: row.profile_ids ? JSON.parse(row.profile_ids) : [],
+      results_summary: row.results_summary ? JSON.parse(row.results_summary) : null
+    }
+  }
+
+  // ── Phase 19: Gesture Training Data ───────────────────────────────────────
+
+  addGestureTrainingData(data: {
+    id: string
+    profile_id: string
+    test_result_id: string
+    archetype_id: string
+    vector_scores: Record<string, boolean>
+    gesture_config: any
+    detection_score: number
+  }): void {
+    this.run(
+      `INSERT INTO gesture_training_data
+         (id, profile_id, test_result_id, archetype_id, vector_scores, gesture_config, detection_score)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [data.id, data.profile_id, data.test_result_id, data.archetype_id,
+       JSON.stringify(data.vector_scores), JSON.stringify(data.gesture_config),
+       data.detection_score]
+    )
+  }
+
+  getGestureTrainingData(profileId?: string, limit: number = 100): any[] {
+    const sql = profileId
+      ? `SELECT * FROM gesture_training_data WHERE profile_id = ? ORDER BY timestamp DESC LIMIT ?`
+      : `SELECT * FROM gesture_training_data ORDER BY timestamp DESC LIMIT ?`
+    const params = profileId ? [profileId, limit] : [limit]
+    return this.queryAll(sql, params).map((row) => ({
+      ...row,
+      vector_scores: row.vector_scores ? JSON.parse(row.vector_scores) : {},
+      gesture_config: row.gesture_config ? JSON.parse(row.gesture_config) : {}
+    }))
+  }
+
+  // ── Phase 19: Cross-Profile Sync Groups ───────────────────────────────────
+
+  createCrossProfileSyncGroup(group: {
+    id: string
+    name: string
+    profile_ids: string[]
+    strategy: string
+    enabled: boolean
+    created_at: string
+  }): void {
+    this.run(
+      `INSERT INTO cross_profile_sync_groups (id, name, profile_ids, strategy, enabled, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [group.id, group.name, JSON.stringify(group.profile_ids),
+       group.strategy, group.enabled ? 1 : 0, group.created_at]
+    )
+  }
+
+  listCrossProfileSyncGroups(): any[] {
+    return this.queryAll(
+      'SELECT * FROM cross_profile_sync_groups ORDER BY created_at DESC'
+    ).map((r) => this.parseSyncGroupRow(r))
+  }
+
+  getCrossProfileSyncGroup(id: string): any {
+    const row = this.queryOne('SELECT * FROM cross_profile_sync_groups WHERE id = ?', [id])
+    return row ? this.parseSyncGroupRow(row) : null
+  }
+
+  updateCrossProfileSyncGroup(id: string, patch: Record<string, any>): void {
+    const mapped: Record<string, any> = {}
+    for (const [k, v] of Object.entries(patch)) {
+      if (k === 'profile_ids') mapped[k] = JSON.stringify(v)
+      else if (k === 'enabled') mapped[k] = v ? 1 : 0
+      else mapped[k] = v
+    }
+    const keys = Object.keys(mapped)
+    if (keys.length === 0) return
+    const sets = keys.map((k) => `${k} = ?`).join(', ')
+    this.run(`UPDATE cross_profile_sync_groups SET ${sets} WHERE id = ?`,
+      [...keys.map((k) => mapped[k]), id])
+  }
+
+  deleteCrossProfileSyncGroup(id: string): void {
+    this.run('DELETE FROM cross_profile_sync_groups WHERE id = ?', [id])
+  }
+
+  private parseSyncGroupRow(row: any): any {
+    return {
+      ...row,
+      profile_ids: row.profile_ids ? JSON.parse(row.profile_ids) : [],
+      enabled: !!row.enabled
+    }
+  }
+
+  addCrossProfileSyncEvent(event: {
+    id: string
+    group_id: string
+    source_profile_id: string
+    target_profile_ids: string[]
+    strategy: string
+    data_synced: string
+    synced_at: string
+  }): void {
+    this.run(
+      `INSERT INTO cross_profile_sync_events
+         (id, group_id, source_profile_id, target_profile_ids, strategy, data_synced, synced_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [event.id, event.group_id, event.source_profile_id,
+       JSON.stringify(event.target_profile_ids), event.strategy,
+       event.data_synced, event.synced_at]
+    )
+  }
+
+  getCrossProfileSyncEvents(groupId: string, limit: number = 20): any[] {
+    return this.queryAll(
+      `SELECT * FROM cross_profile_sync_events
+       WHERE group_id = ? ORDER BY synced_at DESC LIMIT ?`,
+      [groupId, limit]
+    ).map((r) => ({
+      ...r,
+      target_profile_ids: r.target_profile_ids ? JSON.parse(r.target_profile_ids) : []
+    }))
   }
 }
