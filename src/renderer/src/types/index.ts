@@ -160,7 +160,9 @@ export type {
   ApiKeyInfo,
   ApiKeyCreateInput,
   ApiKeyUsage,
-  CommonApiError
+  CommonApiError,
+  CommonApiResponse,
+  CommonAuthResponse
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'

@@ -180,7 +180,28 @@ const api = {
     usage:             ()                    => ipcRenderer.invoke('license:usage'),
     machineId:         ()                    => ipcRenderer.invoke('license:machineId'),
     devices:           ()                    => ipcRenderer.invoke('license:devices'),
-    deactivateDevice:  (machineId: string)   => ipcRenderer.invoke('license:deactivateDevice', machineId)
+    deactivateDevice:  (machineId: string)   => ipcRenderer.invoke('license:deactivateDevice', machineId),
+    pricingPlans:      ()                    => ipcRenderer.invoke('license:pricingPlans'),
+    invoices:          (params?: { page?: number; limit?: number }) => ipcRenderer.invoke('license:invoices', params)
+  },
+  userProfile: {
+    get:          (userId: string)                                                                => ipcRenderer.invoke('userProfile:get', userId),
+    update:       (userId: string, data: { display_name?: string; bio?: string; timezone?: string; language?: string }) => ipcRenderer.invoke('userProfile:update', userId, data),
+    uploadAvatar: (userId: string, imageBuffer: Buffer, filename: string)                        => ipcRenderer.invoke('userProfile:uploadAvatar', userId, imageBuffer, filename)
+  },
+  notifications: {
+    list:        (params?: { page?: number; limit?: number; unread_only?: boolean })  => ipcRenderer.invoke('notifications:list', params),
+    markRead:    (notificationId: string)                                             => ipcRenderer.invoke('notifications:markRead', notificationId),
+    markAllRead: ()                                                                   => ipcRenderer.invoke('notifications:markAllRead'),
+    delete:      (notificationId: string)                                             => ipcRenderer.invoke('notifications:delete', notificationId),
+    onUpdate:    (cb: (data: { unread_count: number; notifications: any[] }) => void): (() => void) => {
+      const handler = (_event: any, data: any) => cb(data)
+      ipcRenderer.on('notifications:update', handler)
+      return () => { ipcRenderer.removeListener('notifications:update', handler) }
+    }
+  },
+  audit: {
+    post: (entry: { action: string; target_id?: string; target_name?: string; metadata?: Record<string, unknown> }) => ipcRenderer.invoke('audit:post', entry)
   },
   apiKeys: {
     list:    (userId: string)                                                 => ipcRenderer.invoke('apiKeys:list', userId),

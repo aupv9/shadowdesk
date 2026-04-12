@@ -5,6 +5,9 @@ import { apiRequest } from './api-client'
 import { Database } from './database'
 import type { License, LicenseDevice, LicensePlan, PLAN_LIMITS } from '../shared/types'
 
+// ── Common SaaS Subscription Endpoints ──────────────────────────────────────
+// Mapped from legacy /licenses/* → /subscriptions/* per Common SaaS API v1
+
 let cachedLicense: License | null = null
 
 export function getMachineId(): string {
@@ -27,7 +30,7 @@ export function getMachineId(): string {
 
 export async function activateLicense(licenseKey: string): Promise<License> {
   const machineId = getMachineId()
-  const license = await apiRequest<License>('/licenses/activate', {
+  const license = await apiRequest<License>('/subscriptions/activate', {
     method: 'POST',
     body: { license_key: licenseKey, machine_id: machineId }
   })
@@ -39,7 +42,7 @@ export async function fetchLicense(): Promise<License | null> {
   if (cachedLicense) return cachedLicense
 
   try {
-    const license = await apiRequest<License>('/licenses/current')
+    const license = await apiRequest<License>('/subscriptions/current')
     cachedLicense = license
     return license
   } catch {
@@ -48,37 +51,49 @@ export async function fetchLicense(): Promise<License | null> {
 }
 
 export async function deactivateLicense(): Promise<void> {
-  await apiRequest('/licenses/deactivate', { method: 'POST' })
+  await apiRequest('/subscriptions/deactivate', { method: 'POST' })
   cachedLicense = null
 }
 
-// E1: List all machines this license has been activated on. The current
-// machine is flagged so the renderer can highlight (and prevent
-// self-deactivation through the device dashboard, which uses the
-// existing local "Deactivate license from this machine" link instead).
 export async function listLicenseDevices(): Promise<LicenseDevice[]> {
   try {
-    const devices = await apiRequest<LicenseDevice[]>('/licenses/devices')
+    const devices = await apiRequest<LicenseDevice[]>('/subscriptions/devices')
     const currentMachineId = getMachineId()
     return devices.map((d) => ({ ...d, is_current: d.machine_id === currentMachineId }))
   } catch {
-    // Backend may not implement this yet — degrade gracefully so the
-    // renderer can hide the section instead of crashing.
     return []
   }
 }
 
-// E1: Remotely deactivate a different machine. Refuses to act on the
-// current machine — that flow goes through `deactivateLicense()` so the
-// in-memory cache is cleared too.
 export async function deactivateDevice(machineId: string): Promise<void> {
   if (machineId === getMachineId()) {
     throw new Error('Use "Deactivate license from this machine" for the current device')
   }
-  await apiRequest('/licenses/devices/deactivate', {
-    method: 'POST',
-    body: { machine_id: machineId }
+  await apiRequest(`/subscriptions/devices/${encodeURIComponent(machineId)}/deactivate`, {
+    method: 'POST'
   })
+}
+
+/** Fetch available pricing plans from the Common SaaS API. */
+export async function fetchPricingPlans(): Promise<Array<{ id: string; name: string; price: number; interval: string; features: Record<string, unknown> }>> {
+  try {
+    return await apiRequest<Array<{ id: string; name: string; price: number; interval: string; features: Record<string, unknown> }>>('/pricing/plans')
+  } catch {
+    return []
+  }
+}
+
+/** Fetch billing invoices for the current user. */
+export async function fetchInvoices(params?: { page?: number; limit?: number }): Promise<{ invoices: Array<{ id: string; amount: number; status: string; created_at: string; pdf_url?: string }>; total: number }> {
+  const query = new URLSearchParams()
+  if (params?.page) query.set('page', String(params.page))
+  if (params?.limit) query.set('limit', String(params.limit))
+  const qs = query.toString()
+  try {
+    return await apiRequest(`/invoices${qs ? `?${qs}` : ''}`)
+  } catch {
+    return { invoices: [], total: 0 }
+  }
 }
 
 export function getFreePlanLicense(): License {
