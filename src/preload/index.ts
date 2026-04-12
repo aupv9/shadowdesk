@@ -514,6 +514,76 @@ const api = {
 
   mobileNetwork: {
     setProfile: (pageId: string, profileType: string) => ipcRenderer.invoke('mobileNetwork:setProfile', pageId, profileType)
+  },
+
+  // ── Phase 2 Integration: Analytics ───────────────────────────────────────
+  analytics: {
+    dashboard:       ()                                                    => ipcRenderer.invoke('analytics:dashboard'),
+    dashboardRemote: ()                                                    => ipcRenderer.invoke('analytics:dashboardRemote'),
+    reportUsage:     (activeSessions: number)                              => ipcRenderer.invoke('analytics:reportUsage', activeSessions),
+    trackFeature:    (feature: string, action: string, metadata?: Record<string, unknown>) =>
+      ipcRenderer.invoke('analytics:trackFeature', feature, action, metadata)
+  },
+
+  // ── Phase 2 Integration: Billing ─────────────────────────────────────────
+  billing: {
+    overview:     ()                                                       => ipcRenderer.invoke('billing:overview'),
+    plans:        ()                                                       => ipcRenderer.invoke('billing:plans'),
+    checkout:     (planId: string, interval: 'monthly' | 'yearly')         => ipcRenderer.invoke('billing:checkout', planId, interval),
+    portal:       ()                                                       => ipcRenderer.invoke('billing:portal'),
+    changePlan:   (planId: string, interval: 'monthly' | 'yearly')         => ipcRenderer.invoke('billing:changePlan', planId, interval),
+    cancel:       ()                                                       => ipcRenderer.invoke('billing:cancel'),
+    resume:       ()                                                       => ipcRenderer.invoke('billing:resume'),
+    invoices:     (params?: { page?: number; limit?: number; status?: string }) => ipcRenderer.invoke('billing:invoices', params),
+    openInvoice:  (invoiceId: string)                                      => ipcRenderer.invoke('billing:openInvoice', invoiceId),
+    usage:        ()                                                       => ipcRenderer.invoke('billing:usage'),
+    promo:        (code: string)                                           => ipcRenderer.invoke('billing:promo', code)
+  },
+
+  // ── Phase 2 Integration: Remote Config ───────────────────────────────────
+  remoteConfig: {
+    fetch:              ()                    => ipcRenderer.invoke('remoteConfig:fetch'),
+    flag:               (key: string)         => ipcRenderer.invoke('remoteConfig:flag', key),
+    flags:              ()                    => ipcRenderer.invoke('remoteConfig:flags'),
+    isEnabled:          (key: string)         => ipcRenderer.invoke('remoteConfig:isEnabled', key),
+    setting:            (key: string)         => ipcRenderer.invoke('remoteConfig:setting', key),
+    announcements:      ()                    => ipcRenderer.invoke('remoteConfig:announcements'),
+    dismissAnnouncement:(id: string)          => ipcRenderer.invoke('remoteConfig:dismissAnnouncement', id),
+    checkVersion:       ()                    => ipcRenderer.invoke('remoteConfig:checkVersion'),
+    presetUpdates:      ()                    => ipcRenderer.invoke('remoteConfig:presetUpdates'),
+    onUpdate: (cb: (config: any) => void): (() => void) => {
+      const handler = (_event: any, config: any) => cb(config)
+      ipcRenderer.on('remoteConfig:update', handler)
+      return () => { ipcRenderer.removeListener('remoteConfig:update', handler) }
+    }
+  },
+
+  // ── Phase 2 Integration: Cloud Profiles ──────────────────────────────────
+  cloudProfiles: {
+    list:       (params?: { page?: number; limit?: number; search?: string; tag?: string }) =>
+      ipcRenderer.invoke('cloudProfiles:list', params),
+    backup:     (profileId: string, tags?: string[])    => ipcRenderer.invoke('cloudProfiles:backup', profileId, tags),
+    backupBulk: (profileIds: string[], tags?: string[]) => ipcRenderer.invoke('cloudProfiles:backupBulk', profileIds, tags),
+    restore:    (cloudId: string)                        => ipcRenderer.invoke('cloudProfiles:restore', cloudId),
+    delete:     (cloudId: string)                        => ipcRenderer.invoke('cloudProfiles:delete', cloudId),
+    deleteBulk: (cloudIds: string[])                     => ipcRenderer.invoke('cloudProfiles:deleteBulk', cloudIds),
+    updateTags: (cloudId: string, tags: string[])        => ipcRenderer.invoke('cloudProfiles:updateTags', cloudId, tags),
+    usage:      ()                                       => ipcRenderer.invoke('cloudProfiles:usage')
+  },
+
+  // ── Phase 2 Integration: Support ─────────────────────────────────────────
+  support: {
+    createTicket: (input: { subject: string; category: string; priority?: string; message: string; include_diagnostics?: boolean }) =>
+      ipcRenderer.invoke('support:createTicket', input),
+    tickets:      (params?: { page?: number; limit?: number; status?: string }) =>
+      ipcRenderer.invoke('support:tickets', params),
+    ticket:       (ticketId: string)                     => ipcRenderer.invoke('support:ticket', ticketId),
+    reply:        (ticketId: string, message: string)    => ipcRenderer.invoke('support:reply', ticketId, message),
+    close:        (ticketId: string)                     => ipcRenderer.invoke('support:close', ticketId),
+    reopen:       (ticketId: string)                     => ipcRenderer.invoke('support:reopen', ticketId),
+    feedback:     (input: { type: string; message: string; rating?: number; context?: string }) =>
+      ipcRenderer.invoke('support:feedback', input),
+    diagnostics:  ()                                     => ipcRenderer.invoke('support:diagnostics')
   }
 }
 

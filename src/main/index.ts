@@ -12,6 +12,8 @@ import { resolveFingerprint } from './fingerprint/presets'
 import { WorkflowScheduler } from './scheduler'
 import { SmartWarmUpScheduler } from './smart-warmup'
 import { CleanupWorker } from './cleanup-worker'
+import { startAnalyticsDaemon, stopAnalyticsDaemon } from './analytics-service'
+import { startRemoteConfigDaemon, stopRemoteConfigDaemon } from './remote-config'
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -103,6 +105,12 @@ app.whenReady().then(async () => {
   cleanupWorker.init(mainWindow)
   cleanupWorker.start()
 
+  // Phase 2 Integration — start analytics & remote config daemons
+  startAnalyticsDaemon()
+  if (mainWindow) {
+    startRemoteConfigDaemon(mainWindow)
+  }
+
   // Auto-launch last used profile if setting is enabled
   const settings = getSettings()
   if (settings.autoLaunchLastSession) {
@@ -141,6 +149,8 @@ app.on('before-quit', async () => {
   SmartWarmUpScheduler.getInstance().stop()
   CleanupWorker.getInstance().stop()
   stopNotificationPolling()
+  stopAnalyticsDaemon()
+  stopRemoteConfigDaemon()
   await ApiServer.getInstance().stop()
 })
 

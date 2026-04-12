@@ -22,7 +22,10 @@ import {
   ChevronLeft,
   ChevronDown,
   FileUp,
-  Smartphone
+  Smartphone,
+  BarChart3,
+  CreditCard,
+  LifeBuoy
 } from 'lucide-react'
 import type { NavSection } from '../../types'
 import type { User as UserType, LicensePlan } from '../../types'
@@ -102,6 +105,15 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { key: 'sea-platforms', icon: MapPin, label: 'SEA Platforms' },
       { key: 'marketplace',   icon: Store,  label: 'Marketplace' }
+    ]
+  },
+  {
+    key: 'business',
+    label: 'Business',
+    items: [
+      { key: 'analytics', icon: BarChart3,  label: 'Analytics' },
+      { key: 'billing',   icon: CreditCard, label: 'Billing' },
+      { key: 'support',   icon: LifeBuoy,   label: 'Support' }
     ]
   }
 ]

@@ -20,6 +20,9 @@ import { ImportHistory } from './components/ImportHistory'
 import { ImportWizard } from './components/ImportWizard'
 import { MobileWorkflowBuilder } from './components/MobileWorkflowBuilder'
 import { MobileDeviceManager } from './components/MobileDeviceManager'
+import { AnalyticsDashboardPage } from './components/AnalyticsDashboardPage'
+import { BillingPortal } from './components/BillingPortal'
+import { SupportCenter } from './components/SupportCenter'
 import { ErrorBoundary } from './components/UI/ErrorBoundary'
 import { ToastContainer } from './components/UI/Toast'
 import { ConfirmDialog } from './components/UI/ConfirmDialog'
@@ -131,6 +134,15 @@ export default function App() {
         </ErrorBoundary>
         <ErrorBoundary section="Mobile Devices">
           {section === 'mobile-devices' && <MobileDeviceManager />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Analytics">
+          {section === 'analytics' && <AnalyticsDashboardPage />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Billing">
+          {section === 'billing' && <BillingPortal />}
+        </ErrorBoundary>
+        <ErrorBoundary section="Support">
+          {section === 'support' && <SupportCenter />}
         </ErrorBoundary>
       </main>
       <ToastContainer />

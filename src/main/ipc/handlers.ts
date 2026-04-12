@@ -92,6 +92,16 @@ import {
 } from '../import'
 import type { ImportOptions } from '../../shared/types'
 
+// Phase 2 Integration — 5 new backend services
+import * as analyticsService from '../analytics-service'
+import * as billingService from '../billing-service'
+import * as remoteConfig from '../remote-config'
+import * as cloudProfiles from '../cloud-profiles'
+import * as supportService from '../support-service'
+import type {
+  CreateTicketInput, FeedbackInput, TicketStatus
+} from '../../shared/types'
+
 // ── Phase 18: Run history export helpers ──────────────────────────────────
 
 /** Escape a single CSV field — wrap in quotes and double any embedded quotes. */
@@ -2513,4 +2523,154 @@ export function registerIpcHandlers(): void {
     const profile = simulator.getSeaRegionProfile()
     return profile
   })
+
+  // ── Phase 2 Integration: Analytics ───────────────────────────────────────
+
+  ipcMain.handle('analytics:dashboard', () => analyticsService.getLocalAnalytics())
+
+  ipcMain.handle('analytics:dashboardRemote', () => analyticsService.getAnalyticsDashboard())
+
+  ipcMain.handle('analytics:reportUsage', (_event, activeSessions: number) =>
+    analyticsService.reportUsage(activeSessions)
+  )
+
+  ipcMain.handle('analytics:trackFeature', (_event, feature: string, action: string, metadata?: Record<string, unknown>) => {
+    analyticsService.trackFeatureUsage(feature, action, metadata)
+  })
+
+  // ── Phase 2 Integration: Billing ─────────────────────────────────────────
+
+  ipcMain.handle('billing:overview', () => billingService.getBillingOverview())
+
+  ipcMain.handle('billing:plans', () => billingService.getPricingPlans())
+
+  ipcMain.handle('billing:checkout', (_event, planId: string, interval: 'monthly' | 'yearly') =>
+    billingService.openCheckout(planId, interval)
+  )
+
+  ipcMain.handle('billing:portal', () => billingService.openCustomerPortal())
+
+  ipcMain.handle('billing:changePlan', (_event, planId: string, interval: 'monthly' | 'yearly') =>
+    billingService.changePlan(planId, interval)
+  )
+
+  ipcMain.handle('billing:cancel', () => billingService.cancelSubscription())
+
+  ipcMain.handle('billing:resume', () => billingService.resumeSubscription())
+
+  ipcMain.handle('billing:invoices', (_event, params?: { page?: number; limit?: number; status?: string }) =>
+    billingService.listInvoices(params)
+  )
+
+  ipcMain.handle('billing:openInvoice', (_event, invoiceId: string) =>
+    billingService.openInvoice(invoiceId)
+  )
+
+  ipcMain.handle('billing:usage', () => billingService.getUsageMeters())
+
+  ipcMain.handle('billing:promo', (_event, code: string) =>
+    billingService.applyPromoCode(code)
+  )
+
+  // ── Phase 2 Integration: Remote Config ───────────────────────────────────
+
+  ipcMain.handle('remoteConfig:fetch', () => remoteConfig.fetchRemoteConfig())
+
+  ipcMain.handle('remoteConfig:flag', (_event, key: string) =>
+    remoteConfig.getFeatureFlag(key)
+  )
+
+  ipcMain.handle('remoteConfig:flags', () => remoteConfig.getAllFlags())
+
+  ipcMain.handle('remoteConfig:isEnabled', (_event, key: string) =>
+    remoteConfig.isFeatureEnabled(key)
+  )
+
+  ipcMain.handle('remoteConfig:setting', (_event, key: string) =>
+    remoteConfig.getRemoteSetting(key)
+  )
+
+  ipcMain.handle('remoteConfig:announcements', () =>
+    remoteConfig.getActiveAnnouncements()
+  )
+
+  ipcMain.handle('remoteConfig:dismissAnnouncement', (_event, id: string) =>
+    remoteConfig.dismissAnnouncement(id)
+  )
+
+  ipcMain.handle('remoteConfig:checkVersion', () =>
+    remoteConfig.checkMinimumVersion()
+  )
+
+  ipcMain.handle('remoteConfig:presetUpdates', () =>
+    remoteConfig.getPresetUpdates()
+  )
+
+  // ── Phase 2 Integration: Cloud Profiles ──────────────────────────────────
+
+  ipcMain.handle('cloudProfiles:list', (_event, params?: { page?: number; limit?: number; search?: string; tag?: string }) =>
+    cloudProfiles.listCloudProfiles(params)
+  )
+
+  ipcMain.handle('cloudProfiles:backup', (_event, profileId: string, tags?: string[]) =>
+    cloudProfiles.backupProfile(profileId, tags)
+  )
+
+  ipcMain.handle('cloudProfiles:backupBulk', (_event, profileIds: string[], tags?: string[]) =>
+    cloudProfiles.backupProfiles(profileIds, tags)
+  )
+
+  ipcMain.handle('cloudProfiles:restore', (_event, cloudId: string) =>
+    cloudProfiles.restoreCloudProfile(cloudId)
+  )
+
+  ipcMain.handle('cloudProfiles:delete', (_event, cloudId: string) =>
+    cloudProfiles.deleteCloudProfile(cloudId)
+  )
+
+  ipcMain.handle('cloudProfiles:deleteBulk', (_event, cloudIds: string[]) =>
+    cloudProfiles.deleteCloudProfiles(cloudIds)
+  )
+
+  ipcMain.handle('cloudProfiles:updateTags', (_event, cloudId: string, tags: string[]) =>
+    cloudProfiles.updateCloudProfileTags(cloudId, tags)
+  )
+
+  ipcMain.handle('cloudProfiles:usage', () =>
+    cloudProfiles.getCloudStorageUsage()
+  )
+
+  // ── Phase 2 Integration: Support ─────────────────────────────────────────
+
+  ipcMain.handle('support:createTicket', (_event, input: CreateTicketInput) =>
+    supportService.createTicket(input)
+  )
+
+  ipcMain.handle('support:tickets', (_event, params?: { page?: number; limit?: number; status?: TicketStatus }) =>
+    supportService.listTickets(params)
+  )
+
+  ipcMain.handle('support:ticket', (_event, ticketId: string) =>
+    supportService.getTicket(ticketId)
+  )
+
+  ipcMain.handle('support:reply', (_event, ticketId: string, message: string) =>
+    supportService.replyToTicket(ticketId, message)
+  )
+
+  ipcMain.handle('support:close', (_event, ticketId: string) =>
+    supportService.closeTicket(ticketId)
+  )
+
+  ipcMain.handle('support:reopen', (_event, ticketId: string) =>
+    supportService.reopenTicket(ticketId)
+  )
+
+  ipcMain.handle('support:feedback', (_event, input: FeedbackInput) =>
+    supportService.submitFeedback(input)
+  )
+
+  ipcMain.handle('support:diagnostics', () =>
+    supportService.getDiagnosticsText()
+  )
 }
