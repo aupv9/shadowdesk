@@ -545,14 +545,17 @@ export interface UpdateProxyInput {
 export interface User {
   id: string
   email: string
+  /** Display name — mapped from server's `full_name` field. */
   name: string
   avatar_url?: string
   team_id?: string
   role?: TeamRole
   created_at: string
-  // D4: email verification (backend may or may not populate — UI degrades gracefully)
+  /** Email verification status from server. */
   email_verified?: boolean
   email_verified_at?: string | null
+  /** Server status: active | suspended | deleted */
+  status?: string
 }
 
 export interface AuthTokens {
@@ -578,33 +581,49 @@ export interface RegisterInput {
   name: string
 }
 
-// ─── Common SaaS API Types ──────────────────────────────────────────────────
+// ─── Server API Types ───────────────────────────────────────────────────────
 
-/** Standard error body returned by the Common SaaS API. */
-export interface CommonApiError {
-  code: string
+/**
+ * Server error response format:
+ * { error: "code", message: "...", code: 400, timestamp: "..." }
+ */
+export interface ServerApiError {
+  error: string
   message: string
-  details?: Record<string, unknown>
+  code: number
+  timestamp: string
+  requestId?: string
 }
 
-/** Standard envelope returned by all Common SaaS API endpoints. */
+// Keep legacy aliases for backward compatibility with renderer code
+export type CommonApiError = ServerApiError
 export interface CommonApiResponse<T> {
-  success: boolean
   data?: T
-  error?: CommonApiError
-  meta?: {
-    pagination?: { page: number; limit: number; total: number }
-    timestamp?: string
-  }
+  total?: number
+  page?: number
+  limit?: number
+  pages?: number
 }
 
-/** Shape returned by POST /api/v1/auth/login and /register after envelope unwrap. */
+/**
+ * Server auth response for login/register:
+ * { user: {...}, tokens: { access_token, refresh_token, expires_at } }
+ */
 export interface CommonAuthResponse {
-  user_id: string
-  email?: string
-  access_token: string
-  refresh_token: string
-  expires_at?: number
+  user: {
+    id: string
+    email: string
+    full_name: string | null
+    email_verified: boolean
+    status: string
+    created_at: string
+    updated_at: string
+  }
+  tokens: {
+    access_token: string
+    refresh_token: string
+    expires_at: number
+  }
 }
 
 /** API Key as returned by the Common SaaS API. */

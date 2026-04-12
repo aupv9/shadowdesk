@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { apiRequest, getApiBaseUrl, getApiVersionPrefix, loadTokens } from './api-client'
+import { apiRequest, getApiBaseUrl, loadTokens } from './api-client'
 import { getMachineId } from './license'
 
 /**
@@ -183,7 +183,7 @@ export async function uploadAttachment(
   formData.append('file', blob, filename)
 
   const res = await fetch(
-    `${getApiBaseUrl()}${getApiVersionPrefix()}/support/tickets/${ticketId}/attachments`,
+    `${getApiBaseUrl()}/support/tickets/${ticketId}/attachments`,
     {
       method: 'POST',
       headers: {

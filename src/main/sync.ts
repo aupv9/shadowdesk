@@ -127,7 +127,7 @@ export async function pushProfiles(encryptionPassword: string): Promise<void> {
     const checksum = createHash('sha256').update(payload).digest('hex')
     const encrypted = encrypt(payload, encryptionPassword, userId)
 
-    await apiRequest('/sync/push', {
+    await apiRequest('/profiles/sync/push', {
       method: 'POST',
       body: {
         data: encrypted.toString('base64'),
@@ -156,7 +156,7 @@ export async function pullProfiles(encryptionPassword: string): Promise<SyncPull
 
   try {
     const userId = await getActiveUserId()
-    const res = await apiRequest<{ data: string; checksum: string }>('/sync/pull')
+    const res = await apiRequest<{ data: string; checksum: string }>('/profiles/sync/pull')
 
     const bundle = Buffer.from(res.data, 'base64')
     let decrypted: string
@@ -272,7 +272,7 @@ export function getSyncHistory(limit = 20): SyncLogEntry[] {
 
 export async function getSyncManifest(): Promise<SyncManifest | null> {
   try {
-    return await apiRequest<SyncManifest>('/sync/manifest')
+    return await apiRequest<SyncManifest>('/profiles/sync/manifest')
   } catch {
     return null
   }

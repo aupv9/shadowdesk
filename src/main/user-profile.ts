@@ -1,4 +1,4 @@
-import { apiRequest, getApiBaseUrl, getApiVersionPrefix, loadTokens } from './api-client'
+import { apiRequest, getApiBaseUrl, loadTokens } from './api-client'
 import type { User } from '../shared/types'
 
 /**
@@ -54,7 +54,7 @@ export async function uploadAvatar(userId: string, imageBuffer: Buffer, filename
   formData.append('avatar', blob, filename)
 
   const res = await fetch(
-    `${getApiBaseUrl()}${getApiVersionPrefix()}/profiles/${userId}/avatar`,
+    `${getApiBaseUrl()}/profiles/${userId}/avatar`,
     {
       method: 'POST',
       headers: {

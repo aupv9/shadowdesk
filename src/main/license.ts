@@ -1,17 +1,23 @@
-import { app } from 'electron'
 import { networkInterfaces, cpus } from 'os'
 import { createHash } from 'crypto'
 import { apiRequest } from './api-client'
 import { Database } from './database'
-import type { License, LicenseDevice, LicensePlan, PLAN_LIMITS } from '../shared/types'
+import type { License, LicenseDevice } from '../shared/types'
 
-// ── Common SaaS Subscription Endpoints ──────────────────────────────────────
-// Mapped from legacy /licenses/* → /subscriptions/* per Common SaaS API v1
+/**
+ * Ghost Browser License Service
+ *
+ * Server endpoints (mounted at /licenses):
+ *   POST /licenses/activate          — Activate license key on machine
+ *   GET  /licenses/current           — Fetch current license
+ *   POST /licenses/deactivate        — Deactivate license
+ *   GET  /licenses/devices           — List activated devices
+ *   POST /licenses/devices/deactivate — Deactivate specific device { machine_id }
+ */
 
 let cachedLicense: License | null = null
 
 export function getMachineId(): string {
-  // Deterministic machine fingerprint: hash of MAC addresses + CPU model
   const nets = networkInterfaces()
   const macs: string[] = []
   for (const name of Object.keys(nets)) {
@@ -28,9 +34,14 @@ export function getMachineId(): string {
   return createHash('sha256').update(raw).digest('hex').slice(0, 32)
 }
 
+/**
+ * POST /licenses/activate
+ * Request: { license_key, machine_id }
+ * Response: License object
+ */
 export async function activateLicense(licenseKey: string): Promise<License> {
   const machineId = getMachineId()
-  const license = await apiRequest<License>('/subscriptions/activate', {
+  const license = await apiRequest<License>('/licenses/activate', {
     method: 'POST',
     body: { license_key: licenseKey, machine_id: machineId }
   })
@@ -38,11 +49,15 @@ export async function activateLicense(licenseKey: string): Promise<License> {
   return license
 }
 
+/**
+ * GET /licenses/current
+ * Response: License object or null
+ */
 export async function fetchLicense(): Promise<License | null> {
   if (cachedLicense) return cachedLicense
 
   try {
-    const license = await apiRequest<License>('/subscriptions/current')
+    const license = await apiRequest<License>('/licenses/current')
     cachedLicense = license
     return license
   } catch {
@@ -50,14 +65,22 @@ export async function fetchLicense(): Promise<License | null> {
   }
 }
 
+/**
+ * POST /licenses/deactivate
+ * Response: 204 No Content
+ */
 export async function deactivateLicense(): Promise<void> {
-  await apiRequest('/subscriptions/deactivate', { method: 'POST' })
+  await apiRequest('/licenses/deactivate', { method: 'POST' })
   cachedLicense = null
 }
 
+/**
+ * GET /licenses/devices
+ * Response: LicenseDevice[]
+ */
 export async function listLicenseDevices(): Promise<LicenseDevice[]> {
   try {
-    const devices = await apiRequest<LicenseDevice[]>('/subscriptions/devices')
+    const devices = await apiRequest<LicenseDevice[]>('/licenses/devices')
     const currentMachineId = getMachineId()
     return devices.map((d) => ({ ...d, is_current: d.machine_id === currentMachineId }))
   } catch {
@@ -65,35 +88,19 @@ export async function listLicenseDevices(): Promise<LicenseDevice[]> {
   }
 }
 
+/**
+ * POST /licenses/devices/deactivate
+ * Request: { machine_id }
+ * Response: 204 No Content
+ */
 export async function deactivateDevice(machineId: string): Promise<void> {
   if (machineId === getMachineId()) {
     throw new Error('Use "Deactivate license from this machine" for the current device')
   }
-  await apiRequest(`/subscriptions/devices/${encodeURIComponent(machineId)}/deactivate`, {
-    method: 'POST'
+  await apiRequest('/licenses/devices/deactivate', {
+    method: 'POST',
+    body: { machine_id: machineId }
   })
-}
-
-/** Fetch available pricing plans from the Common SaaS API. */
-export async function fetchPricingPlans(): Promise<Array<{ id: string; name: string; price: number; interval: string; features: Record<string, unknown> }>> {
-  try {
-    return await apiRequest<Array<{ id: string; name: string; price: number; interval: string; features: Record<string, unknown> }>>('/pricing/plans')
-  } catch {
-    return []
-  }
-}
-
-/** Fetch billing invoices for the current user. */
-export async function fetchInvoices(params?: { page?: number; limit?: number }): Promise<{ invoices: Array<{ id: string; amount: number; status: string; created_at: string; pdf_url?: string }>; total: number }> {
-  const query = new URLSearchParams()
-  if (params?.page) query.set('page', String(params.page))
-  if (params?.limit) query.set('limit', String(params.limit))
-  const qs = query.toString()
-  try {
-    return await apiRequest(`/invoices${qs ? `?${qs}` : ''}`)
-  } catch {
-    return { invoices: [], total: 0 }
-  }
 }
 
 export function getFreePlanLicense(): License {
@@ -109,34 +116,21 @@ export function getFreePlanLicense(): License {
   }
 }
 
-/**
- * 7-day grace period after `valid_until` during which the license still
- * grants its paid limits. After grace, fall back to the free plan so
- * abandoned subscriptions don't keep paid features unlocked indefinitely.
- */
 const GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000
 
 export function getCurrentLicense(): License {
   if (!cachedLicense) return getFreePlanLicense()
-  // Free-plan sentinel never expires.
   if (cachedLicense.plan === 'free') return cachedLicense
 
   const validUntil = new Date(cachedLicense.valid_until).getTime()
   if (Number.isNaN(validUntil)) return cachedLicense
 
-  // Past grace period → drop to free plan limits.
   if (Date.now() > validUntil + GRACE_PERIOD_MS) {
     return getFreePlanLicense()
   }
   return cachedLicense
 }
 
-/**
- * Computed license status used by the renderer to drive expiry banners.
- * `active`  — `valid_until` is in the future
- * `grace`   — within 7 days past `valid_until`, paid limits still apply
- * `expired` — beyond grace, falling back to free plan
- */
 export function getLicenseStatus(): {
   status: 'active' | 'grace' | 'expired' | 'free'
   days_until_expiry: number
@@ -183,4 +177,14 @@ export function getUsage(): { profiles: number; members: number } {
   const db = Database.getInstance()
   const profiles = db.getAllProfiles()
   return { profiles: profiles.length, members: 0 }
+}
+
+/** Placeholder — pricing plans not implemented on server yet. */
+export async function fetchPricingPlans(): Promise<any[]> {
+  return []
+}
+
+/** Placeholder — invoices not implemented on server yet. */
+export async function fetchInvoices(_params?: { page?: number; limit?: number }): Promise<any[]> {
+  return []
 }
