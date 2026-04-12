@@ -219,7 +219,7 @@ export class MobileWorkflowEngine {
 
       // ── Passthrough to standard desktop actions ─────────────────────────
       case 'navigate':
-        await page.goto(p.url, { waitUntil: p.waitUntil ?? 'networkidle2', timeout })
+        await page.goto(p.url, { waitUntil: p.waitUntil ?? 'networkidle2', timeout: p.timeout ?? 30000 })
         return {}
       case 'wait':
         await this.sleep(p.ms ?? 1000)

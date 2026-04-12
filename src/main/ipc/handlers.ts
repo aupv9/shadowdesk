@@ -25,11 +25,12 @@ import {
   getUsage, getMachineId, getLicenseStatus, listLicenseDevices, deactivateDevice
 } from '../license'
 import * as team from '../team'
+import * as apiKeys from '../api-keys'
 import {
   pushProfiles, pullProfiles, getSyncState, getSyncManifest, getSyncHistory, getSyncDiff,
   markPendingChange, enableSyncDaemon, disableSyncDaemon, isDaemonEnabled
 } from '../sync'
-import type { CreateProfileInput, CreateProxyInput, TeamRole, CreateWorkflowInput, UpdateWorkflowInput, ApiServerConfig } from '../../shared/types'
+import type { CreateProfileInput, CreateProxyInput, TeamRole, CreateWorkflowInput, UpdateWorkflowInput, ApiServerConfig, ApiKeyCreateInput } from '../../shared/types'
 import { parseNetscapeCookies, toNetscapeFormat } from '../utils/cookies'
 import { DetectionTestRunner } from '../detection-test'
 // Phase 4.2: Input validation + structured error handling
@@ -1301,6 +1302,28 @@ export function registerIpcHandlers(): void {
     return team.getAuditLog(params)
   })
 
+  // ── API Keys (Common SaaS) ──────────────────────────────────────────────
+
+  ipcMain.handle('apiKeys:list', async (_event, userId: string) => {
+    return apiKeys.listApiKeys(userId)
+  })
+
+  ipcMain.handle('apiKeys:create', async (_event, userId: string, input: ApiKeyCreateInput) => {
+    return apiKeys.createApiKey(userId, input)
+  })
+
+  ipcMain.handle('apiKeys:rotate', async (_event, keyId: string) => {
+    return apiKeys.rotateApiKey(keyId)
+  })
+
+  ipcMain.handle('apiKeys:delete', async (_event, keyId: string) => {
+    return apiKeys.deleteApiKey(keyId)
+  })
+
+  ipcMain.handle('apiKeys:usage', async (_event, keyId: string, period?: string) => {
+    return apiKeys.getApiKeyUsage(keyId, period)
+  })
+
   // ── Cloud Sync ───────────────────────────────────────────────────────────
 
   ipcMain.handle('sync:status', () => {
@@ -2269,16 +2292,15 @@ export function registerIpcHandlers(): void {
       if (!profile) throw new NotFoundError('Profile not found')
 
       // Ensure profile is launched
-      const sessions = bm.getActiveSessions()
-      let session = sessions.find((s: any) => s.profileId === profileIds[0])
-      if (!session) {
-        await bm.launchProfile(profile)
-        const updated = bm.getActiveSessions()
-        session = updated.find((s: any) => s.profileId === profileIds[0])
+      if (!bm.isRunning(profileIds[0])) {
+        const fp = JSON.parse(profile.fingerprint)
+        const proxy = profile.proxy_id ? db.getProxy(profile.proxy_id) : undefined
+        await bm.launchProfile(profileIds[0], fp, proxy ?? undefined)
       }
-      if (!session?.page) throw new Error('Could not get page for profile')
+      const page = await bm.getActivePage(profileIds[0])
+      if (!page) throw new Error('Could not get page for profile')
 
-      return await engine.executeWorkflow(wf, profileIds[0], session.page)
+      return await engine.executeWorkflow(wf, profileIds[0], page)
     }
 
     // Multi-profile: use orchestrator

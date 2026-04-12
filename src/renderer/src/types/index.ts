@@ -155,7 +155,12 @@ export type {
   RealDevice,
   RealDeviceExecutionConfig,
   NetworkType,
-  NetworkProfile
+  NetworkProfile,
+  // Common SaaS API
+  ApiKeyInfo,
+  ApiKeyCreateInput,
+  ApiKeyUsage,
+  CommonApiError
 } from '../../../shared/types'
 
 export { PLAN_LIMITS } from '../../../shared/types'

@@ -1,28 +1,48 @@
-import { apiRequest, saveTokens, clearTokens, loadTokens } from './api-client'
-import type { User, LoginInput, RegisterInput, AuthTokens } from '../shared/types'
+import { apiRequest, saveTokens, clearTokens, loadTokens, decodeJwtExpiry } from './api-client'
+import type { User, LoginInput, RegisterInput, AuthTokens, CommonAuthResponse } from '../shared/types'
 
 let currentUser: User | null = null
 
+/**
+ * Save tokens from a Common SaaS auth response.
+ * The backend may or may not include `expires_at`; when absent we decode the
+ * JWT `exp` claim so the token-refresh logic still works.
+ */
+function persistTokens(data: CommonAuthResponse): void {
+  const expiresAt = data.expires_at ?? decodeJwtExpiry(data.access_token)
+  saveTokens({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: expiresAt
+  })
+}
+
 export async function login(input: LoginInput): Promise<User> {
-  const res = await apiRequest<{ user: User; tokens: AuthTokens }>('/auth/login', {
+  const res = await apiRequest<CommonAuthResponse>('/auth/login', {
     method: 'POST',
     body: input,
     authenticated: false
   })
-  saveTokens(res.tokens)
-  currentUser = res.user
-  return res.user
+  persistTokens(res)
+
+  // Common SaaS login returns tokens + user_id but not the full user
+  // object — fetch the profile in a second call.
+  const user = await apiRequest<User>('/auth/me')
+  currentUser = user
+  return user
 }
 
 export async function register(input: RegisterInput): Promise<User> {
-  const res = await apiRequest<{ user: User; tokens: AuthTokens }>('/auth/register', {
+  const res = await apiRequest<CommonAuthResponse>('/auth/register', {
     method: 'POST',
     body: input,
     authenticated: false
   })
-  saveTokens(res.tokens)
-  currentUser = res.user
-  return res.user
+  persistTokens(res)
+
+  const user = await apiRequest<User>('/auth/me')
+  currentUser = user
+  return user
 }
 
 export async function logout(): Promise<void> {

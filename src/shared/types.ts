@@ -578,6 +578,59 @@ export interface RegisterInput {
   name: string
 }
 
+// ─── Common SaaS API Types ──────────────────────────────────────────────────
+
+/** Standard error body returned by the Common SaaS API. */
+export interface CommonApiError {
+  code: string
+  message: string
+  details?: Record<string, unknown>
+}
+
+/** Standard envelope returned by all Common SaaS API endpoints. */
+export interface CommonApiResponse<T> {
+  success: boolean
+  data?: T
+  error?: CommonApiError
+  meta?: {
+    pagination?: { page: number; limit: number; total: number }
+    timestamp?: string
+  }
+}
+
+/** Shape returned by POST /api/v1/auth/login and /register after envelope unwrap. */
+export interface CommonAuthResponse {
+  user_id: string
+  email?: string
+  access_token: string
+  refresh_token: string
+  expires_at?: number
+}
+
+/** API Key as returned by the Common SaaS API. */
+export interface ApiKeyInfo {
+  id: string
+  key?: string        // Only present on create/rotate
+  name: string
+  scopes: string[]
+  created_at: string
+  expires_at?: string | null
+  last_used_at?: string | null
+}
+
+export interface ApiKeyCreateInput {
+  name: string
+  scopes: string[]
+  expires_in?: number // days
+}
+
+export interface ApiKeyUsage {
+  key_id: string
+  total_requests: number
+  period: string
+  breakdown?: Record<string, number>
+}
+
 // ─── License Types ───────────────────────────────────────────────────────────
 
 export type LicensePlan = 'free' | 'starter' | 'professional' | 'enterprise'

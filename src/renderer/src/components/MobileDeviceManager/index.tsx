@@ -170,7 +170,7 @@ export function MobileDeviceManager() {
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-white">{device.name}</p>
                       <p className="text-xs text-slate-500">
-                        {device.model} • {tab === 'android' ? device.androidVersion : device.osVersion}
+                        {device.model} • {tab === 'android' ? (device as any).androidVersion : (device as any).osVersion}
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
