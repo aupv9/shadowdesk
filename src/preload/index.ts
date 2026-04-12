@@ -182,6 +182,13 @@ const api = {
     devices:           ()                    => ipcRenderer.invoke('license:devices'),
     deactivateDevice:  (machineId: string)   => ipcRenderer.invoke('license:deactivateDevice', machineId)
   },
+  apiKeys: {
+    list:    (userId: string)                                                 => ipcRenderer.invoke('apiKeys:list', userId),
+    create:  (userId: string, input: { name: string; scopes: string[]; expires_in?: number }) => ipcRenderer.invoke('apiKeys:create', userId, input),
+    rotate:  (keyId: string)                                                 => ipcRenderer.invoke('apiKeys:rotate', keyId),
+    delete:  (keyId: string)                                                 => ipcRenderer.invoke('apiKeys:delete', keyId),
+    usage:   (keyId: string, period?: string)                                => ipcRenderer.invoke('apiKeys:usage', keyId, period)
+  },
   team: {
     get:              ()                                                                   => ipcRenderer.invoke('team:get'),
     create:           (name: string)                                                       => ipcRenderer.invoke('team:create', name),

@@ -104,10 +104,8 @@ export class MobileOrchestrator {
    */
   private async getOrLaunchPage(bm: BrowserManager, profileId: string): Promise<Page | null> {
     // Check if profile is already active
-    const sessions = bm.getActiveSessions()
-    const existing = sessions.find((s: any) => s.profileId === profileId)
-    if (existing && existing.page) {
-      return existing.page
+    if (bm.isRunning(profileId)) {
+      return bm.getActivePage(profileId)
     }
 
     // Launch the profile
@@ -116,10 +114,10 @@ export class MobileOrchestrator {
     if (!profile) return null
 
     try {
-      await bm.launchProfile(profile)
-      const updatedSessions = bm.getActiveSessions()
-      const session = updatedSessions.find((s: any) => s.profileId === profileId)
-      return session?.page ?? null
+      const fp = JSON.parse(profile.fingerprint)
+      const proxy = profile.proxy_id ? db.getProxy(profile.proxy_id) : undefined
+      await bm.launchProfile(profileId, fp, proxy ?? undefined)
+      return bm.getActivePage(profileId)
     } catch {
       return null
     }
