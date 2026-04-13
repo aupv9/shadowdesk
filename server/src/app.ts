@@ -10,6 +10,9 @@ import authRoutes from './modules/auth/auth.routes'
 import licenseRoutes from './modules/license/license.routes'
 import teamRoutes from './modules/team/team.routes'
 import syncRoutes from './modules/sync/sync.routes'
+import profilesRoutes from './modules/profiles/profiles.routes'
+import workflowsRoutes from './modules/workflows/workflows.routes'
+import detectionRoutes from './modules/detection/detection.routes'
 
 const app = express()
 
@@ -51,7 +54,10 @@ app.get('/health/ready', (req, res) => {
 app.use('/auth', authRoutes)
 app.use('/licenses', authMiddleware, licenseRoutes)
 app.use('/team', authMiddleware, teamRoutes)
+app.use('/profiles', authMiddleware, profilesRoutes)
 app.use('/profiles/sync', authMiddleware, syncRoutes)
+app.use('/workflows', authMiddleware, workflowsRoutes)
+app.use('/detection', authMiddleware, detectionRoutes)
 
 // 404 handler
 app.use((req: Request, res: Response) => {
