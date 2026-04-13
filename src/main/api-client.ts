@@ -17,6 +17,9 @@ import type { AuthTokens } from '../shared/types'
  *   /licenses/*        — License management
  *   /team/*            — Team collaboration
  *   /profiles/sync/*   — Cloud sync
+ *   /profiles/*        — Browser profile CRUD (Phase 3)
+ *   /workflows/*       — Workflow automation (Phase 3)
+ *   /detection/*       — Detection testing (Phase 3)
  */
 
 const API_BASE_URL = process.env.GHOST_API_URL || 'https://api.ghostbrowser.app'
@@ -213,4 +216,81 @@ export async function apiRequest<T>(
 
 export function getApiBaseUrl(): string {
   return API_BASE_URL
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Phase 3: Browser Profile Management
+// ════════════════════════════════════════════════════════════════════════════
+
+export const profiles = {
+  // CRUD
+  create: (data: any) => apiRequest<any>('/profiles', { method: 'POST', body: data }),
+  list: (filters?: any) => apiRequest<any[]>('/profiles', { method: 'GET' }),
+  get: (id: string) => apiRequest<any>(`/profiles/${id}`, { method: 'GET' }),
+  update: (id: string, data: any) => apiRequest<any>(`/profiles/${id}`, { method: 'PUT', body: data }),
+  delete: (id: string) => apiRequest<void>(`/profiles/${id}`, { method: 'DELETE' }),
+
+  // Versions
+  listVersions: (profileId: string) => apiRequest<any[]>(`/profiles/${profileId}/versions`, { method: 'GET' }),
+  createVersion: (profileId: string, data: any) => apiRequest<any>(`/profiles/${profileId}/versions`, { method: 'POST', body: data }),
+
+  // Groups
+  listGroups: () => apiRequest<any[]>('/profiles/groups', { method: 'GET' }),
+  createGroup: (data: any) => apiRequest<any>('/profiles/groups', { method: 'POST', body: data }),
+  updateGroup: (groupId: string, data: any) => apiRequest<any>(`/profiles/groups/${groupId}`, { method: 'PUT', body: data }),
+  deleteGroup: (groupId: string) => apiRequest<void>(`/profiles/groups/${groupId}`, { method: 'DELETE' }),
+
+  // Sharing
+  share: (profileId: string, data: any) => apiRequest<any>(`/profiles/${profileId}/share`, { method: 'POST', body: data }),
+  unshare: (profileId: string, userId: string) => apiRequest<void>(`/profiles/${profileId}/share?user_id=${userId}`, { method: 'DELETE' }),
+  listShares: (profileId: string) => apiRequest<any[]>(`/profiles/${profileId}/shares`, { method: 'GET' })
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Phase 3: Workflow Automation
+// ════════════════════════════════════════════════════════════════════════════
+
+export const workflows = {
+  // Workflows
+  create: (data: any) => apiRequest<any>('/workflows', { method: 'POST', body: data }),
+  list: () => apiRequest<any[]>('/workflows', { method: 'GET' }),
+  get: (id: string) => apiRequest<any>(`/workflows/${id}`, { method: 'GET' }),
+  update: (id: string, data: any) => apiRequest<any>(`/workflows/${id}`, { method: 'PUT', body: data }),
+  delete: (id: string) => apiRequest<void>(`/workflows/${id}`, { method: 'DELETE' }),
+
+  // Execution
+  execute: (workflowId: string, data: any) => apiRequest<any>(`/workflows/${workflowId}/execute`, { method: 'POST', body: data }),
+  getExecution: (executionId: string) => apiRequest<any>(`/workflows/executions/${executionId}`, { method: 'GET' }),
+  listExecutions: (workflowId?: string) => apiRequest<any[]>(`/workflows/${workflowId || ''}/executions`, { method: 'GET' }),
+  cancelExecution: (executionId: string) => apiRequest<void>(`/workflows/executions/${executionId}/cancel`, { method: 'POST', body: {} }),
+  getExecutionLogs: (executionId: string) => apiRequest<any[]>(`/workflows/executions/${executionId}/logs`, { method: 'GET' }),
+
+  // Schedules
+  createSchedule: (data: any) => apiRequest<any>('/workflows/schedules', { method: 'POST', body: data }),
+  listSchedules: () => apiRequest<any[]>('/workflows/schedules', { method: 'GET' }),
+  updateSchedule: (scheduleId: string, data: any) => apiRequest<any>(`/workflows/schedules/${scheduleId}`, { method: 'PUT', body: data }),
+  deleteSchedule: (scheduleId: string) => apiRequest<void>(`/workflows/schedules/${scheduleId}`, { method: 'DELETE' })
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Phase 3: Detection Testing
+// ════════════════════════════════════════════════════════════════════════════
+
+export const detection = {
+  // Tests
+  createTest: (data: any) => apiRequest<any>('/detection', { method: 'POST', body: data }),
+  listTests: (filters?: any) => apiRequest<any[]>('/detection', { method: 'GET' }),
+  getTest: (testId: string) => apiRequest<any>(`/detection/${testId}`, { method: 'GET' }),
+  deleteTest: (testId: string) => apiRequest<void>(`/detection/${testId}`, { method: 'DELETE' }),
+  completeTest: (testId: string, data: any) => apiRequest<any>(`/detection/${testId}/complete`, { method: 'PUT', body: data }),
+  listTestsByProfile: (profileId: string, limit?: number) =>
+    apiRequest<any[]>(`/detection/profile/${profileId}${limit ? `?limit=${limit}` : ''}`, { method: 'GET' }),
+
+  // Comparison
+  compareTests: (testIdA: string, testIdB: string) =>
+    apiRequest<any>('/detection/compare', { method: 'POST', body: { test_id_a: testIdA, test_id_b: testIdB } }),
+
+  // Vectors
+  listVectors: () => apiRequest<any[]>('/detection/vectors', { method: 'GET' }),
+  getVector: (vectorId: string) => apiRequest<any>(`/detection/vectors/${vectorId}`, { method: 'GET' })
 }

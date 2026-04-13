@@ -116,3 +116,85 @@ export interface AuditLogEntry {
   error_message?: string
   created_at: string
 }
+
+// Workflow types
+export interface CreateWorkflowRequest {
+  name: string
+  description?: string
+  steps: Record<string, any>[]
+  variables?: Record<string, any>
+  tags?: string[]
+  status?: 'draft' | 'published' | 'archived'
+}
+
+export interface UpdateWorkflowRequest {
+  name?: string
+  description?: string
+  steps?: Record<string, any>[]
+  variables?: Record<string, any>
+  tags?: string[]
+  status?: 'draft' | 'published' | 'archived'
+}
+
+export interface ExecuteWorkflowRequest {
+  profile_id?: string
+  variables?: Record<string, any>
+}
+
+export interface CreateScheduleRequest {
+  workflow_id: string
+  profile_id?: string
+  cron_expression: string
+  timezone?: string
+  max_runs?: number
+}
+
+export interface UpdateScheduleRequest {
+  cron_expression?: string
+  timezone?: string
+  max_runs?: number
+  status?: 'active' | 'paused'
+}
+
+export interface Workflow {
+  id: string
+  user_id: string
+  name: string
+  description?: string
+  steps: Record<string, any>[]
+  variables?: Record<string, any>
+  tags?: string[]
+  status: 'draft' | 'published' | 'archived'
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkflowExecution {
+  id: string
+  workflow_id: string
+  user_id: string
+  profile_id?: string
+  variables?: Record<string, any>
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+  result?: Record<string, any>
+  error?: string
+  started_at?: string
+  completed_at?: string
+  created_at: string
+}
+
+export interface WorkflowSchedule {
+  id: string
+  workflow_id: string
+  user_id: string
+  profile_id?: string
+  cron_expression: string
+  timezone: string
+  max_runs?: number
+  runs_count: number
+  status: 'active' | 'paused'
+  last_execution_at?: string
+  next_execution_at?: string
+  created_at: string
+  updated_at: string
+}
