@@ -1,0 +1,237 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                   GHOST BROWSER DOCKER QUICK REFERENCE                      ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📋 DEPLOYMENT SCRIPT COMMANDS (Linux/Mac)
+─────────────────────────────────────────
+/home/user/deploy.sh start-all          ← Start everything
+/home/user/deploy.sh stop-all           ← Stop everything
+/home/user/deploy.sh restart-all        ← Restart everything
+/home/user/deploy.sh status             ← Show container status
+/home/user/deploy.sh health             ← Health check
+/home/user/deploy.sh logs               ← View logs
+/home/user/deploy.sh logs-cs            ← Common-sass logs
+/home/user/deploy.sh logs-sb            ← Shadowdesk logs
+
+📋 DEPLOYMENT SCRIPT COMMANDS (Windows)
+────────────────────────────────────────
+deploy.bat start-all                    ← Start everything
+deploy.bat stop-all                     ← Stop everything
+deploy.bat restart-all                  ← Restart everything
+deploy.bat status                       ← Show container status
+deploy.bat health                       ← Health check
+deploy.bat logs                         ← View logs
+
+
+🔌 SERVICE PORTS & URLS
+───────────────────────
+API Gateway              http://localhost:8080
+Ghost Browser API        http://localhost:3000
+Profile Service          http://localhost:5010
+Automation Service       http://localhost:5011
+Detection Service        http://localhost:5012
+Service Registry         http://localhost:4000
+Grafana Dashboard        http://localhost:3000      (admin/admin)
+Prometheus              http://localhost:9090
+Jaeger Tracing          http://localhost:16686
+pgAdmin                 http://localhost:5050      (admin@example.com/admin)
+PostgreSQL              localhost:5432
+Redis                   localhost:6379
+
+
+🔍 HEALTH CHECKS
+────────────────
+curl http://localhost:8080/health                   # API Gateway
+curl http://localhost:3000/health/live              # Ghost Browser API
+curl http://localhost:5010/health                   # Profile Service
+curl http://localhost:5011/health                   # Automation Service
+curl http://localhost:5012/health                   # Detection Service
+curl http://localhost:4000/health                   # Service Registry
+
+
+🧪 TEST API ENDPOINTS
+──────────────────────
+# Register new user
+curl -X POST http://localhost:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"Test123!","full_name":"User"}'
+
+# Login
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"Test123!"}'
+
+# Create profile (requires token from login)
+curl -X POST http://localhost:3000/profiles \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Profile1","fingerprint_preset":"win10-chrome120"}'
+
+# Create workflow
+curl -X POST http://localhost:3000/workflows \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Workflow1","steps":[]}'
+
+# Create detection test
+curl -X POST http://localhost:3000/detection \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"profile_id":"<ID>","profile_name":"Profile1"}'
+
+
+📊 DATABASE COMMANDS
+─────────────────────
+# Common-sass PostgreSQL
+psql postgresql://postgres:postgres@localhost:5432/common_sass
+
+# Ghost Browser PostgreSQL
+psql postgresql://postgres:dev_password@localhost:5432/ghost_browser
+
+# Redis CLI
+redis-cli
+
+# List tables (in psql)
+\dt
+
+# View users table
+SELECT * FROM users LIMIT 5;
+
+# Exit psql
+\q
+
+
+🐳 DOCKER COMMANDS
+──────────────────
+# View all containers
+docker ps
+
+# View specific project containers
+cd /home/user/common-sass && docker-compose ps
+cd /home/user/shadowdesk/server && docker-compose ps
+
+# View logs
+docker-compose logs -f --tail=50 <service-name>
+
+# Restart service
+docker-compose restart <service-name>
+
+# Rebuild service
+docker-compose build --no-cache <service-name>
+
+# Execute command in container
+docker exec <container-name> <command>
+
+# Stop all containers
+docker-compose down
+
+# Remove all data
+docker-compose down -v
+
+
+⚙️ ENVIRONMENT VARIABLES
+─────────────────────────
+Common-sass (.env):
+  DATABASE_URL=postgres://postgres:postgres@postgres:5432/common_sass
+  JWT_SECRET=dev-secret-change-in-production
+  REGISTRY_ADDR=http://service-registry:4000
+
+Ghost Browser Server (.env):
+  DATABASE_URL=postgres://postgres:dev_password@postgres:5432/ghost_browser
+  JWT_SECRET=dev-secret-key-change-in-production
+  GHOST_API_URL=http://api-gateway:8080
+
+
+🐛 TROUBLESHOOTING
+──────────────────
+Problem: Services won't start
+Solution: Check logs with "docker-compose logs <service>"
+
+Problem: Port already in use
+Solution: Change port in docker-compose.yml or kill process using port
+
+Problem: Can't reach services
+Solution: Verify networks with "docker network ls" and "docker network inspect"
+
+Problem: Database connection errors
+Solution: Check DATABASE_URL in .env matches docker-compose setup
+
+Problem: Out of memory
+Solution: Increase Docker memory limit in Docker Desktop settings
+
+
+📁 IMPORTANT FILES
+──────────────────
+/home/user/DOCKER_SETUP.md              ← Full setup guide
+/home/user/DOCKER_DEPLOYMENT_SUMMARY.md ← What was set up
+/home/user/DEPLOYMENT_CHECKLIST.md      ← Pre/post checklist
+/home/user/deploy.sh                    ← Deployment script (Unix/Mac)
+/home/user/deploy.bat                   ← Deployment script (Windows)
+
+/home/user/common-sass/docker-compose.yml
+/home/user/common-sass/.env
+/home/user/common-sass/cmd/profile-service/Dockerfile
+/home/user/common-sass/cmd/automation-service/Dockerfile
+/home/user/common-sass/cmd/detection-service/Dockerfile
+
+/home/user/shadowdesk/server/docker-compose.yml
+/home/user/shadowdesk/server/.env
+/home/user/shadowdesk/server/docker/Dockerfile
+
+
+✅ QUICK START (Linux/Mac)
+──────────────────────────
+1. chmod +x /home/user/deploy.sh
+2. /home/user/deploy.sh start-all
+3. /home/user/deploy.sh health           # Wait for services
+4. Open http://localhost:3000 in browser
+
+
+✅ QUICK START (Windows)
+──────────────────────
+1. Run Command Prompt as Administrator
+2. deploy.bat start-all
+3. deploy.bat health                     # Wait for services
+4. Open http://localhost:3000 in browser
+
+
+📞 MONITORING DASHBOARDS
+─────────────────────────
+Grafana Dashboard:    http://localhost:3000 (admin/admin)
+  → View metrics by service
+  → Set up alerts
+
+Prometheus:           http://localhost:9090
+  → Query metrics directly
+
+Jaeger Tracing:       http://localhost:16686
+  → Trace requests across services
+
+pgAdmin Database:     http://localhost:5050
+  → Email: admin@example.com
+  → Password: admin
+
+
+🚀 DEPLOYMENT ARCHITECTURE
+──────────────────────────
+Electron App (port 9080)
+         ↓ HTTP
+    shadowdesk/server (3000)
+         ↓ HTTP
+    API Gateway (8080)
+    ↙ ↓ ↘
+Profile  Automation  Detection
+(5010)  (5011)      (5012)
+
+
+📝 NOTES
+────────
+• Grafana and Ghost Browser API both use port 3000 - adjust if needed
+• Database data persists in Docker volumes
+• All services use dev secrets - change in production
+• Logs are visible via docker-compose logs
+• Services auto-restart on container failure
+
+
+Last Updated: 2026-04-13
+Status: ✅ Ready for Deployment
