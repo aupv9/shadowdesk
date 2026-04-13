@@ -165,3 +165,385 @@ Adding a new IPC channel requires updating all three files.
 3. **`require('electron')`** — only works inside the Electron process (with `ELECTRON_RUN_AS_NODE` unset). Importing electron modules in renderer code won't work.
 4. **Fingerprint JSON** — stored as a TEXT blob in SQLite. Always `JSON.parse()` on read.
 5. **Profile user-data-dir** — each profile gets its own Chromium user-data directory under `app.getPath('userData')/profiles/<id>/`. Created lazily on first launch.
+
+---
+
+## Development Workflow
+
+### Adding a New Feature
+
+1. **Define the data model** in `src/shared/types.ts` (TS interface + DB schema if needed)
+2. **Add DB table** via migration in `src/main/database.ts` (if required)
+3. **Implement main-process logic** in `src/main/` (service module or existing handler)
+4. **Register IPC handler** in `src/main/ipc/handlers.ts`:
+   ```typescript
+   ipcMain.handle('myFeature:action', async (event, arg) => {
+     return await myFeatureService.doAction(arg)
+   })
+   ```
+5. **Expose via preload** in `src/preload/index.ts`:
+   ```typescript
+   myFeature: {
+     action: (arg: MyInput) => ipcInvoke('myFeature:action', arg)
+   }
+   ```
+6. **Type the API** in `src/renderer/src/env.d.ts`
+7. **Create Zustand store** in `src/renderer/src/stores/myFeatureStore.ts`
+8. **Build UI components** in `src/renderer/src/components/MyFeature/`
+9. **Wire into App.tsx** sidebar + router
+10. **Test** via `npm run dev` + manual testing in Electron window
+
+### Testing Fingerprints
+
+To verify fingerprint injection is working:
+
+```typescript
+// In renderer console (F12):
+console.log(navigator.userAgent)
+console.log(navigator.hardwareConcurrency)
+console.log(canvas fingerprint test)
+
+// Or use detection test: Profiles → select → Detection Test button
+```
+
+### Debugging IPC
+
+**Enable IPC logging**:
+```typescript
+// src/main/ipc/handlers.ts
+ipcMain.handle('channel:action', async (event, arg) => {
+  console.log(`[IPC] channel:action called with`, arg)
+  try {
+    const result = await service.doAction(arg)
+    console.log(`[IPC] channel:action returned`, result)
+    return result
+  } catch (e) {
+    console.error(`[IPC] channel:action errored`, e)
+    throw e
+  }
+})
+```
+
+**Watch store updates**:
+```typescript
+// In React component
+useEffect(() => {
+  const unsubscribe = useProfileStore.subscribe(
+    (state) => state.profiles,
+    (profiles) => console.log('Profiles updated:', profiles)
+  )
+  return unsubscribe
+}, [])
+```
+
+### Database Migrations
+
+To add a new table or column:
+
+```typescript
+// src/main/database.ts - in initialize()
+const migrations = [
+  `CREATE TABLE IF NOT EXISTS new_table (...)`,
+  `ALTER TABLE existing_table ADD COLUMN new_col TEXT`
+]
+
+for (const sql of migrations) {
+  try {
+    this.exec(sql)
+  } catch (e) {
+    if (!e.message.includes('already exists')) throw e
+  }
+}
+```
+
+### Performance Optimization Tips
+
+1. **Pagination**: Always paginate profile lists (limit 50 default)
+2. **Lazy loading**: Don't load fingerprint JSON until needed
+3. **Zustand selectors**: Use `useProfileStore(s => s.profiles.length)` not whole state
+4. **Worker threads** (if CPU-intensive): Use Node.js `worker_threads` for scrypt/hashing
+5. **Profile pooling**: Cache launched profiles in `browser-manager.ts` to avoid restart overhead
+
+---
+
+## Architecture Patterns
+
+### The IPC Pattern (Renderer → Main → Renderer)
+
+```
+┌─────────────┐
+│  Renderer   │
+│  (React UI) │
+└──────┬──────┘
+       │ window.api.profiles.list()
+       │ (returns Promise)
+       ↓
+┌─────────────────────────────┐
+│  Preload (contextBridge)    │
+│  ipcRenderer.invoke()       │
+└──────┬──────────────────────┘
+       │
+       ↓
+┌─────────────────────────────┐
+│  Main Process IPC Handler   │
+│  ipcMain.handle()           │
+│  → Service logic            │
+│  → DB query                 │
+│  → return result            │
+└──────┬──────────────────────┘
+       │
+       ↓ Promise resolves
+┌─────────────┐
+│  Renderer   │
+│  Update UI  │
+└─────────────┘
+```
+
+### State Management (Zustand)
+
+```typescript
+// Bad: Prop drilling
+<ProfileManager profiles={profiles} onSelect={onSelect} />
+  <ProfileCard profile={profile} onSelect={onSelect} />
+    <ProfileActions onSelect={onSelect} />
+
+// Good: Global store
+// stores/profileStore.ts
+export const useProfileStore = create(s => ({
+  profiles: [],
+  selectedId: null,
+  selectProfile: (id) => s.selectedId = id,
+  loadProfiles: async () => {
+    const profiles = await window.api.profiles.list()
+    set({ profiles })
+  }
+}))
+
+// In any component:
+const { profiles, selectedId, selectProfile } = useProfileStore()
+```
+
+### Error Handling
+
+**In IPC handler** (main process):
+```typescript
+ipcMain.handle('profile:launch', async (event, id) => {
+  try {
+    return await browser.launchProfile(id)
+  } catch (e) {
+    if (e instanceof ProfileLaunchError) {
+      throw new Error(`Launch failed: ${e.message}`)
+    }
+    throw e  // Let renderer decide how to display
+  }
+})
+```
+
+**In component** (renderer):
+```typescript
+const launchProfile = async (id: string) => {
+  setLoading(true)
+  setError(null)
+  try {
+    const { port } = await window.api.profiles.launch(id)
+    setPort(port)  // Success
+  } catch (e: any) {
+    setError(e.message || 'Launch failed')
+  } finally {
+    setLoading(false)
+  }
+}
+```
+
+### Data Serialization
+
+**Between main ↔ renderer**: JSON only (IPC boundary)
+- Numbers, strings, booleans, null, arrays, objects: ✓
+- Dates, functions, symbols, BigInt: ✗
+
+**Solution**: Convert to/from JSON
+```typescript
+// Main → Renderer
+const profile = db.getProfile(id)
+return {
+  ...profile,
+  createdAt: profile.createdAt.toISOString(),  // Date → string
+  fingerprint: JSON.parse(profile.fingerprint)  // TEXT → object
+}
+
+// Renderer → Main
+{
+  ...input,
+  createdAt: new Date(input.createdAt)  // string → Date (if needed)
+}
+```
+
+---
+
+## Code Style Guide
+
+### Naming Conventions
+
+| Type | Convention | Example |
+|------|-----------|---------|
+| Constants | SCREAMING_SNAKE_CASE | `MAX_PROFILES = 500` |
+| Functions | camelCase | `launchProfile()` |
+| Classes | PascalCase | `BrowserManager` |
+| Types/Interfaces | PascalCase | `Profile`, `FingerprintConfig` |
+| React components | PascalCase | `<ProfileCard />` |
+| Stores | camelCase + `Store` | `useProfileStore` |
+| Enum keys | PascalCase | `enum Status { Active, Inactive }` |
+
+### File Organization
+
+```
+src/main/
+├── index.ts              # Entry point (app events, window creation)
+├── database.ts           # SQLite wrapper
+├── browser-manager.ts    # Chromium launcher
+├── auth.ts               # Login/token management
+├── api-client.ts         # HTTP requests to backend
+├── modules/              # Feature domains
+│   ├── profiles.ts
+│   ├── workflows.ts
+│   ├── detection.ts
+│   └── ...
+├── fingerprint/          # Injection engine
+│   ├── injector.ts
+│   ├── presets.ts
+│   └── scripts/          # JS override strings
+├── ipc/
+│   └── handlers.ts       # All ipcMain.handle() calls
+└── utils/                # Helpers
+    ├── crypto.ts
+    ├── validators.ts
+    └── ...
+```
+
+### Comments
+
+- **Why** (not what): Code should read clearly; comments explain reasoning
+- **Before complex logic**: Explain the algorithm at a high level
+- **Avoid**: Obvious comments like `// increment x`
+- **Use**: TODO, FIXME, HACK marks for code debt
+
+```typescript
+// BAD
+x++  // increment x
+
+// GOOD
+// Reserve profile slots for pending launches to avoid over-subscription
+reservedSlots += pendingCount
+```
+
+---
+
+## Testing Strategy
+
+### Unit Tests (Zustand stores, utilities)
+```bash
+npm run test:unit
+```
+
+### Integration Tests (IPC, DB)
+```bash
+npm run test:integration
+```
+
+### E2E Tests (Full app workflow)
+```bash
+npm run test:e2e
+```
+
+### Manual Testing Checklist
+
+- [ ] Launch profile → verify Chromium starts
+- [ ] Run workflow → verify steps execute in order
+- [ ] Cloud sync → verify profiles encrypted
+- [ ] Fingerprint injection → verify canvas noise applied
+- [ ] Settings persist → restart app, verify settings remain
+
+---
+
+## Common Tasks
+
+### Add a new fingerprint vector
+
+1. Create `src/main/fingerprint/scripts/my-vector.ts`
+   ```typescript
+   export function buildMyVectorScript(seed: string): string {
+     return `
+       // My vector implementation
+       Object.defineProperty(navigator, 'myProperty', {
+         get: () => 'spoofed-value'
+       })
+     `
+   }
+   ```
+
+2. Update `src/main/fingerprint/injector.ts`
+   ```typescript
+   import { buildMyVectorScript } from './scripts/my-vector'
+   
+   scripts.push(buildMyVectorScript(seed))
+   ```
+
+3. Update `src/shared/types.ts`
+   ```typescript
+   interface FingerprintConfig {
+     // ... existing
+     myVectorConfig?: { enabled: boolean }
+   }
+   ```
+
+### Add a new automation action
+
+1. Define type in `src/shared/types.ts`
+   ```typescript
+   type AutomationAction = 
+     | { type: 'navigate'; url: string }
+     | { type: 'myNewAction'; myParam: string }
+   ```
+
+2. Implement in `src/main/automation.ts`
+   ```typescript
+   case 'myNewAction':
+     return await executeMyNewAction(step, page, variables)
+   ```
+
+3. Update UI: `src/renderer/src/components/Automation/ActionEditor.tsx`
+
+---
+
+## Debugging Tips
+
+### Enable verbose logging
+
+```bash
+LOG_LEVEL=debug npm run dev
+```
+
+### Inspect IPC traffic
+
+In main process:
+```typescript
+ipcMain.on('message', (event, msg) => console.log('[IPC]', msg))
+```
+
+### Chrome DevTools for profiles
+
+When profile launches on port `XXXX`:
+```
+chrome://inspect/#devices
+→ Add port localhost:XXXX
+→ Click "inspect" to open DevTools for running profile
+```
+
+### Profile database manually
+
+Open `userData/db.sqlite` with SQLite browser:
+```bash
+sqlite3 ~/.config/ghostbrowser/db.sqlite
+> .mode column
+> SELECT * FROM profiles LIMIT 5;
+```
