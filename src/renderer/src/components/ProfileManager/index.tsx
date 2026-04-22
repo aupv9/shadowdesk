@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Plus, RefreshCw, X, FolderPlus, CheckSquare, ShieldAlert, Upload, MonitorX,
   LayoutGrid, List, ArrowDownAZ, ArrowUpAZ, CalendarClock, CalendarPlus,
 } from 'lucide-react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { useProfileStore } from '../../stores/profileStore'
 import { useProxyStore } from '../../stores/proxyStore'
 import { useGroupStore } from '../../stores/groupStore'
@@ -23,6 +24,7 @@ import { ExtensionsModal } from './ExtensionsModal'
 import { WarmUpModal } from './WarmUpModal'
 import { CollisionsDrawer } from './CollisionsDrawer'
 import { ImportGuideModal } from './ImportGuideModal'
+import { LaunchErrorModal } from './LaunchErrorModal'
 import { useImportStore } from '../../stores/importStore'
 import {
   AdvancedFilters, DEFAULT_FILTERS,
@@ -35,6 +37,231 @@ import { CleanupMonitor } from './CleanupMonitor'
 import { BulkActionsToolbar } from './BulkActionsToolbar'
 import { Header } from '../Layout/Header'
 import type { Profile } from '../../types'
+
+// Phase 13.B — Virtualized profile list for 500+ profile performance
+const GRID_ROW_HEIGHT = 240
+const LIST_ROW_HEIGHT = 52
+
+function useGridColumns() {
+  const [cols, setCols] = useState(4)
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth - 280 // sidebar width estimate
+      setCols(w >= 1280 ? 4 : w >= 1024 ? 3 : w >= 640 ? 2 : 1)
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+  return cols
+}
+
+interface VirtualizedProfileListProps {
+  filtered: Profile[]
+  profiles: Profile[]
+  loading: boolean
+  viewMode: ViewMode
+  selectionMode: boolean
+  selected: Set<string>
+  activeSessions: string[]
+  launching: string | null
+  highlightId: string | null
+  quickFilter: QuickFilter
+  onSetShowCreate: () => void
+  onSetQuickFilter: (q: QuickFilter) => void
+  onToggleSelect: (id: string) => void
+  onLaunch: (id: string) => void
+  onClose: (id: string) => void
+  onEdit: (p: Profile) => void
+  onClone: (id: string) => void
+  onDelete: (id: string) => void
+  onCookieModal: (v: { profile: Profile; mode: 'browse' | 'import' | 'export' }) => void
+  onStorage: (p: Profile) => void
+  onExportBundle: (id: string) => void
+  onImportBundle: () => void
+  onHistory: (p: Profile) => void
+  onExtensions: (p: Profile) => void
+  onWarmUp: (p: Profile) => void
+  onApplyDrift: (p: Profile) => void
+  onToggleSyncExcluded: (p: Profile) => void
+  children?: React.ReactNode
+}
+
+function VirtualizedProfileList({
+  filtered, profiles, loading, viewMode, selectionMode, selected, activeSessions,
+  launching, highlightId, quickFilter,
+  onSetShowCreate, onSetQuickFilter, onToggleSelect,
+  onLaunch, onClose, onEdit, onClone, onDelete, onCookieModal, onStorage,
+  onExportBundle, onImportBundle, onHistory, onExtensions, onWarmUp,
+  onApplyDrift, onToggleSyncExcluded, children,
+}: VirtualizedProfileListProps) {
+  const parentRef = useRef<HTMLDivElement>(null)
+  const gridCols = useGridColumns()
+
+  const gridRowCount = Math.ceil(filtered.length / gridCols)
+  const isGrid = viewMode === 'grid'
+
+  const virtualizer = useVirtualizer({
+    count: isGrid ? gridRowCount : filtered.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => isGrid ? GRID_ROW_HEIGHT : LIST_ROW_HEIGHT,
+    overscan: 5,
+  })
+
+  if (loading && profiles.length === 0) {
+    return (
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex items-center justify-center h-40 text-slate-500 text-sm">
+          Loading profiles...
+        </div>
+      </div>
+    )
+  }
+
+  if (filtered.length === 0) {
+    return (
+      <div className="flex-1 overflow-y-auto p-6">
+        {profiles.length === 0 ? (
+          <EmptyState
+            icon={MonitorX}
+            title="No profiles yet"
+            description="Create your first browser profile with a unique fingerprint to get started."
+            actionLabel="Create Profile"
+            onAction={onSetShowCreate}
+          />
+        ) : (
+          <EmptyState
+            icon={MonitorX}
+            title="No profiles match"
+            description={
+              quickFilter !== 'all'
+                ? 'Try clearing the quick filter above, changing your search, or switching groups.'
+                : 'Try a different search term or group filter.'
+            }
+            actionLabel={quickFilter !== 'all' ? 'Clear quick filter' : undefined}
+            onAction={quickFilter !== 'all' ? () => onSetQuickFilter('all') : undefined}
+          />
+        )}
+        {children}
+      </div>
+    )
+  }
+
+  const renderCardProps = (profile: Profile) => ({
+    profile,
+    isActive: activeSessions.includes(profile.id),
+    isLaunching: launching === profile.id,
+    onLaunch: () => onLaunch(profile.id),
+    onClose: () => onClose(profile.id),
+    onEdit: () => onEdit(profile),
+    onClone: () => onClone(profile.id),
+    onDelete: () => onDelete(profile.id),
+    onImportCookies: () => onCookieModal({ profile, mode: 'browse' }),
+    onExportCookies: () => onCookieModal({ profile, mode: 'export' }),
+    onStorage: () => onStorage(profile),
+    onExportBundle: () => onExportBundle(profile.id),
+    onImportBundle,
+    onHistory: () => onHistory(profile),
+    onExtensions: () => onExtensions(profile),
+    onWarmUp: () => onWarmUp(profile),
+    onApplyDrift: () => onApplyDrift(profile),
+    onToggleSyncExcluded: () => onToggleSyncExcluded(profile),
+  })
+
+  return (
+    <div ref={parentRef} className="flex-1 overflow-y-auto p-6">
+      {isGrid ? (
+        <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative' }}>
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const startIdx = virtualRow.index * gridCols
+            const rowProfiles = filtered.slice(startIdx, startIdx + gridCols)
+            return (
+              <div
+                key={virtualRow.key}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: virtualRow.size,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+                className={`grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`}
+              >
+                {rowProfiles.map((profile) => (
+                  <div
+                    key={profile.id}
+                    id={`profile-card-${profile.id}`}
+                    className={`relative transition-shadow ${
+                      highlightId === profile.id
+                        ? 'ring-2 ring-amber-400 rounded-xl shadow-lg shadow-amber-500/20'
+                        : ''
+                    }`}
+                  >
+                    {selectionMode && (
+                      <div
+                        className="absolute inset-0 z-10 flex items-start justify-end p-2 cursor-pointer"
+                        onClick={() => onToggleSelect(profile.id)}
+                      >
+                        <input type="checkbox" readOnly checked={selected.has(profile.id)} className="w-4 h-4 accent-indigo-500 cursor-pointer" />
+                      </div>
+                    )}
+                    <ProfileCard {...renderCardProps(profile)} />
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/30 overflow-hidden">
+          <div className="hidden md:flex items-center gap-4 px-4 py-2 text-[10px] uppercase tracking-wide text-slate-500 border-b border-slate-800 bg-slate-800/40">
+            {selectionMode && <span className="w-4" />}
+            <span className="w-9" />
+            <span className="flex-1">Profile</span>
+            <span className="w-40">Proxy</span>
+            <span className="hidden lg:inline w-24">Screen</span>
+            <span className="hidden lg:inline w-28">Last used</span>
+            <span className="w-[76px]">Action</span>
+            <span className="w-7" />
+          </div>
+          <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative' }}>
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const profile = filtered[virtualRow.index]
+              return (
+                <div
+                  key={virtualRow.key}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: virtualRow.size,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                  id={`profile-card-${profile.id}`}
+                  className={`transition-shadow ${
+                    highlightId === profile.id
+                      ? 'ring-2 ring-inset ring-amber-400 shadow-inner shadow-amber-500/20'
+                      : ''
+                  }`}
+                >
+                  <ProfileListRow
+                    {...renderCardProps(profile)}
+                    selected={selected.has(profile.id)}
+                    selectionMode={selectionMode}
+                    onToggleSelect={() => onToggleSelect(profile.id)}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+      {children}
+    </div>
+  )
+}
 
 /** Sort options for the profile list. Persisted via `useLocalStorage`. */
 type SortKey = 'name-asc' | 'name-desc' | 'last-used' | 'created-desc' | 'created-asc'
@@ -88,6 +315,7 @@ export function ProfileManager() {
   const [showCollisions, setShowCollisions] = useState(false)
   const [showImportGuide, setShowImportGuide] = useState(false)
   const [highlightId,    setHighlightId]    = useState<string | null>(null)
+  const [launchError,    setLaunchError]    = useState<{ profileName: string; message: string } | null>(null)
 
   // Preferences persisted to localStorage so power users don't need to
   // re-set their preferred view every time they re-open the app.
@@ -164,6 +392,37 @@ export function ProfileManager() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Phase 13.C — Additional keyboard shortcuts
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
+        const focusedTag = document.activeElement?.tagName.toLowerCase()
+        if (focusedTag !== 'input' && focusedTag !== 'textarea' && focusedTag !== 'select') {
+          e.preventDefault()
+          document.querySelector<HTMLInputElement>('.header-search')?.focus()
+        }
+      }
+      if (e.key === ' ' && !e.ctrlKey && !e.metaKey && !showCreate && !editProfile && !cookieModal) {
+        const focusedTag = document.activeElement?.tagName.toLowerCase()
+        if (focusedTag !== 'input' && focusedTag !== 'textarea' && focusedTag !== 'button') {
+          if (filtered.length > 0) {
+            e.preventDefault()
+            const firstId = filtered[0].id
+            if (activeSessions.includes(firstId)) {
+              closeProfile(firstId)
+            } else {
+              handleLaunch(firstId)
+            }
+          }
+        }
+      }
+      if (e.key === 'Escape') {
+        if (search) {
+          setSearch('')
+        } else if (selectionMode) {
+          setSelectionMode(false)
+          setSelected(new Set())
+        }
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); setShowCreate(true) }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); document.querySelector<HTMLInputElement>('.header-search')?.focus() }
       if ((e.ctrlKey || e.metaKey) && e.key === 'r') { e.preventDefault(); fetchProfiles(); fetchActiveSessions() }
@@ -178,7 +437,7 @@ export function ProfileManager() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [filtered, activeSessions, showCreate, editProfile, cookieModal])
+  }, [filtered, activeSessions, showCreate, editProfile, cookieModal, search, selectionMode])
 
   const handleLaunch = async (id: string) => {
     setLaunching(id)
@@ -186,7 +445,9 @@ export function ProfileManager() {
     try {
       await launchProfile(id)
     } catch (e: any) {
-      setError(e.message ?? 'Failed to launch profile')
+      const msg = e.message ?? 'Failed to launch profile'
+      setError(msg)
+      setLaunchError({ profileName: profiles.find(p => p.id === id)?.name ?? id, message: msg })
     } finally {
       setLaunching(null)
     }
@@ -762,134 +1023,35 @@ export function ProfileManager() {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-6">
-        {loading && profiles.length === 0 ? (
-          <div className="flex items-center justify-center h-40 text-slate-500 text-sm">
-            Loading profiles...
-          </div>
-        ) : filtered.length === 0 ? (
-          profiles.length === 0 ? (
-            <EmptyState
-              icon={MonitorX}
-              title="No profiles yet"
-              description="Create your first browser profile with a unique fingerprint to get started."
-              actionLabel="Create Profile"
-              onAction={() => setShowCreate(true)}
-            />
-          ) : (
-            <EmptyState
-              icon={MonitorX}
-              title="No profiles match"
-              description={
-                quickFilter !== 'all'
-                  ? 'Try clearing the quick filter above, changing your search, or switching groups.'
-                  : 'Try a different search term or group filter.'
-              }
-              actionLabel={quickFilter !== 'all' ? 'Clear quick filter' : undefined}
-              onAction={quickFilter !== 'all' ? () => setQuickFilter('all') : undefined}
-            />
-          )
-        ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filtered.map((profile) => (
-              <div
-                key={profile.id}
-                id={`profile-card-${profile.id}`}
-                className={`relative transition-shadow ${
-                  highlightId === profile.id
-                    ? 'ring-2 ring-amber-400 rounded-xl shadow-lg shadow-amber-500/20'
-                    : ''
-                }`}
-              >
-                {selectionMode && (
-                  <div
-                    className="absolute inset-0 z-10 flex items-start justify-end p-2 cursor-pointer"
-                    onClick={() => toggleSelect(profile.id)}
-                  >
-                    <input
-                      type="checkbox"
-                      readOnly
-                      checked={selected.has(profile.id)}
-                      className="w-4 h-4 accent-indigo-500 cursor-pointer"
-                    />
-                  </div>
-                )}
-                <ProfileCard
-                  profile={profile}
-                  isActive={activeSessions.includes(profile.id)}
-                  isLaunching={launching === profile.id}
-                  onLaunch={() => handleLaunch(profile.id)}
-                  onClose={() => closeProfile(profile.id)}
-                  onEdit={() => setEditProfile(profile)}
-                  onClone={() => handleClone(profile.id)}
-                  onDelete={() => handleDelete(profile.id)}
-                  onImportCookies={() => setCookieModal({ profile, mode: 'browse' })}
-                  onExportCookies={() => setCookieModal({ profile, mode: 'export' })}
-                  onStorage={() => setStorageProfile(profile)}
-                  onExportBundle={() => handleExportBundle(profile.id)}
-                  onImportBundle={handleImportBundle}
-                  onHistory={() => setHistoryProfile(profile)}
-                  onExtensions={() => setExtensionsProfile(profile)}
-                  onWarmUp={() => setWarmUpProfile(profile)}
-                  onApplyDrift={() => handleApplyDrift(profile)}
-                  onToggleSyncExcluded={() => handleToggleSyncExcluded(profile)}
-                />
-              </div>
-            ))}
-          </div>
-        ) : (
-          // List view — denser, scannable row layout. Shares the same action
-          // set as ProfileCard via the overflow menu so feature parity is
-          // preserved across both view modes.
-          <div className="rounded-xl border border-slate-800 bg-slate-900/30 overflow-hidden">
-            <div className="hidden md:flex items-center gap-4 px-4 py-2 text-[10px] uppercase tracking-wide text-slate-500 border-b border-slate-800 bg-slate-800/40">
-              {selectionMode && <span className="w-4" />}
-              <span className="w-9" />
-              <span className="flex-1">Profile</span>
-              <span className="w-40">Proxy</span>
-              <span className="hidden lg:inline w-24">Screen</span>
-              <span className="hidden lg:inline w-28">Last used</span>
-              <span className="w-[76px]">Action</span>
-              <span className="w-7" />
-            </div>
-            {filtered.map((profile) => (
-              <div
-                key={profile.id}
-                id={`profile-card-${profile.id}`}
-                className={`transition-shadow ${
-                  highlightId === profile.id
-                    ? 'ring-2 ring-inset ring-amber-400 shadow-inner shadow-amber-500/20'
-                    : ''
-                }`}
-              >
-                <ProfileListRow
-                  profile={profile}
-                  isActive={activeSessions.includes(profile.id)}
-                  isLaunching={launching === profile.id}
-                  selected={selected.has(profile.id)}
-                  selectionMode={selectionMode}
-                  onToggleSelect={() => toggleSelect(profile.id)}
-                  onLaunch={() => handleLaunch(profile.id)}
-                  onClose={() => closeProfile(profile.id)}
-                  onEdit={() => setEditProfile(profile)}
-                  onClone={() => handleClone(profile.id)}
-                  onDelete={() => handleDelete(profile.id)}
-                  onImportCookies={() => setCookieModal({ profile, mode: 'browse' })}
-                  onExportCookies={() => setCookieModal({ profile, mode: 'export' })}
-                  onStorage={() => setStorageProfile(profile)}
-                  onExportBundle={() => handleExportBundle(profile.id)}
-                  onImportBundle={handleImportBundle}
-                  onHistory={() => setHistoryProfile(profile)}
-                  onExtensions={() => setExtensionsProfile(profile)}
-                  onWarmUp={() => setWarmUpProfile(profile)}
-                  onApplyDrift={() => handleApplyDrift(profile)}
-                  onToggleSyncExcluded={() => handleToggleSyncExcluded(profile)}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
+      <VirtualizedProfileList
+        filtered={filtered}
+        profiles={profiles}
+        loading={loading}
+        viewMode={viewMode}
+        selectionMode={selectionMode}
+        selected={selected}
+        activeSessions={activeSessions}
+        launching={launching}
+        highlightId={highlightId}
+        quickFilter={quickFilter}
+        onSetShowCreate={() => setShowCreate(true)}
+        onSetQuickFilter={setQuickFilter}
+        onToggleSelect={toggleSelect}
+        onLaunch={handleLaunch}
+        onClose={closeProfile}
+        onEdit={setEditProfile}
+        onClone={handleClone}
+        onDelete={handleDelete}
+        onCookieModal={setCookieModal}
+        onStorage={setStorageProfile}
+        onExportBundle={handleExportBundle}
+        onImportBundle={handleImportBundle}
+        onHistory={setHistoryProfile}
+        onExtensions={setExtensionsProfile}
+        onWarmUp={setWarmUpProfile}
+        onApplyDrift={handleApplyDrift}
+        onToggleSyncExcluded={handleToggleSyncExcluded}
+      >
         {/* Phase 3: Pagination controls — shown when pagination is enabled */}
         {paginationEnabled && profiles.length > 0 && (
           <PaginationControls
@@ -901,7 +1063,7 @@ export function ProfileManager() {
             onLimitChange={setPaginationLimit}
           />
         )}
-      </div>
+      </VirtualizedProfileList>
 
       {/* Phase 3: Enhanced Bulk Actions Toolbar */}
       <BulkActionsToolbar
@@ -975,6 +1137,14 @@ export function ProfileManager() {
             setShowImportGuide(false)
             pickAndImport()
           }}
+        />
+      )}
+      {launchError && (
+        <LaunchErrorModal
+          profileName={launchError.profileName}
+          errorMessage={launchError.message}
+          onClose={() => setLaunchError(null)}
+          onRetry={() => handleLaunch(profiles.find(p => p.name === launchError.profileName)?.id ?? '')}
         />
       )}
     </div>

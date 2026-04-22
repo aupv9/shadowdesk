@@ -29,7 +29,8 @@ const api = {
     restoreVersion:     (profileId: string, versionId: string)=> ipcRenderer.invoke('profiles:restoreVersion', profileId, versionId),
     deleteVersion:      (versionId: string)                   => ipcRenderer.invoke('profiles:deleteVersion', versionId),
     // Phase 12.C.4
-    detectCollisions:   ()                                    => ipcRenderer.invoke('profiles:detectCollisions')
+    detectCollisions:   ()                                    => ipcRenderer.invoke('profiles:detectCollisions'),
+    search:             (query: string, groupId?: string)     => ipcRenderer.invoke('profiles:search', query, groupId)
   },
   cookies: {
     import:   (profileId: string, text: string, format: 'netscape' | 'json') =>

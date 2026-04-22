@@ -272,6 +272,10 @@ export function registerIpcHandlers(): void {
     return db.getProfilesPaginated(limit, offset, filters)
   })
 
+  ipcMain.handle('profiles:search', async (_event, query: string, groupId?: string) => {
+    return db.searchProfiles(query, groupId)
+  })
+
   ipcMain.handle('profiles:create', (_event, input: CreateProfileInput) => {
     // Phase 4.2: Validate input before DB write
     const validationError = validateCreateProfileInput(input)

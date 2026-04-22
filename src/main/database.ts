@@ -654,6 +654,8 @@ export class Database {
       CREATE INDEX IF NOT EXISTS idx_gesture_templates_type ON gesture_templates(gesture_type);
     `)
 
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_profiles_name ON profiles(name)`)
+
     // Backfill fingerprint_hash for existing profiles that don't have one
     try {
       const rows = this.queryAll(`SELECT id, fingerprint FROM profiles WHERE fingerprint_hash IS NULL AND status = 'active'`)
@@ -1119,6 +1121,44 @@ export class Database {
       )
     }
     return row
+  }
+
+  searchProfiles(query: string, groupId?: string, limit = 100): any[] {
+    const likeParam = `%${query}%`
+    const conditions = [
+      `p.status = 'active'`,
+      `(p.name LIKE ? OR p.notes LIKE ? OR p.fingerprint LIKE ?)`
+    ]
+    const params: any[] = [likeParam, likeParam, likeParam]
+
+    if (groupId) {
+      conditions.push(`p.group_id = ?`)
+      params.push(groupId)
+    }
+
+    params.push(limit)
+
+    const rows = this.queryAll(`
+      SELECT p.*,
+             pr.host || ':' || CAST(pr.port AS TEXT) AS proxy_label,
+             pr.type AS proxy_type,
+             pg.name  AS group_name,
+             pg.color AS group_color
+      FROM profiles p
+      LEFT JOIN proxies pr ON p.proxy_id = pr.id
+      LEFT JOIN profile_groups pg ON p.group_id = pg.id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY p.last_used_at DESC NULLS LAST
+      LIMIT ?
+    `, params)
+
+    return rows.map((row) => {
+      const decrypted = this.decryptProfileRow(row)
+      try {
+        decrypted.fingerprint = JSON.parse(decrypted.fingerprint)
+      } catch { /* keep as-is if not valid JSON */ }
+      return decrypted
+    })
   }
 
   getAllProfiles(): any[] {

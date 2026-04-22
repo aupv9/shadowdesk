@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { CheckCircle, AlertCircle, Info, RefreshCw, ChevronDown, Sliders, AlertTriangle, Layers } from 'lucide-react'
 import { Header } from '../Layout/Header'
 import { useProfileStore } from '../../stores/profileStore'
@@ -27,52 +27,52 @@ function isLocaleTzMismatch(locale: string, timezone: string): boolean {
 }
 
 const VECTORS = [
-  { category: 'Browser',    name: 'User-Agent / UA-CH',        risk: 'critical', status: 'spoofed' },
-  { category: 'Browser',    name: 'Platform / OS Version',     risk: 'critical', status: 'spoofed' },
-  { category: 'Graphics',   name: 'Canvas Fingerprint',         risk: 'critical', status: 'spoofed' },
-  { category: 'Graphics',   name: 'WebGL Vendor/Renderer',      risk: 'high',     status: 'spoofed' },
-  { category: 'Graphics',   name: 'WebGL Parameters',           risk: 'high',     status: 'spoofed' },
-  { category: 'Audio',      name: 'AudioContext',                risk: 'high',     status: 'spoofed' },
-  { category: 'Hardware',   name: 'Screen Resolution',          risk: 'medium',   status: 'spoofed' },
-  { category: 'Hardware',   name: 'Device Memory',              risk: 'medium',   status: 'spoofed' },
-  { category: 'Hardware',   name: 'Hardware Concurrency',       risk: 'medium',   status: 'spoofed' },
-  { category: 'Network',    name: 'WebRTC Local IP',            risk: 'critical', status: 'spoofed' },
-  { category: 'Locale',     name: 'Timezone',                   risk: 'high',     status: 'spoofed' },
-  { category: 'Locale',     name: 'Language / Accept-Language', risk: 'high',     status: 'spoofed' },
-  { category: 'Fonts',      name: 'Font Enumeration',           risk: 'high',     status: 'spoofed' },
-  { category: 'Fonts',      name: 'Font Metrics',               risk: 'medium',   status: 'spoofed' },
-  { category: 'DOM',        name: 'ClientRects noise',          risk: 'medium',   status: 'spoofed' },
-  { category: 'API',        name: 'Battery API',                risk: 'low',      status: 'spoofed' },
-  { category: 'API',        name: 'Media Devices',              risk: 'medium',   status: 'spoofed' },
-  { category: 'API',        name: 'Speech Synthesis Voices',    risk: 'low',      status: 'spoofed' },
-  { category: 'Browser',    name: 'Plugin / MimeType List',     risk: 'high',     status: 'spoofed' },
-  { category: 'Mobile',     name: 'Touch Points / Events',      risk: 'high',     status: 'spoofed' },
-  { category: 'Mobile',     name: 'Device Pixel Ratio',         risk: 'medium',   status: 'spoofed' },
-  { category: 'Mobile',     name: 'Mobile UA & Platform',       risk: 'critical', status: 'spoofed' },
+  { category: 'Browser',    name: 'User-Agent / UA-CH',        risk: 'critical', status: 'spoofed', tooltip: 'Controls browser identity string and Client Hints headers. Critical for matching browser/OS consistency.' },
+  { category: 'Browser',    name: 'Platform / OS Version',     risk: 'critical', status: 'spoofed', tooltip: 'Spoofs navigator.platform and OS version strings to match the selected preset.' },
+  { category: 'Graphics',   name: 'Canvas Fingerprint',         risk: 'critical', status: 'spoofed', tooltip: 'Injects deterministic noise into canvas rendering to prevent unique GPU-based identification.' },
+  { category: 'Graphics',   name: 'WebGL Vendor/Renderer',      risk: 'high',     status: 'spoofed', tooltip: 'Overrides GPU vendor/renderer strings reported by WebGL API.' },
+  { category: 'Graphics',   name: 'WebGL Parameters',           risk: 'high',     status: 'spoofed', tooltip: 'Spoofs WebGL extension and parameter queries to match common GPU profiles.' },
+  { category: 'Audio',      name: 'AudioContext',                risk: 'high',     status: 'spoofed', tooltip: 'Adds noise to AudioContext processing to prevent audio-based fingerprinting.' },
+  { category: 'Hardware',   name: 'Screen Resolution',          risk: 'medium',   status: 'spoofed', tooltip: 'Overrides screen.width/height and related properties.' },
+  { category: 'Hardware',   name: 'Device Memory',              risk: 'medium',   status: 'spoofed', tooltip: 'Spoofs navigator.deviceMemory to a common value (4/8 GB).' },
+  { category: 'Hardware',   name: 'Hardware Concurrency',       risk: 'medium',   status: 'spoofed', tooltip: 'Overrides navigator.hardwareConcurrency (CPU core count).' },
+  { category: 'Network',    name: 'WebRTC Local IP',            risk: 'critical', status: 'spoofed', tooltip: 'Prevents local IP address leaks through WebRTC ICE candidates.' },
+  { category: 'Locale',     name: 'Timezone',                   risk: 'high',     status: 'spoofed', tooltip: 'Spoofs Intl.DateTimeFormat timezone to match the profile\'s locale.' },
+  { category: 'Locale',     name: 'Language / Accept-Language', risk: 'high',     status: 'spoofed', tooltip: 'Controls navigator.language and Accept-Language HTTP header.' },
+  { category: 'Fonts',      name: 'Font Enumeration',           risk: 'high',     status: 'spoofed', tooltip: 'Whitelists fonts reported by document.fonts.check() to a platform-appropriate set.' },
+  { category: 'Fonts',      name: 'Font Metrics',               risk: 'medium',   status: 'spoofed', tooltip: 'Adds subtle noise to measureText() results to prevent font metric fingerprinting.' },
+  { category: 'DOM',        name: 'ClientRects noise',          risk: 'medium',   status: 'spoofed', tooltip: 'Injects sub-pixel noise into getBoundingClientRect() and getClientRects().' },
+  { category: 'API',        name: 'Battery API',                risk: 'low',      status: 'spoofed', tooltip: 'Spoofs or blocks the Battery Status API to prevent charge-level tracking.' },
+  { category: 'API',        name: 'Media Devices',              risk: 'medium',   status: 'spoofed', tooltip: 'Controls the number and types of media devices reported by enumerateDevices().' },
+  { category: 'API',        name: 'Speech Synthesis Voices',    risk: 'low',      status: 'spoofed', tooltip: 'Filters speechSynthesis.getVoices() to OS-appropriate voice subset.' },
+  { category: 'Browser',    name: 'Plugin / MimeType List',     risk: 'high',     status: 'spoofed', tooltip: 'Overrides navigator.plugins with a realistic browser plugin set.' },
+  { category: 'Mobile',     name: 'Touch Points / Events',      risk: 'high',     status: 'spoofed', tooltip: 'Spoofs maxTouchPoints and touch event support for mobile emulation.' },
+  { category: 'Mobile',     name: 'Device Pixel Ratio',         risk: 'medium',   status: 'spoofed', tooltip: 'Overrides window.devicePixelRatio to match the target device.' },
+  { category: 'Mobile',     name: 'Mobile UA & Platform',       risk: 'critical', status: 'spoofed', tooltip: 'Ensures mobile User-Agent, platform, and feature flags are consistent.' },
   // Phase 5: New vectors
-  { category: 'Evasion',    name: 'CDP Automation Hiding',      risk: 'critical', status: 'spoofed' },
-  { category: 'Evasion',    name: 'ChromeDriver Variables',     risk: 'critical', status: 'spoofed' },
-  { category: 'Evasion',    name: 'Error Stack Sanitization',   risk: 'high',     status: 'spoofed' },
-  { category: 'Evasion',    name: 'Function.toString Masking',  risk: 'high',     status: 'spoofed' },
-  { category: 'Evasion',    name: 'Headless Signal Hiding',     risk: 'critical', status: 'spoofed' },
-  { category: 'API',        name: 'Permissions API',            risk: 'medium',   status: 'spoofed' },
-  { category: 'API',        name: 'Storage Quota',              risk: 'medium',   status: 'spoofed' },
-  { category: 'Network',    name: 'Network Information API',    risk: 'medium',   status: 'spoofed' },
-  { category: 'API',        name: 'Performance Entries',        risk: 'high',     status: 'spoofed' },
-  { category: 'Browser',    name: 'chrome.runtime Stub',        risk: 'high',     status: 'spoofed' },
-  { category: 'Browser',    name: 'chrome.loadTimes Stub',      risk: 'medium',   status: 'spoofed' },
-  { category: 'Evasion',    name: 'iframe contentWindow',       risk: 'medium',   status: 'spoofed' },
+  { category: 'Evasion',    name: 'CDP Automation Hiding',      risk: 'critical', status: 'spoofed', tooltip: 'Removes Chrome DevTools Protocol traces that indicate automation.' },
+  { category: 'Evasion',    name: 'ChromeDriver Variables',     risk: 'critical', status: 'spoofed', tooltip: 'Cleans up global variables (cdc_, $cdc_) left by ChromeDriver.' },
+  { category: 'Evasion',    name: 'Error Stack Sanitization',   risk: 'high',     status: 'spoofed', tooltip: 'Removes automation framework paths from Error.stack traces.' },
+  { category: 'Evasion',    name: 'Function.toString Masking',  risk: 'high',     status: 'spoofed', tooltip: 'Ensures overridden functions return \'[native code]\' from toString().' },
+  { category: 'Evasion',    name: 'Headless Signal Hiding',     risk: 'critical', status: 'spoofed', tooltip: 'Removes indicators of headless Chrome (navigator.webdriver, etc.).' },
+  { category: 'API',        name: 'Permissions API',            risk: 'medium',   status: 'spoofed', tooltip: 'Spoofs Permissions.query() results for consistent permission states.' },
+  { category: 'API',        name: 'Storage Quota',              risk: 'medium',   status: 'spoofed', tooltip: 'Overrides StorageManager.estimate() to return realistic quota values.' },
+  { category: 'Network',    name: 'Network Information API',    risk: 'medium',   status: 'spoofed', tooltip: 'Spoofs navigator.connection properties (effectiveType, downlink, rtt).' },
+  { category: 'API',        name: 'Performance Entries',        risk: 'high',     status: 'spoofed', tooltip: 'Sanitizes performance.getEntries() to remove automation-related entries.' },
+  { category: 'Browser',    name: 'chrome.runtime Stub',        risk: 'high',     status: 'spoofed', tooltip: 'Provides a chrome.runtime stub so sites see a normal Chrome extension API.' },
+  { category: 'Browser',    name: 'chrome.loadTimes Stub',      risk: 'medium',   status: 'spoofed', tooltip: 'Stubs the deprecated chrome.loadTimes() for older detection scripts.' },
+  { category: 'Evasion',    name: 'iframe contentWindow',       risk: 'medium',   status: 'spoofed', tooltip: 'Propagates fingerprint overrides into cross-origin iframe contexts.' },
   // Phase 6: New vectors
-  { category: 'Behavior',   name: 'Mouse Jitter Simulation',    risk: 'high',     status: 'spoofed' },
-  { category: 'Behavior',   name: 'Typing Cadence Noise',       risk: 'medium',   status: 'spoofed' },
-  { category: 'Behavior',   name: 'Scroll Inertia Simulation',  risk: 'medium',   status: 'spoofed' },
-  { category: 'Timing',     name: 'Date.now() Quantisation',    risk: 'high',     status: 'spoofed' },
-  { category: 'Timing',     name: 'rAF Timestamp Jitter',       risk: 'medium',   status: 'spoofed' },
-  { category: 'Timing',     name: 'performance.now() Clamping', risk: 'high',     status: 'spoofed' },
-  { category: 'Timing',     name: 'Atomics.wait() Noise',       risk: 'medium',   status: 'spoofed' },
-  { category: 'Evasion',    name: 'Object.defineProperty Trap', risk: 'high',     status: 'spoofed' },
-  { category: 'Evasion',    name: 'Worker webdriver Patch',     risk: 'critical', status: 'spoofed' },
-  { category: 'Evasion',    name: 'Blink Internal Masking',     risk: 'high',     status: 'spoofed' },
+  { category: 'Behavior',   name: 'Mouse Jitter Simulation',    risk: 'high',     status: 'spoofed', tooltip: 'Adds realistic micro-movements to mouse events to mimic human behavior.' },
+  { category: 'Behavior',   name: 'Typing Cadence Noise',       risk: 'medium',   status: 'spoofed', tooltip: 'Varies keystroke timing to simulate natural typing rhythm.' },
+  { category: 'Behavior',   name: 'Scroll Inertia Simulation',  risk: 'medium',   status: 'spoofed', tooltip: 'Adds momentum and deceleration to scroll events.' },
+  { category: 'Timing',     name: 'Date.now() Quantisation',    risk: 'high',     status: 'spoofed', tooltip: 'Reduces Date.now() precision to prevent timing-based fingerprinting.' },
+  { category: 'Timing',     name: 'rAF Timestamp Jitter',       risk: 'medium',   status: 'spoofed', tooltip: 'Adds slight jitter to requestAnimationFrame timestamps.' },
+  { category: 'Timing',     name: 'performance.now() Clamping', risk: 'high',     status: 'spoofed', tooltip: 'Clamps performance.now() to a configurable precision level.' },
+  { category: 'Timing',     name: 'Atomics.wait() Noise',       risk: 'medium',   status: 'spoofed', tooltip: 'Adds noise to SharedArrayBuffer timing measurements.' },
+  { category: 'Evasion',    name: 'Object.defineProperty Trap', risk: 'high',     status: 'spoofed', tooltip: 'Prevents detection of property descriptor overrides.' },
+  { category: 'Evasion',    name: 'Worker webdriver Patch',     risk: 'critical', status: 'spoofed', tooltip: 'Patches navigator.webdriver inside Web Worker contexts.' },
+  { category: 'Evasion',    name: 'Blink Internal Masking',     risk: 'high',     status: 'spoofed', tooltip: 'Hides Blink-internal properties that reveal automation.' },
 ]
 
 const RISK_BADGE: Record<string, string> = {
@@ -100,6 +100,9 @@ export function FingerprintEditor() {
   const [behavior, setBehavior] = useState<BehaviorConfig | null>(null)
   const [timing,   setTiming]   = useState<TimingConfig | null>(null)
 
+  // Phase 13.B — Debounce fingerprint editor changes (500ms)
+  const saveBehaviorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     if (profiles.length === 0) fetchProfiles()
     window.api.fingerprint.presets().then((p: Record<string, any>) => {
@@ -120,6 +123,29 @@ export function FingerprintEditor() {
       setTiming(null)
     }
   }, [selectedId, fp?.behavior, fp?.timing])
+
+  // Phase 13.B — Auto-save behavior/timing changes after 500ms debounce
+  useEffect(() => {
+    if (!selectedId || !fp || !behavior || !timing) return
+    // Don't debounce the initial sync from profile selection
+    if (behavior === fp.behavior && timing === fp.timing) return
+
+    if (saveBehaviorTimerRef.current) clearTimeout(saveBehaviorTimerRef.current)
+    saveBehaviorTimerRef.current = setTimeout(async () => {
+      try {
+        await window.api.profiles.update(selectedId, {
+          fingerprint: { ...fp, behavior, timing }
+        })
+        await fetchProfiles()
+        setBehaviorMsg(true)
+        setTimeout(() => setBehaviorMsg(false), 2000)
+      } catch { /* silently fail — user can manually save */ }
+    }, 500)
+
+    return () => {
+      if (saveBehaviorTimerRef.current) clearTimeout(saveBehaviorTimerRef.current)
+    }
+  }, [behavior, timing])
 
   const handleReroll = async () => {
     if (!selectedId) return
@@ -392,8 +418,9 @@ export function FingerprintEditor() {
                     ? <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
                     : <AlertCircle className="w-4 h-4 text-slate-500 shrink-0" />
                   }
-                  <span className={`text-sm flex-1 ${v.status === 'spoofed' ? 'text-slate-200' : 'text-slate-500'}`}>
+                  <span className={`text-sm flex-1 flex items-center gap-1 ${v.status === 'spoofed' ? 'text-slate-200' : 'text-slate-500'}`} title={v.tooltip}>
                     {v.name}
+                    <Info className="w-3 h-3 text-slate-500 shrink-0" />
                   </span>
                   <span className={RISK_BADGE[v.risk]}>{v.risk}</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
