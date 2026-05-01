@@ -272,6 +272,11 @@ export function registerIpcHandlers(): void {
     return db.getProfilesPaginated(limit, offset, filters)
   })
 
+  // Phase 13.B: DB-side profile search
+  ipcMain.handle('profiles:search', (_event, query: string, limit: number, offset: number, filters?: any) => {
+    return db.searchProfiles(query, limit, offset, filters)
+  })
+
   ipcMain.handle('profiles:create', (_event, input: CreateProfileInput) => {
     // Phase 4.2: Validate input before DB write
     const validationError = validateCreateProfileInput(input)

@@ -5,6 +5,7 @@ const api = {
     list:               ()                                    => ipcRenderer.invoke('profiles:list'),
     // Phase 2.1: Pagination
     listPaginated:      (limit: number, offset: number, filters?: any) => ipcRenderer.invoke('profiles:list-paginated', limit, offset, filters),
+    search:             (query: string, limit: number, offset: number, filters?: any) => ipcRenderer.invoke('profiles:search', query, limit, offset, filters),
     create:             (input: unknown)                      => ipcRenderer.invoke('profiles:create', input),
     update:             (id: string, data: unknown)           => ipcRenderer.invoke('profiles:update', id, data),
     clone:              (id: string)                          => ipcRenderer.invoke('profiles:clone', id),

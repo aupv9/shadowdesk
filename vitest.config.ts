@@ -8,12 +8,17 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/main/**/*.ts'],
-      exclude: ['src/main/index.ts', 'src/main/ipc/handlers.ts']
-    }
+      exclude: ['src/main/index.ts', 'src/main/ipc/handlers.ts'],
+      thresholds: {
+        lines: 50,
+        functions: 50,
+        branches: 40,
+      },
+    },
   },
   resolve: {
     alias: {
-      '@shared': resolve('src/shared')
-    }
-  }
+      '@shared': resolve('src/shared'),
+    },
+  },
 })

@@ -1,7 +1,7 @@
 # Ghost Browser — Development Plan
 
-> Last updated: 2026-04-06
-> Current phase: **Phase 3 — Monetization + Team** (COMPLETE)
+> Last updated: 2026-05-01
+> Current phase: **Phase 13 — Production Hardening** (Sprint 1 COMPLETE)
 
 ---
 
@@ -180,14 +180,38 @@ Step-by-step guide in `.claude/commands/fingerprint.md`.
 
 ---
 
-## Immediate Next Steps (this session)
+## Phase 13 — Production Hardening (Sprint 1) ✅ COMPLETE
 
-Phase 3 is complete. Next milestone: **Phase 4 — Advanced**
+### 13.A — Test Coverage ✅
+- ✅ `tests/unit/browser-manager.test.ts` — 51 tests (singleton, sessions, fingerprint sync, proxy selection, launch args)
+- ✅ `tests/unit/detection-test.test.ts` — 25 tests (scoring, status thresholds, result persistence, fingerprint parsing)
+- ✅ `tests/unit/sync.test.ts` — 16 tests (AES-256-GCM encrypt/decrypt, wrong password/userId, Unicode, large data, tampered ciphertext)
+- ✅ `tests/unit/api-client.test.ts` — 21 tests (JWT decode, token management, apiRequest 200/429/401, rate limit retry)
+- ✅ Coverage thresholds: 50% lines, 50% functions, 40% branches
+- ✅ CI matrix expanded to Node 18/20/22 with coverage upload
 
-1. **Custom Chromium Build** — Fork Chromium, C++ level fingerprint patches
-2. **Automation API** — REST + WebSocket server for profile automation
-3. **Mobile Fingerprint Profiles** — Android Chrome presets
-4. **RPA Builder** — Visual workflow editor
+### 13.B — Performance Optimization ✅
+- ✅ DB-side profile search (`searchProfiles()` in database.ts) — LIKE query with pagination, replaces client-side filtering
+- ✅ IPC handler `profiles:search` + preload `search()` wired up
+- ✅ Virtual scrolling for ProfileManager list view (`useVirtualList` hook, 56px row height, overscan 6)
+
+### 13.C — UX Polish ✅
+- ✅ Global keyboard shortcuts (`useGlobalShortcuts` hook): Ctrl+N, Ctrl+F, Ctrl+R, Ctrl+,, number keys 1-5 for nav
+- ✅ Welcome wizard for first-time users
+- ✅ Confirm dialog (imperative API)
+
+### 13.E — Error Handling ✅
+- ✅ Offline status banner (`OfflineBanner` component)
+- ✅ Structured error events from main process (onError subscription → toast notifications)
+
+---
+
+## Immediate Next Steps
+
+Phase 13 Sprint 1 is complete. Next: **Phase 13 Sprint 2** or **Phase 4 — Advanced**
+
+1. **Phase 13 Sprint 2** — E2E tests, Lighthouse audit, accessibility improvements
+2. **Phase 4 — Advanced** — Custom Chromium Build, Automation API, Mobile Fingerprints, RPA Builder
 
 ---
 

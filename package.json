@@ -55,6 +55,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
+    "@tanstack/react-virtual": "^3.13.24",
     "adm-zip": "^0.5.17",
     "electron-updater": "^6.8.3",
     "lucide-react": "^0.316.0",

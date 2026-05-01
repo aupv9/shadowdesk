@@ -13,7 +13,7 @@
  */
 
 import React, { useMemo, useState } from 'react'
-import { Copy, Check, TrendingUp, AlertTriangle, Info } from 'lucide-react'
+import { Copy, Check, TrendingUp, AlertTriangle, Info, Clipboard } from 'lucide-react'
 import type { FingerprintConfig } from '../../types'
 
 // ── UA syntax highlighter ────────────────────────────────────────────────────
@@ -240,6 +240,7 @@ interface Props {
 
 export function FingerprintLivePreview({ fingerprint: fp }: Props) {
   const [copied, setCopied] = useState(false)
+  const [copiedJson, setCopiedJson] = useState(false)
   const [showFactors, setShowFactors] = useState(false)
 
   const tokens = useMemo(() => tokenizeUA(fp.browser.userAgent), [fp.browser.userAgent])
@@ -249,6 +250,13 @@ export function FingerprintLivePreview({ fingerprint: fp }: Props) {
     navigator.clipboard.writeText(fp.browser.userAgent).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
+    })
+  }
+
+  const handleCopyJson = () => {
+    navigator.clipboard.writeText(JSON.stringify(fp, null, 2)).then(() => {
+      setCopiedJson(true)
+      setTimeout(() => setCopiedJson(false), 1800)
     })
   }
 
@@ -277,17 +285,30 @@ export function FingerprintLivePreview({ fingerprint: fp }: Props) {
             <span className="w-2 h-2 rounded-full bg-indigo-400" />
             Live User-Agent
           </h4>
-          <button
-            onClick={handleCopy}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-slate-700"
-            title="Copy UA string"
-          >
-            {copied ? (
-              <><Check className="w-3.5 h-3.5 text-emerald-400" /> Copied</>
-            ) : (
-              <><Copy className="w-3.5 h-3.5" /> Copy</>
-            )}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-slate-700"
+              title="Copy UA string"
+            >
+              {copied ? (
+                <><Check className="w-3.5 h-3.5 text-emerald-400" /> Copied</>
+              ) : (
+                <><Copy className="w-3.5 h-3.5" /> Copy UA</>
+              )}
+            </button>
+            <button
+              onClick={handleCopyJson}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-slate-700"
+              title="Copy fingerprint as JSON"
+            >
+              {copiedJson ? (
+                <><Check className="w-3.5 h-3.5 text-emerald-400" /> Copied!</>
+              ) : (
+                <><Clipboard className="w-3.5 h-3.5" /> Copy JSON</>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Highlighted UA string */}
@@ -315,6 +336,49 @@ export function FingerprintLivePreview({ fingerprint: fp }: Props) {
               <p className="text-xs text-slate-200 font-medium truncate" title={value}>{value}</p>
             </div>
           ))}
+        </div>
+
+        {/* Screen Resolution Visualizer */}
+        <div className="mt-3">
+          <p className="text-xs text-slate-500 mb-2">Screen Preview</p>
+          <div className="flex items-center gap-3">
+            {/* Miniature screen outline */}
+            {(() => {
+              const { width, height } = fp.screen
+              const maxW = 200
+              const scale = maxW / Math.max(width, 1)
+              const scaledW = Math.round(width * scale)
+              const scaledH = Math.round(height * scale)
+              const COMMON_RES = ['1920x1080', '1366x768', '2560x1440']
+              const LESS_COMMON_RES = ['1440x900', '1280x800', '1600x900', '1280x1024', '1024x768', '3840x2160', '1536x864']
+              const resKey = `${width}x${height}`
+              const borderColor =
+                COMMON_RES.includes(resKey) ? 'border-emerald-400' :
+                LESS_COMMON_RES.includes(resKey) ? 'border-amber-400' : 'border-red-400'
+              const commonnessLabel =
+                COMMON_RES.includes(resKey) ? 'Common' :
+                LESS_COMMON_RES.includes(resKey) ? 'Less common' : 'Rare'
+              const commonnessColor =
+                COMMON_RES.includes(resKey) ? 'text-emerald-400' :
+                LESS_COMMON_RES.includes(resKey) ? 'text-amber-400' : 'text-red-400'
+              return (
+                <>
+                  <div
+                    className={`border-2 ${borderColor} rounded-md flex items-center justify-center bg-slate-900/50`}
+                    style={{ width: scaledW, height: scaledH }}
+                  >
+                    <span className="text-xs text-slate-300">{width} × {height}</span>
+                  </div>
+                  {/* DPR badge */}
+                  <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full text-slate-300">
+                    {fp.screen.pixelRatio}x DPR
+                  </span>
+                  {/* Commonness indicator */}
+                  <span className={`text-xs ${commonnessColor}`}>{commonnessLabel}</span>
+                </>
+              )
+            })()}
+          </div>
         </div>
       </div>
 
