@@ -1123,44 +1123,6 @@ export class Database {
     return row
   }
 
-  searchProfiles(query: string, groupId?: string, limit = 100): any[] {
-    const likeParam = `%${query}%`
-    const conditions = [
-      `p.status = 'active'`,
-      `(p.name LIKE ? OR p.notes LIKE ? OR p.fingerprint LIKE ?)`
-    ]
-    const params: any[] = [likeParam, likeParam, likeParam]
-
-    if (groupId) {
-      conditions.push(`p.group_id = ?`)
-      params.push(groupId)
-    }
-
-    params.push(limit)
-
-    const rows = this.queryAll(`
-      SELECT p.*,
-             pr.host || ':' || CAST(pr.port AS TEXT) AS proxy_label,
-             pr.type AS proxy_type,
-             pg.name  AS group_name,
-             pg.color AS group_color
-      FROM profiles p
-      LEFT JOIN proxies pr ON p.proxy_id = pr.id
-      LEFT JOIN profile_groups pg ON p.group_id = pg.id
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY p.last_used_at DESC NULLS LAST
-      LIMIT ?
-    `, params)
-
-    return rows.map((row) => {
-      const decrypted = this.decryptProfileRow(row)
-      try {
-        decrypted.fingerprint = JSON.parse(decrypted.fingerprint)
-      } catch { /* keep as-is if not valid JSON */ }
-      return decrypted
-    })
-  }
-
   getAllProfiles(): any[] {
     const rows = this.queryAll(`
       SELECT p.*,
@@ -1237,6 +1199,67 @@ export class Database {
     const hasMore = normalizedOffset + normalizedLimit < total
 
     return { profiles, total, hasMore }
+  }
+
+  /**
+   * Phase 13.B — DB-side profile search with LIKE query.
+   * Searches name, notes, and proxy_label columns server-side
+   * instead of fetching all profiles and filtering in the renderer.
+   */
+  searchProfiles(
+    query: string,
+    limit: number = 50,
+    offset: number = 0,
+    filters?: { groupId?: string; status?: 'active' | 'archived' }
+  ): { profiles: any[]; total: number; hasMore: boolean } {
+    const normalizedLimit = Math.max(1, Math.min(limit, 100))
+    const normalizedOffset = Math.max(0, offset)
+    const searchPattern = `%${query}%`
+
+    const whereConditions = [
+      `(p.name LIKE ? OR p.notes LIKE ? OR pr.host LIKE ?)`
+    ]
+    const baseParams: any[] = [searchPattern, searchPattern, searchPattern]
+
+    if (filters?.status) {
+      whereConditions.push(`p.status = ?`)
+      baseParams.push(filters.status)
+    } else {
+      whereConditions.push(`p.status != 'archived'`)
+    }
+
+    if (filters?.groupId) {
+      whereConditions.push(`p.group_id = ?`)
+      baseParams.push(filters.groupId)
+    }
+
+    const whereClause = `WHERE ${whereConditions.join(' AND ')}`
+
+    const countResult = this.queryOne(
+      `SELECT COUNT(*) as count FROM profiles p LEFT JOIN proxies pr ON p.proxy_id = pr.id ${whereClause}`,
+      baseParams
+    )
+    const total = countResult?.count ?? 0
+
+    const rows = this.queryAll(
+      `
+      SELECT p.*,
+             pr.host || ':' || CAST(pr.port AS TEXT) AS proxy_label,
+             pr.type AS proxy_type,
+             pg.name  AS group_name,
+             pg.color AS group_color
+      FROM profiles p
+      LEFT JOIN proxies pr ON p.proxy_id = pr.id
+      LEFT JOIN profile_groups pg ON p.group_id = pg.id
+      ${whereClause}
+      ORDER BY p.created_at DESC
+      LIMIT ? OFFSET ?
+    `,
+      [...baseParams, normalizedLimit, normalizedOffset]
+    )
+
+    const profiles = rows.map((row) => this.decryptProfileRow(row))
+    return { profiles, total, hasMore: normalizedOffset + normalizedLimit < total }
   }
 
   /**

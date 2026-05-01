@@ -5,6 +5,7 @@ const api = {
     list:               ()                                    => ipcRenderer.invoke('profiles:list'),
     // Phase 2.1: Pagination
     listPaginated:      (limit: number, offset: number, filters?: any) => ipcRenderer.invoke('profiles:list-paginated', limit, offset, filters),
+    search:             (query: string, limit: number, offset: number, filters?: any) => ipcRenderer.invoke('profiles:search', query, limit, offset, filters),
     create:             (input: unknown)                      => ipcRenderer.invoke('profiles:create', input),
     update:             (id: string, data: unknown)           => ipcRenderer.invoke('profiles:update', id, data),
     clone:              (id: string)                          => ipcRenderer.invoke('profiles:clone', id),
@@ -29,8 +30,7 @@ const api = {
     restoreVersion:     (profileId: string, versionId: string)=> ipcRenderer.invoke('profiles:restoreVersion', profileId, versionId),
     deleteVersion:      (versionId: string)                   => ipcRenderer.invoke('profiles:deleteVersion', versionId),
     // Phase 12.C.4
-    detectCollisions:   ()                                    => ipcRenderer.invoke('profiles:detectCollisions'),
-    search:             (query: string, groupId?: string)     => ipcRenderer.invoke('profiles:search', query, groupId)
+    detectCollisions:   ()                                    => ipcRenderer.invoke('profiles:detectCollisions')
   },
   cookies: {
     import:   (profileId: string, text: string, format: 'netscape' | 'json') =>

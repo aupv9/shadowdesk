@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Sidebar } from './components/Layout/Sidebar'
 import { ProfileManager } from './components/ProfileManager'
 import { ProxyManager } from './components/ProxyManager'
@@ -28,6 +28,7 @@ import { ToastContainer } from './components/UI/Toast'
 import { ConfirmDialog } from './components/UI/ConfirmDialog'
 import { OfflineBanner } from './components/UI/OfflineBanner'
 import { WelcomeWizard, useWelcomeWizard } from './components/WelcomeWizard'
+import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
 import { useProfileStore } from './stores/profileStore'
 import { useAuthStore } from './stores/authStore'
 import { useLicenseStore } from './stores/licenseStore'
@@ -41,6 +42,24 @@ export default function App() {
   const license = useLicenseStore()
   const { show: showWizard, dismiss: dismissWizard } = useWelcomeWizard()
   const pushToast = useToastStore((s) => s.push)
+
+  // Phase 13.C — Global keyboard shortcuts
+  const handleNewProfile = useCallback(() => {
+    setSection('profiles')
+  }, [])
+  const handleSearch = useCallback(() => {
+    setSection('profiles')
+  }, [])
+  const handleRefresh = useCallback(() => {
+    useProfileStore.getState().fetchProfiles()
+    useProfileStore.getState().fetchActiveSessions()
+  }, [])
+  useGlobalShortcuts({
+    onNavigate: setSection,
+    onNewProfile: handleNewProfile,
+    onSearch: handleSearch,
+    onRefresh: handleRefresh,
+  })
 
   useEffect(() => {
     auth.checkAuth()

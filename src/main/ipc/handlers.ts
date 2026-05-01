@@ -272,8 +272,9 @@ export function registerIpcHandlers(): void {
     return db.getProfilesPaginated(limit, offset, filters)
   })
 
-  ipcMain.handle('profiles:search', async (_event, query: string, groupId?: string) => {
-    return db.searchProfiles(query, groupId)
+  // Phase 13.B: DB-side profile search
+  ipcMain.handle('profiles:search', (_event, query: string, limit: number, offset: number, filters?: any) => {
+    return db.searchProfiles(query, limit, offset, filters)
   })
 
   ipcMain.handle('profiles:create', (_event, input: CreateProfileInput) => {
