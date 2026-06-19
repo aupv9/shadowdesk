@@ -11,6 +11,8 @@ dev-app-update.yml
 
 # Chromium profiles (local data)
 profiles/
+# ...but the server-side user-profile source module is code, not runtime data
+!server/src/modules/profiles/
 
 # SQLite database
 *.db

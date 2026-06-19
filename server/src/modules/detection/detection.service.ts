@@ -54,7 +54,7 @@ export class DetectionService {
         throw new Error(`Detection Service error: ${response.statusText}`)
       }
 
-      const test = await response.json()
+      const test: any = await response.json()
       logger.debug('Detection test created in cloud service', { testId: test.id })
       return test
     } catch (error) {
@@ -85,7 +85,7 @@ export class DetectionService {
         throw new Error(`Detection Service error: ${response.statusText}`)
       }
 
-      const tests = await response.json()
+      const tests: any = await response.json()
       logger.debug('Detection tests retrieved', { userId, count: tests.length })
       return tests
     } catch (error) {
@@ -114,7 +114,7 @@ export class DetectionService {
         throw new Error(`Detection Service error: ${response.statusText}`)
       }
 
-      const test = await response.json()
+      const test: any = await response.json()
 
       // Verify authorization - ensure user owns this test
       if (test.user_id !== userId) {
@@ -182,7 +182,7 @@ export class DetectionService {
         throw new Error(`Detection Service error: ${response.statusText}`)
       }
 
-      const test = await response.json()
+      const test: any = await response.json()
       logger.debug('Detection test completed', { testId, overallScore: input.overall_score })
       return test
     } catch (error) {
@@ -211,7 +211,7 @@ export class DetectionService {
         throw new Error(`Detection Service error: ${response.statusText}`)
       }
 
-      const tests = await response.json()
+      const tests: any = await response.json()
       logger.debug('Detection tests retrieved for profile', { profileId, count: tests.length })
       return tests
     } catch (error) {
@@ -270,7 +270,7 @@ export class DetectionService {
         throw new Error(`Detection Service error: ${response.statusText}`)
       }
 
-      const vectors = await response.json()
+      const vectors: any = await response.json()
       logger.debug('Detection vectors retrieved', { count: vectors.length })
       return vectors
     } catch (error) {

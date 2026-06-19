@@ -31,6 +31,13 @@ export const env = {
   AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
   S3_BUCKET: process.env.S3_BUCKET || 'ghost-browser-sync',
 
+  // Supabase Storage (avatars, ticket attachments, cloud-profile bundles)
+  SUPABASE_URL: process.env.SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  SUPABASE_BUCKET_AVATARS: process.env.SUPABASE_BUCKET_AVATARS || 'avatars',
+  SUPABASE_BUCKET_ATTACHMENTS: process.env.SUPABASE_BUCKET_ATTACHMENTS || 'attachments',
+  SUPABASE_BUCKET_PROFILES: process.env.SUPABASE_BUCKET_PROFILES || 'cloud-profiles',
+
   // App
   APP_NAME: 'Ghost Browser',
   APP_URL: process.env.APP_URL || 'https://app.ghostbrowser.app',

@@ -20,7 +20,7 @@ class ApiClient {
     this.apiKey = apiKey
   }
 
-  private async request<T>(method: string, path: string, body?: any): Promise<T> {
+  private async request<T = any>(method: string, path: string, body?: any): Promise<T> {
     try {
       const url = `${this.baseUrl}${path}`
       const response = await fetch(url, {
@@ -49,15 +49,15 @@ class ApiClient {
     }
   }
 
-  async get<T>(path: string): Promise<T> {
+  async get<T = any>(path: string): Promise<T> {
     return this.request<T>('GET', path)
   }
 
-  async post<T>(path: string, body: any): Promise<T> {
+  async post<T = any>(path: string, body: any): Promise<T> {
     return this.request<T>('POST', path, body)
   }
 
-  async put<T>(path: string, body: any): Promise<T> {
+  async put<T = any>(path: string, body: any): Promise<T> {
     return this.request<T>('PUT', path, body)
   }
 

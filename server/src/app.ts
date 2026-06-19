@@ -13,6 +13,13 @@ import syncRoutes from './modules/sync/sync.routes'
 import profilesRoutes from './modules/profiles/profiles.routes'
 import workflowsRoutes from './modules/workflows/workflows.routes'
 import detectionRoutes from './modules/detection/detection.routes'
+import notificationsRoutes from './modules/notifications/notifications.routes'
+import configRoutes from './modules/config/config.routes'
+import apiKeysRoutes from './modules/api-keys/api-keys.routes'
+import analyticsRoutes from './modules/analytics/analytics.routes'
+import cloudProfilesRoutes from './modules/cloud-profiles/cloud-profiles.routes'
+import supportRoutes from './modules/support/support.routes'
+import billingRoutes from './modules/billing/billing.routes'
 
 const app = express()
 
@@ -54,10 +61,19 @@ app.get('/health/ready', (req, res) => {
 app.use('/auth', authRoutes)
 app.use('/licenses', authMiddleware, licenseRoutes)
 app.use('/team', authMiddleware, teamRoutes)
-app.use('/profiles', authMiddleware, profilesRoutes)
+// '/profiles/sync' must be registered before '/profiles' so the cloud-sync
+// routes aren't captured by the user-profile '/:userId' route.
 app.use('/profiles/sync', authMiddleware, syncRoutes)
+app.use('/profiles', authMiddleware, profilesRoutes)
 app.use('/workflows', authMiddleware, workflowsRoutes)
 app.use('/detection', authMiddleware, detectionRoutes)
+app.use('/notifications', authMiddleware, notificationsRoutes)
+app.use('/config', authMiddleware, configRoutes)
+app.use('/api-keys', authMiddleware, apiKeysRoutes)
+app.use('/analytics', authMiddleware, analyticsRoutes)
+app.use('/cloud-profiles', authMiddleware, cloudProfilesRoutes)
+app.use('/support', authMiddleware, supportRoutes)
+app.use('/billing', authMiddleware, billingRoutes)
 
 // 404 handler
 app.use((req: Request, res: Response) => {

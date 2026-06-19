@@ -198,3 +198,245 @@ export interface WorkflowSchedule {
   created_at: string
   updated_at: string
 }
+
+// ─── User Profile (Common SaaS) ───────────────────────────────────────────────
+export interface UserProfile {
+  user_id: string
+  display_name?: string | null
+  avatar_url?: string | null
+  bio?: string | null
+  timezone?: string | null
+  language?: string | null
+  metadata?: Record<string, unknown>
+  updated_at?: string
+}
+
+// ─── Notifications ─────────────────────────────────────────────────────────────
+export interface AppNotification {
+  id: string
+  type: 'license_expiry' | 'team_invite' | 'detection_alert' | 'system' | 'billing'
+  title: string
+  message: string
+  read: boolean
+  created_at: string
+  action_url?: string
+  metadata?: Record<string, unknown>
+}
+
+// ─── Remote Config / Feature Flags ─────────────────────────────────────────────
+export interface FeatureFlag {
+  key: string
+  enabled: boolean
+  variant?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface Announcement {
+  id: string
+  type: 'info' | 'warning' | 'critical' | 'maintenance'
+  title: string
+  message: string
+  action_url?: string
+  action_label?: string
+  dismissible: boolean
+  starts_at: string
+  ends_at?: string | null
+}
+
+export interface RemoteConfig {
+  flags: FeatureFlag[]
+  settings: Record<string, unknown>
+  announcements: Announcement[]
+  minimum_version: string | null
+  fetched_at: string
+}
+
+export interface FingerprintPresetUpdate {
+  preset_key: string
+  version: number
+  changes: Record<string, unknown>
+  description: string
+  published_at: string
+}
+
+// ─── API Keys ──────────────────────────────────────────────────────────────────
+export interface ApiKeyInfo {
+  id: string
+  key?: string // Only present on create/rotate
+  name: string
+  scopes: string[]
+  created_at: string
+  expires_at?: string | null
+  last_used_at?: string | null
+}
+
+export interface ApiKeyUsage {
+  key_id: string
+  total_requests: number
+  period: string
+  breakdown?: Record<string, number>
+}
+
+// ─── Analytics ───────────────────────────────────────────────────────────────
+export interface AnalyticsDashboardData {
+  total_profiles: number
+  active_sessions: number
+  avg_detection_score: number | null
+  detection_trend: Array<{ date: string; score: number }>
+  feature_usage: Array<{ feature: string; count: number }>
+  profile_creation_trend: Array<{ date: string; count: number }>
+  proxy_health: { healthy: number; unhealthy: number; untested: number }
+  top_presets: Array<{ preset: string; count: number }>
+}
+
+// ─── Cloud Profiles ────────────────────────────────────────────────────────────
+export interface CloudProfile {
+  id: string
+  local_id: string | null
+  name: string
+  fingerprint_hash: string
+  preset: string
+  proxy_config: { type: string; country?: string } | null
+  tags: string[]
+  notes: string | null
+  backed_up_at: string
+  updated_at: string
+  size_bytes: number
+}
+
+export interface CloudProfileDetail extends CloudProfile {
+  fingerprint: string // JSON string
+  cookies: string | null
+  user_data_snapshot: boolean
+}
+
+export interface BackupResult {
+  cloud_id: string
+  fingerprint_hash: string
+  backed_up_at: string
+  size_bytes: number
+}
+
+export interface CloudProfileListResult {
+  profiles: CloudProfile[]
+  total: number
+  storage_used_bytes: number
+  storage_limit_bytes: number
+}
+
+// ─── Support ────────────────────────────────────────────────────────────────────
+export type TicketCategory =
+  | 'bug'
+  | 'feature_request'
+  | 'billing'
+  | 'account'
+  | 'detection'
+  | 'proxy'
+  | 'general'
+export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent'
+export type TicketStatus = 'open' | 'in_progress' | 'waiting_reply' | 'resolved' | 'closed'
+
+export interface SupportTicket {
+  id: string
+  subject: string
+  category: TicketCategory
+  priority: TicketPriority
+  status: TicketStatus
+  created_at: string
+  updated_at: string
+  last_reply_at: string | null
+  message_count: number
+}
+
+export interface TicketAttachment {
+  id: string
+  filename: string
+  size_bytes: number
+  content_type: string
+  url: string
+}
+
+export interface TicketMessage {
+  id: string
+  ticket_id: string
+  author_type: 'user' | 'support' | 'system'
+  author_name: string
+  content: string
+  attachments: TicketAttachment[]
+  created_at: string
+}
+
+// ─── Billing (stub) ─────────────────────────────────────────────────────────────
+export interface PaymentMethodSummary {
+  type: 'card' | 'bank_transfer' | 'paypal'
+  last4?: string
+  brand?: string
+  exp_month?: number
+  exp_year?: number
+}
+
+export interface UpcomingInvoice {
+  amount_due: number
+  currency: string
+  next_payment_date: string
+  line_items: Array<{ description: string; quantity: number; unit_amount: number; amount: number }>
+}
+
+export interface BillingOverview {
+  subscription_id: string | null
+  plan_id: string | null
+  plan_name: string | null
+  status: 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'none'
+  current_period_start: string | null
+  current_period_end: string | null
+  cancel_at_period_end: boolean
+  trial_end: string | null
+  payment_method: PaymentMethodSummary | null
+  upcoming_invoice: UpcomingInvoice | null
+}
+
+export interface Invoice {
+  id: string
+  number: string
+  status: 'draft' | 'open' | 'paid' | 'void' | 'uncollectible'
+  amount_due: number
+  amount_paid: number
+  currency: string
+  created_at: string
+  paid_at: string | null
+  pdf_url: string | null
+  hosted_url: string | null
+}
+
+export interface CheckoutSession {
+  checkout_url: string
+  session_id: string
+}
+
+export interface PricingPlan {
+  id: string
+  name: string
+  description: string
+  price_monthly: number
+  price_yearly: number
+  currency: string
+  features: Record<string, unknown>
+  limits: {
+    max_profiles: number
+    max_team_members: number
+    max_workflows: number
+    cloud_sync: boolean
+    api_access: boolean
+    priority_support: boolean
+  }
+  popular?: boolean
+}
+
+export interface UsageMeter {
+  meter_id: string
+  name: string
+  current_usage: number
+  limit: number | null
+  unit: string
+  reset_at: string | null
+}
