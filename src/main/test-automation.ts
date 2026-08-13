@@ -150,7 +150,7 @@ class AutomationTestRunner {
 
   async runAllWorkflows(): Promise<void> {
     console.log('=' + '='.repeat(60))
-    console.log('Ghost Browser Automation Test Suite')
+    console.log('ShadowDesk Automation Test Suite')
     console.log('=' + '='.repeat(60))
     console.log(`\n📊 Running ${this.workflows.length} workflows...\n`)
 

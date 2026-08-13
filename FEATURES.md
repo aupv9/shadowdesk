@@ -3,6 +3,23 @@
 > Anti-detect browser platform for SEA market (Vietnam, Thailand, Indonesia).
 > Desktop app: Electron 31 + React 18 + TypeScript.
 
+## Scope of the v1.0 desktop release
+
+A checked box below means the code exists — not that the feature is reachable
+in the shipping build. v1.0 is desktop-only, and these sections are gated off
+in `src/shared/features.ts` because what they depend on is not deployed:
+
+| Hidden in v1.0 | Depends on | Section |
+|---|---|---|
+| Authentication, Licensing, Team, Cloud Sync | `server/` (not deployed; `app.ts` also imports a `modules/profiles` that does not exist) | 14, 15, 16, 17 |
+| Analytics, Billing, Support, Cloud Profiles, Remote Config | External "Common SaaS API" — no implementation in this repo | — |
+| Mobile Devices (ADB / Appium) | A real handset plus `adb`; the iOS connector is still a skeleton | — |
+| Community Fingerprint Presets | Nothing — the panel fakes its download and applies no preset | — |
+
+Everything else ships and runs locally, with no account and no profile cap.
+Mobile *workflows* are included: they drive Chromium mobile emulation, not
+hardware.
+
 ---
 
 ## 1. Profile Management

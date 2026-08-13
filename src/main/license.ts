@@ -3,9 +3,10 @@ import { createHash } from 'crypto'
 import { apiRequest } from './api-client'
 import { Database } from './database'
 import type { License, LicenseDevice } from '../shared/types'
+import { DESKTOP_ONLY } from '../shared/features'
 
 /**
- * Ghost Browser License Service
+ * ShadowDesk License Service
  *
  * Server endpoints (mounted at /licenses):
  *   POST /licenses/activate          — Activate license key on machine
@@ -104,6 +105,23 @@ export async function deactivateDevice(machineId: string): Promise<void> {
 }
 
 export function getFreePlanLicense(): License {
+  // The desktop-only build has no licensing server to activate against, so the
+  // 5-profile free tier would be a permanent cap rather than an upsell — which
+  // makes the app useless for its actual purpose. Until the server ships, the
+  // local build is unmetered. (-1 = unlimited, same convention as the plans.)
+  if (DESKTOP_ONLY) {
+    return {
+      id: 'local',
+      plan: 'free',
+      max_profiles: -1,
+      max_team_members: 1,
+      cloud_sync_enabled: false,
+      valid_until: '2099-12-31T23:59:59Z',
+      machine_id: getMachineId(),
+      activated_at: new Date().toISOString()
+    }
+  }
+
   return {
     id: 'free',
     plan: 'free',
@@ -154,6 +172,14 @@ export function getLicenseStatus(): {
   return { status: 'expired', days_until_expiry: days, in_grace_period: false }
 }
 
+/**
+ * Current profile usage against the plan cap.
+ *
+ * `max` is -1 when unlimited — the same convention as `License.max_profiles`,
+ * and what callers across the IPC boundary check for. It used to return
+ * `Infinity` here, which no caller tested for and which does not survive a
+ * JSON round-trip.
+ */
 export function checkProfileLimit(): { allowed: boolean; current: number; max: number } {
   const license = getCurrentLicense()
   const db = Database.getInstance()
@@ -164,7 +190,7 @@ export function checkProfileLimit(): { allowed: boolean; current: number; max: n
   return {
     allowed: max === -1 || current < max,
     current,
-    max: max === -1 ? Infinity : max
+    max
   }
 }
 

@@ -23,7 +23,7 @@ interface URLHelperProps {
  * - Common URL templates (login, search, API endpoints) with copy-and-use
  * - Guidance about protocol, query params, and variable substitution
  * - A quick-pick builder that lets the user compose a URL from parts
- * - Examples that accept Ghost Browser variable placeholders ({var})
+ * - Examples that accept ShadowDesk variable placeholders ({var})
  */
 export function URLHelper({ onSelect, onClose, initialValue = '' }: URLHelperProps) {
   const [copied, setCopied] = useState<string | null>(null)

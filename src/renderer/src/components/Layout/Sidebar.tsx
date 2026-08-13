@@ -25,10 +25,12 @@ import {
   Smartphone,
   BarChart3,
   CreditCard,
-  LifeBuoy
+  LifeBuoy,
+  HardDrive
 } from 'lucide-react'
 import type { NavSection } from '../../types'
 import type { User as UserType, LicensePlan } from '../../types'
+import { isSectionEnabled } from '../../../../shared/features'
 
 interface UpdateStatus {
   status: string
@@ -123,6 +125,16 @@ const FOOTER_ITEMS: NavItem[] = [
   { key: 'settings', icon: Settings, label: 'Settings' }
 ]
 
+// Sections whose backend isn't deployed yet are compiled out of the nav rather
+// than shown as dead buttons — see src/shared/features.ts.
+const VISIBLE_NAV_GROUPS: NavGroup[] = NAV_GROUPS
+  .map((g) => ({ ...g, items: g.items.filter((i) => isSectionEnabled(i.key)) }))
+  .filter((g) => g.items.length > 0)
+
+const VISIBLE_FOOTER_ITEMS: NavItem[] = FOOTER_ITEMS.filter((i) => isSectionEnabled(i.key))
+
+const ACCOUNT_ENABLED = isSectionEnabled('account')
+
 const SIDEBAR_COLLAPSED_KEY = 'sidebar:collapsed'
 const SIDEBAR_GROUPS_KEY = 'sidebar:groups'
 
@@ -140,7 +152,7 @@ function loadGroupState(): Record<string, boolean> {
     if (raw) return JSON.parse(raw)
   } catch {}
   // Default: all groups expanded
-  return Object.fromEntries(NAV_GROUPS.map((g) => [g.key, true]))
+  return Object.fromEntries(VISIBLE_NAV_GROUPS.map((g) => [g.key, true]))
 }
 
 export function Sidebar({ active, onChange, profileCount, activeSessionCount, user, plan = 'free' }: SidebarProps) {
@@ -165,7 +177,7 @@ export function Sidebar({ active, onChange, profileCount, activeSessionCount, us
 
   // Auto-expand the group that contains the active section
   const activeGroupKey = useMemo(() => {
-    return NAV_GROUPS.find((g) => g.items.some((i) => i.key === active))?.key
+    return VISIBLE_NAV_GROUPS.find((g) => g.items.some((i) => i.key === active))?.key
   }, [active])
 
   useEffect(() => {
@@ -225,7 +237,7 @@ export function Sidebar({ active, onChange, profileCount, activeSessionCount, us
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <div className="font-semibold text-white text-sm leading-none truncate">Ghost Browser</div>
+              <div className="font-semibold text-white text-sm leading-none truncate">ShadowDesk</div>
               <div className="text-xs text-slate-500 mt-0.5 truncate">Anti-Detect</div>
             </div>
           )}
@@ -260,7 +272,7 @@ export function Sidebar({ active, onChange, profileCount, activeSessionCount, us
         className={`flex-1 overflow-y-auto ${collapsed ? 'px-1.5 py-3' : 'px-2 py-3'}`}
         aria-label="Main navigation"
       >
-        {NAV_GROUPS.map((group, gIdx) => {
+        {VISIBLE_NAV_GROUPS.map((group, gIdx) => {
           const isOpen = collapsed ? true : groupOpen[group.key] !== false
           return (
             <div key={group.key} className={gIdx > 0 ? (collapsed ? 'mt-2 pt-2 border-t border-slate-800/60' : 'mt-3') : ''}>
@@ -287,7 +299,7 @@ export function Sidebar({ active, onChange, profileCount, activeSessionCount, us
 
         {/* Footer items (Team, Settings) — separated from main groups */}
         <div className={collapsed ? 'mt-2 pt-2 border-t border-slate-800/60 space-y-0.5' : 'mt-4 pt-3 border-t border-slate-800/60 space-y-0.5'}>
-          {FOOTER_ITEMS.map(renderNavItem)}
+          {VISIBLE_FOOTER_ITEMS.map(renderNavItem)}
         </div>
       </nav>
 
@@ -324,7 +336,19 @@ export function Sidebar({ active, onChange, profileCount, activeSessionCount, us
 
       {/* User / Plan footer */}
       <div className={`border-t border-slate-800 ${collapsed ? 'px-2 py-3' : 'px-3 py-3'}`}>
-        {user ? (
+        {!ACCOUNT_ENABLED ? (
+          // Desktop-only build: no sign-in, no plan gating — say so plainly
+          // instead of leaving a button that opens an unreachable backend.
+          !collapsed && (
+            <div className="flex items-center gap-2 px-2 py-1.5 text-slate-500">
+              <HardDrive className="w-4 h-4 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-medium text-slate-400 leading-none">Local workspace</div>
+                <div className="text-[10px] text-slate-600 mt-0.5">Unlimited profiles</div>
+              </div>
+            </div>
+          )
+        ) : user ? (
           <button
             onClick={() => onChange('account')}
             title={collapsed ? `${user.name} — ${badge.label}` : undefined}
@@ -358,7 +382,7 @@ export function Sidebar({ active, onChange, profileCount, activeSessionCount, us
         )}
         {!collapsed && (
           <div className="flex items-center justify-between mt-1.5 px-2">
-            <div className="text-[10px] text-slate-600">v0.5.0 Beta</div>
+            <div className="text-[10px] text-slate-600">v{__APP_VERSION__}</div>
           </div>
         )}
         {/* Expand button when collapsed — moved here so it's reachable in collapsed mode */}

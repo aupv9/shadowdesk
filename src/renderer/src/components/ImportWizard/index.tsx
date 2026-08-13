@@ -98,7 +98,7 @@ export function ImportWizard() {
               {([
                 { key: 'csv', icon: FileText, label: 'CSV File', desc: 'name, preset, notes, proxy_id, group_id, fingerprint_json' },
                 { key: 'json', icon: FileJson, label: 'JSON File', desc: 'Array of profile objects with all fields' },
-                { key: 'zip', icon: FileArchive, label: 'ZIP Bundle', desc: 'Ghost Browser .zip exports (single or multi)' }
+                { key: 'zip', icon: FileArchive, label: 'ZIP Bundle', desc: 'ShadowDesk .zip exports (single or multi)' }
               ] as const).map((fmt) => (
                 <button
                   key={fmt.key}

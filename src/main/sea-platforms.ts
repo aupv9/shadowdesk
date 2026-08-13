@@ -2,7 +2,7 @@
  * Phase 17 — SEA Platform Templates
  *
  * Static registry of the major South-East-Asia e-commerce, payment and social
- * platforms Ghost Browser targets out of the box:
+ * platforms ShadowDesk targets out of the box:
  *
  *   • Shopee          — regional e-commerce leader (VN, TH, ID, MY, PH, SG)
  *   • Lazada          — Alibaba-owned regional marketplace
@@ -101,7 +101,7 @@ export const SEA_PLATFORMS: SeaPlatform[] = [
       loginSubmit: 'button[type="submit"]'
     },
     notes: [
-      'Akamai Bot Manager fingerprints TLS + canvas — Ghost Browser Layer 1 + Layer 4 patches recommended.',
+      'Akamai Bot Manager fingerprints TLS + canvas — ShadowDesk Layer 1 + Layer 4 patches recommended.',
       'Lazada shows a slider CAPTCHA on suspicious sessions — use hoverJitter + variable scroll speed.',
       'Product pages set a _m_h5_tk cookie that must be preserved across steps.'
     ],
@@ -204,7 +204,7 @@ export const SEA_PLATFORMS: SeaPlatform[] = [
     },
     notes: [
       'VNPay checkout is sandbox-testable at https://sandbox.vnpayment.vn — never use real cards in automation.',
-      'OTP step requires a callback — use Ghost Browser credential vault to inject test OTP in sandbox mode.',
+      'OTP step requires a callback — use ShadowDesk credential vault to inject test OTP in sandbox mode.',
       'Session expires after 15 minutes — keep workflows under that timeout.'
     ],
     icon: 'CreditCard',

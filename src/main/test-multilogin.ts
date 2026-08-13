@@ -1,7 +1,7 @@
 /**
  * Multi-Login Test Runner
  *
- * Tests Ghost Browser's ability to run multiple profiles simultaneously
+ * Tests ShadowDesk's ability to run multiple profiles simultaneously
  * with proper isolation and fingerprint consistency.
  *
  * Usage:
@@ -279,7 +279,7 @@ class MultiLoginTestRunner {
 
   async runAllTests(): Promise<void> {
     console.log('\n' + '='.repeat(60))
-    console.log('Ghost Browser Multi-Login Test Suite')
+    console.log('ShadowDesk Multi-Login Test Suite')
     console.log('='.repeat(60) + '\n')
 
     const startTime = Date.now()

@@ -50,9 +50,9 @@ export function ImportGuideModal({ onConfirm, onClose }: Props) {
               <h3 className="text-sm font-semibold text-white">Expected format</h3>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Ghost Browser profile bundles use the <code className="px-1 py-0.5 rounded bg-slate-900 text-ghost-300">.ghost.zip</code> extension
+              ShadowDesk profile bundles use the <code className="px-1 py-0.5 rounded bg-slate-900 text-ghost-300">.ghost.zip</code> extension
               (any <code className="px-1 py-0.5 rounded bg-slate-900 text-ghost-300">.zip</code> with the right contents will also work).
-              Bundles are produced by <span className="text-slate-300">Profile menu → Export Bundle</span> in any Ghost Browser
+              Bundles are produced by <span className="text-slate-300">Profile menu → Export Bundle</span> in any ShadowDesk
               installation. They are not compatible with bundles from other anti-detect tools.
             </p>
           </div>

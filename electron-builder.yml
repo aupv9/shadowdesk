@@ -1,6 +1,6 @@
-appId: com.ghostbrowser.app
-productName: Ghost Browser
-copyright: Copyright © 2026 Ghost Browser
+appId: com.shadowdesk.app
+productName: ShadowDesk
+copyright: Copyright © 2026 ShadowDesk
 
 directories:
   buildResources: resources
@@ -14,14 +14,22 @@ win:
     - target: nsis
       arch: [x64]
   icon: resources/icon.ico
+  # Unsigned builds trip SmartScreen on first run. To sign, supply an
+  # Authenticode certificate via the CSC_LINK / CSC_KEY_PASSWORD env vars —
+  # no config change needed here.
 
 mac:
   target:
     - target: dmg
       arch: [x64, arm64]
   icon: resources/icon.icns
+  category: public.app-category.utilities
+  entitlements: resources/entitlements.mac.plist
   entitlementsInherit: resources/entitlements.mac.plist
   hardenedRuntime: true
+  # hardenedRuntime only gets past Gatekeeper once the DMG is notarised, which
+  # needs a Developer ID cert plus notarytool credentials in CI. Until those
+  # exist the macOS build is for internal distribution only.
 
 linux:
   target:
@@ -38,5 +46,5 @@ nsis:
 
 publish:
   provider: github
-  owner: ghost-browser
-  repo: ghost-browser
+  owner: aupv9
+  repo: shadowdesk

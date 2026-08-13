@@ -1,8 +1,20 @@
-# Ghost Browser — Claude Code Guide
+# ShadowDesk — Claude Code Guide
 
 ## Project Overview
 Anti-detect browser platform targeting SEA market (Vietnam, Thailand, Indonesia).
 Desktop app: **Electron 31 + React 18 + TypeScript**, packed with `electron-vite`.
+
+> **v1.0 ships desktop-only.** Neither backend is deployed — not `server/`
+> (auth, licensing, team, sync) nor the external "Common SaaS API" (analytics,
+> billing, support, cloud profiles, remote config). `src/shared/features.ts`
+> gates every section that needs one: they are hidden from the nav and their
+> boot daemons never start. Anything running locally is unaffected, and the
+> local licence is unmetered because there is no server to raise the cap.
+> Set `DESKTOP_ONLY = false` to restore the cloud build.
+>
+> Before adding a feature that calls `apiRequest()`, check that the endpoint
+> actually exists in `server/src/app.ts` — several client modules already call
+> paths that nothing implements.
 
 ## Commands
 
