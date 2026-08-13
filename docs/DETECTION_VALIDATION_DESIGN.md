@@ -1,6 +1,19 @@
 # ShadowDesk — Detection Validation Design
 
-**Version 1.0** | **Date:** 2026-08-13 | **Status:** Proposed
+**Version 1.1** | **Date:** 2026-08-13 | **Status:** Phases A–C implemented; D–E outstanding
+
+> **Landed:** severity model and weighted scoring, guarded vector runner, dual
+> scores, the coherence engine (R1–R14), and the WAF canary with
+> fingerprint-vs-IP attribution.
+>
+> **Outstanding:** Layer 2 external probes (Phase D) and the reporting work in
+> Phase E beyond the dual-score gauges already in the dashboard.
+>
+> **Not yet exercised against a live browser.** The rules, classifier,
+> attribution and persistence are unit-tested, but the collectors
+> (`coherence-collector.ts`) and `runCanary` have only been typechecked. In
+> particular, if `collectWorker`/`collectIframe` return null in practice, R3
+> and R4 will report `unavailable` rather than actually comparing realms.
 
 > Supersedes the framing in `DETECTION_ANALYSIS.md` and `DETECTION_SCORECARD.md`.
 > Those documents grade the existing suite as "production ready" against the
@@ -286,13 +299,22 @@ deliberately-contradictory fixtures.
 against a live profile, and R11 catches a seeded profile whose canvas hash
 changes between launches.
 
-### Phase C — WAF canary (S)
+### Phase C — WAF canary (S) ✅
 Canary config in Settings; response classifier; per-(profile × proxy)
 attribution in the report.
 
 *Done when:* a profile on a datacenter proxy reports `js-challenge` while the
 same profile on a residential proxy reports `passed`, and the report names the
 IP as the differing variable.
+
+*As built:* `detection/canary.ts` classifies on vendor markers before status
+codes, because challenge pages are routinely served with HTTP 200 — hence the
+page sentinel, without which an interstitial is indistinguishable from the real
+page. `detection/attribution.ts` derives the suspect from stored
+(profile × proxy) history and returns `inconclusive` with a next step rather
+than guessing when no passing comparison exists. The canary loads in its own
+tab so the sweep does not navigate whatever the user had open. Disabled by
+default, with no third-party URL shipped.
 
 ### Phase D — External probes (M, highest maintenance)
 `probes.json` manifest; probe runner with fail-soft parsing; CreepJS +

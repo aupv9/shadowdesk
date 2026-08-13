@@ -425,6 +425,25 @@ export class Database {
       );
     `)
 
+    // Canary verdicts are keyed on the (profile, proxy) pair, not the profile:
+    // attribution works by comparing a failing pair against passing ones that
+    // share one half of it. Storing only the profile would make that impossible.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS canary_results (
+        id         TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        proxy_id   TEXT,
+        url        TEXT NOT NULL DEFAULT '',
+        verdict    TEXT NOT NULL,
+        detail     TEXT NOT NULL DEFAULT '',
+        tested_at  TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_canary_profile ON canary_results(profile_id);
+      CREATE INDEX IF NOT EXISTS idx_canary_proxy   ON canary_results(proxy_id);
+    `)
+
     // Tier 3 RPA — workflow versioning (mirrors profile_versions pattern)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS workflow_versions (
@@ -2360,6 +2379,38 @@ export class Database {
         result.proxyId ?? null
       ]
     )
+  }
+
+  saveCanaryResult(r: {
+    id: string
+    profileId: string
+    proxyId: string | null
+    url: string
+    verdict: string
+    detail: string
+    testedAt: string
+  }): void {
+    this.run(
+      `INSERT INTO canary_results (id, profile_id, proxy_id, url, verdict, detail, tested_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [r.id, r.profileId, r.proxyId, r.url, r.verdict, r.detail, r.testedAt]
+    )
+  }
+
+  /**
+   * Recent canary history for attribution. Capped because the inference only
+   * needs to know whether a passing comparison exists, not every one of them.
+   */
+  getCanaryHistory(limit = 200): Array<{ profileId: string; proxyId: string | null; verdict: string; testedAt: string }> {
+    return this.queryAll(
+      'SELECT profile_id, proxy_id, verdict, tested_at FROM canary_results ORDER BY tested_at DESC LIMIT ?',
+      [limit]
+    ).map((r: any) => ({
+      profileId: r.profile_id,
+      proxyId: r.proxy_id ?? null,
+      verdict: r.verdict,
+      testedAt: r.tested_at
+    }))
   }
 
   /** Last recorded rendered-output hashes for a profile (R11 baseline). */

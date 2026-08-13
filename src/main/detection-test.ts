@@ -20,6 +20,9 @@ import {
   collectRenderHashes,
   collectWebrtcPublicIps
 } from './fingerprint/coherence-collector'
+import { runCanary, canaryVector, type CanaryVerdict } from './detection/canary'
+import { attributeVerdict } from './detection/attribution'
+import { getSettings } from './settings'
 
 /**
  * Per-probe budget. A stalled page.evaluate() used to hang the entire run;
@@ -34,6 +37,9 @@ const VECTOR_TIMEOUT_MS = 5000
  * timed out on every run and silently reported itself unavailable.
  */
 const COHERENCE_TIMEOUT_MS = 30000
+
+/** A challenge page plus its JS can take a while; give the canary room. */
+const CANARY_TIMEOUT_MS = 40000
 
 /**
  * Detection Test Runner — launches a profile's browser and runs
@@ -253,7 +259,72 @@ export class DetectionTestRunner {
       COHERENCE_TIMEOUT_MS
     )
 
-    return [...injectionVectors, ...coherenceVectors]
+    // Layer 3 — live WAF verdict. Opt-in, and a no-op unless the operator has
+    // pointed it at a canary they own.
+    const canaryVectors = await this.runGuarded(
+      'Canary: live WAF verdict',
+      () => this.evaluateCanary(profileId, page),
+      CANARY_TIMEOUT_MS
+    )
+
+    return [...injectionVectors, ...coherenceVectors, ...canaryVectors]
+  }
+
+  /**
+   * Loads the operator's canary through this profile's browser and records the
+   * verdict against the (profile × proxy) pair it belongs to.
+   */
+  private async evaluateCanary(profileId: string, page: Page): Promise<DetectionVectorResult[]> {
+    const config = getSettings().canary
+    if (!config?.enabled || !config.url) {
+      return [canaryVector({ verdict: 'unreachable', detail: 'Canary not configured' })]
+    }
+
+    const db = Database.getInstance()
+    const profile = db.getProfile(profileId) as any
+    const proxyId = profile?.proxy_id ?? null
+
+    // Load the canary in its own tab. The rest of the sweep reuses the
+    // profile's first page, and navigating that to an external URL would
+    // clobber whatever the user had open.
+    const canaryPage = await page.browser().newPage()
+    let classification
+    try {
+      classification = await runCanary(canaryPage, config)
+    } finally {
+      await canaryPage.close().catch(() => {})
+    }
+
+    // Attribute before recording, so this run is not compared against itself.
+    const history = db.getCanaryHistory().map((h) => ({
+      profileId: h.profileId,
+      proxyId: h.proxyId,
+      verdict: h.verdict as CanaryVerdict,
+      testedAt: h.testedAt
+    }))
+    const attribution = attributeVerdict(
+      { profileId, proxyId, verdict: classification.verdict },
+      history
+    )
+
+    db.saveCanaryResult({
+      id: uuidv4(),
+      profileId,
+      proxyId,
+      url: config.url,
+      verdict: classification.verdict,
+      detail: classification.detail,
+      testedAt: new Date().toISOString()
+    })
+
+    return [
+      canaryVector(
+        classification,
+        attribution.suspect === 'inconclusive' && classification.verdict === 'passed'
+          ? undefined
+          : attribution.summary
+      )
+    ]
   }
 
   /**
