@@ -384,6 +384,47 @@ export class Database {
         ON workflow_runs(workflow_id, started_at DESC);
     `)
 
+    // Coherence rule R6 compares the browser's timezone against where the
+    // proxy actually geolocates. testProxy already resolves the exit IP through
+    // ip-api; these columns give it somewhere to persist the answer.
+    try {
+      this.db.exec(`ALTER TABLE proxies ADD COLUMN last_ip TEXT`)
+    } catch { /* exists */ }
+    try {
+      this.db.exec(`ALTER TABLE proxies ADD COLUMN timezone TEXT`)
+    } catch { /* exists */ }
+
+    // Detection validation — split the single misleading score into injection
+    // integrity vs detection risk, and record the proxy, since network-dependent
+    // verdicts belong to a (profile × proxy) pair rather than to the profile.
+    // Legacy rows keep a null risk_score and render as "layer 0 only".
+    try {
+      this.db.exec(`ALTER TABLE detection_tests ADD COLUMN injection_score INTEGER`)
+    } catch { /* exists */ }
+    try {
+      this.db.exec(`ALTER TABLE detection_tests ADD COLUMN risk_score INTEGER`)
+    } catch { /* exists */ }
+    try {
+      this.db.exec(`ALTER TABLE detection_tests ADD COLUMN proxy_id TEXT`)
+    } catch { /* exists */ }
+
+    // Rendered-output hashes, so coherence rules R11/R12 have a baseline.
+    // CLAUDE.md asserts one profile renders identically across sessions and
+    // that seeds are per-profile; nothing verified either, and
+    // collision-detector.ts compares stored config rather than what actually
+    // gets painted. Two profiles can hold different configs and still produce
+    // the same canvas.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS fingerprint_hashes (
+        profile_id  TEXT PRIMARY KEY,
+        canvas      TEXT NOT NULL DEFAULT '',
+        webgl       TEXT NOT NULL DEFAULT '',
+        audio       TEXT NOT NULL DEFAULT '',
+        recorded_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      );
+    `)
+
     // Tier 3 RPA — workflow versioning (mirrors profile_versions pattern)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS workflow_versions (
@@ -1602,10 +1643,17 @@ export class Database {
     )
   }
 
-  updateProxyHealth(id: string, latency_ms: number, is_healthy: boolean): void {
+  updateProxyHealth(
+    id: string,
+    latency_ms: number,
+    is_healthy: boolean,
+    geo?: { ip?: string; timezone?: string }
+  ): void {
     this.run(
-      `UPDATE proxies SET latency_ms = ?, is_healthy = ?, last_checked_at = datetime('now') WHERE id = ?`,
-      [latency_ms, is_healthy ? 1 : 0, id]
+      `UPDATE proxies SET latency_ms = ?, is_healthy = ?, last_checked_at = datetime('now'),
+         last_ip = COALESCE(?, last_ip), timezone = COALESCE(?, timezone)
+       WHERE id = ?`,
+      [latency_ms, is_healthy ? 1 : 0, geo?.ip ?? null, geo?.timezone ?? null, id]
     )
   }
 
@@ -2295,11 +2343,43 @@ export class Database {
     overallScore: number
     vectors: any[]
     status: string
+    injectionScore?: number
+    riskScore?: number
+    proxyId?: string | null
   }): void {
     this.run(
-      `INSERT INTO detection_tests (id, profile_id, profile_name, tested_at, overall_score, vectors, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [result.id, result.profileId, result.profileName, result.testedAt, result.overallScore, JSON.stringify(result.vectors), result.status]
+      `INSERT INTO detection_tests
+         (id, profile_id, profile_name, tested_at, overall_score, vectors, status,
+          injection_score, risk_score, proxy_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        result.id, result.profileId, result.profileName, result.testedAt,
+        result.overallScore, JSON.stringify(result.vectors), result.status,
+        result.injectionScore ?? result.overallScore,
+        result.riskScore ?? null,
+        result.proxyId ?? null
+      ]
+    )
+  }
+
+  /** Last recorded rendered-output hashes for a profile (R11 baseline). */
+  getFingerprintHashes(profileId: string): { canvas: string; webgl: string; audio: string; recorded_at: string } | null {
+    return this.queryOne('SELECT * FROM fingerprint_hashes WHERE profile_id = ?', [profileId]) ?? null
+  }
+
+  /** Every other profile's hashes, for the R12 uniqueness check. */
+  getOtherFingerprintHashes(profileId: string): Array<{ profile_id: string; canvas: string; webgl: string; audio: string }> {
+    return this.queryAll('SELECT * FROM fingerprint_hashes WHERE profile_id != ?', [profileId])
+  }
+
+  saveFingerprintHashes(profileId: string, h: { canvas: string; webgl: string; audio: string }): void {
+    this.run(
+      `INSERT INTO fingerprint_hashes (profile_id, canvas, webgl, audio, recorded_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(profile_id) DO UPDATE SET
+         canvas = excluded.canvas, webgl = excluded.webgl,
+         audio = excluded.audio, recorded_at = excluded.recorded_at`,
+      [profileId, h.canvas, h.webgl, h.audio, new Date().toISOString()]
     )
   }
 
@@ -2315,7 +2395,12 @@ export class Database {
       testedAt: r.tested_at,
       overallScore: r.overall_score,
       status: r.status,
-      vectors: JSON.parse(r.vectors)
+      vectors: JSON.parse(r.vectors),
+      // Null on rows written before the split — the dashboard renders those as
+      // injection-only rather than as a zero risk score.
+      injectionScore: r.injection_score ?? r.overall_score,
+      riskScore: r.risk_score ?? undefined,
+      proxyId: r.proxy_id ?? null
     })
     if (profileId) {
       return this.queryAll(
