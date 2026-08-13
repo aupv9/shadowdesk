@@ -14,6 +14,7 @@ import { SmartWarmUpScheduler } from './smart-warmup'
 import { CleanupWorker } from './cleanup-worker'
 import { startAnalyticsDaemon, stopAnalyticsDaemon } from './analytics-service'
 import { startRemoteConfigDaemon, stopRemoteConfigDaemon } from './remote-config'
+import { DESKTOP_ONLY } from '../shared/features'
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -71,7 +72,7 @@ function createWindow(): void {
 
 app.whenReady().then(async () => {
   if (process.platform === 'win32') {
-    app.setAppUserModelId('com.ghostbrowser.app')
+    app.setAppUserModelId('com.shadowdesk.app')
   }
 
   // Initialize database (sql.js is async — WASM load)
@@ -91,7 +92,11 @@ app.whenReady().then(async () => {
   // Initialize sync window reference for status notifications
   if (mainWindow) {
     initSyncWindow(mainWindow)
-    startNotificationPolling(mainWindow)
+    // Notification polling talks to the Common SaaS API — skip it in the
+    // desktop-only build so we don't poll a backend that isn't deployed.
+    if (!DESKTOP_ONLY) {
+      startNotificationPolling(mainWindow)
+    }
   }
 
   // Phase 10.2 — start the workflow scheduler poller
@@ -106,9 +111,11 @@ app.whenReady().then(async () => {
   cleanupWorker.start()
 
   // Phase 2 Integration — start analytics & remote config daemons
-  startAnalyticsDaemon()
-  if (mainWindow) {
-    startRemoteConfigDaemon(mainWindow)
+  if (!DESKTOP_ONLY) {
+    startAnalyticsDaemon()
+    if (mainWindow) {
+      startRemoteConfigDaemon(mainWindow)
+    }
   }
 
   // Auto-launch last used profile if setting is enabled

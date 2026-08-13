@@ -4,9 +4,9 @@ import { join } from 'path'
 import type { AuthTokens } from '../shared/types'
 
 /**
- * Ghost Browser API Client
+ * ShadowDesk API Client
  *
- * Communicates with the Ghost Browser server (Express, no version prefix).
+ * Communicates with the ShadowDesk server (Express, no version prefix).
  *
  * Server response format:
  *   Success → raw JSON (no envelope)
@@ -120,7 +120,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Make an authenticated API request to the Ghost Browser server.
+ * Make an authenticated API request to the ShadowDesk server.
  *
  * The server returns data directly (no { success, data } envelope).
  * Errors come as { error: "code", message: "...", code: 400, timestamp: "..." }.

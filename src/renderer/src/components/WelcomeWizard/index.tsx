@@ -2,7 +2,7 @@
  * Phase 13.C — Welcome wizard for first-time users.
  *
  * 4-step onboarding flow:
- *   1. Introduction — what Ghost Browser does
+ *   1. Introduction — what ShadowDesk does
  *   2. Create first profile + pick a fingerprint preset
  *   3. Add a proxy (optional, skippable)
  *   4. Ready — launch profile
@@ -51,7 +51,7 @@ function StepIntro({ onNext }: StepProps) {
         <Shield className="w-10 h-10 text-indigo-400" />
       </div>
       <div>
-        <h2 className="text-2xl font-bold text-white mb-2">Welcome to Ghost Browser</h2>
+        <h2 className="text-2xl font-bold text-white mb-2">Welcome to ShadowDesk</h2>
         <p className="text-slate-400 text-sm max-w-sm">
           The anti-detect browser platform for professionals. Each profile runs
           in a fully isolated Chromium with its own unique fingerprint, cookies,

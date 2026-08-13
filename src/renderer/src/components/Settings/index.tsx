@@ -4,6 +4,8 @@ import type { ApiServerStatus, ApiServerConfig } from '../../types'
 import { RemoteNodesPanel } from './RemoteNodesPanel'
 import { CommunityPresetsPanel } from './CommunityPresetsPanel'
 import { WebhooksPanel } from './WebhooksPanel'
+import { ACTION_META } from '../AutomationBuilder/actionMetadata'
+import { COMMUNITY_PRESETS_ENABLED, DESKTOP_ONLY } from '../../../../shared/features'
 
 type CaptchaProviderId = '2captcha' | 'anticaptcha' | 'capmonster'
 
@@ -86,9 +88,13 @@ export function SettingsPage() {
   const [vaultCreds, setVaultCreds] = useState<Array<{ id: string; profile_id: string | null; label: string; username: string; password: string; fields: Record<string, string> }>>([])
   const [showAddCred, setShowAddCred] = useState(false)
   const [newCred, setNewCred] = useState<{ label: string; username: string; password: string }>({ label: '', username: '', password: '' })
+  const [presetCount, setPresetCount] = useState<number | null>(null)
 
   useEffect(() => {
     window.api.settings.get().then(setSettings)
+    window.api.fingerprint.presets()
+      .then((p: Record<string, unknown>) => setPresetCount(Object.keys(p).length))
+      .catch(() => {})
     window.api.apiServer.status().then(setApiStatus)
     window.api.apiServer.config().then((cfg) => {
       setApiPort(cfg.port)
@@ -750,7 +756,7 @@ export function SettingsPage() {
         <RemoteNodesPanel />
 
         {/* Phase 15.B — Community Fingerprint Presets */}
-        <CommunityPresetsPanel />
+        {COMMUNITY_PRESETS_ENABLED && <CommunityPresetsPanel />}
 
         {/* Phase 15.C — Outbound Webhooks */}
         <WebhooksPanel />
@@ -777,32 +783,31 @@ export function SettingsPage() {
         <div className="card">
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
             <Info className="w-4 h-4" />
-            About Ghost Browser
+            About ShadowDesk
           </h2>
+          {/* Counts are derived, not typed in — the hardcoded ones had all
+              drifted (8 presets, 17 actions, "0.3.0 Beta" against a 1.0.0
+              package). */}
           <div className="space-y-2 text-sm text-slate-400">
             <div className="flex justify-between">
               <span>Version</span>
-              <span className="text-slate-300">0.3.0 Beta</span>
+              <span className="text-slate-300">{__APP_VERSION__}</span>
             </div>
             <div className="flex justify-between">
-              <span>Phase</span>
-              <span className="text-slate-300">4 - Automation API + RPA</span>
+              <span>Edition</span>
+              <span className="text-slate-300">{DESKTOP_ONLY ? 'Desktop (local)' : 'Cloud'}</span>
             </div>
             <div className="flex justify-between">
               <span>Fingerprint Layer</span>
               <span className="text-slate-300">CDP + JS Injection</span>
             </div>
             <div className="flex justify-between">
-              <span>Vectors Protected</span>
-              <span className="text-green-400">19 / 19</span>
-            </div>
-            <div className="flex justify-between">
               <span>Fingerprint Presets</span>
-              <span className="text-slate-300">8 (5 desktop + 3 mobile)</span>
+              <span className="text-slate-300">{presetCount ?? '—'}</span>
             </div>
             <div className="flex justify-between">
               <span>Automation Actions</span>
-              <span className="text-slate-300">17 (incl. conditional + loop)</span>
+              <span className="text-slate-300">{Object.keys(ACTION_META).length}</span>
             </div>
           </div>
         </div>

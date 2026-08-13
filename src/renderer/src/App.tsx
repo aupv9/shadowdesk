@@ -33,6 +33,7 @@ import { useAuthStore } from './stores/authStore'
 import { useLicenseStore } from './stores/licenseStore'
 import { useToastStore } from './stores/toastStore'
 import type { NavSection } from './types'
+import { DESKTOP_ONLY, isSectionEnabled } from '../../shared/features'
 
 export default function App() {
   const [section, setSection] = useState<NavSection>('profiles')
@@ -43,8 +44,12 @@ export default function App() {
   const pushToast = useToastStore((s) => s.push)
 
   useEffect(() => {
-    auth.checkAuth()
-    license.fetchLicense()
+    // Desktop-only build has no auth or licensing backend — calling these on
+    // boot would just be two failed requests before the window paints.
+    if (!DESKTOP_ONLY) {
+      auth.checkAuth()
+      license.fetchLicense()
+    }
     // Apply saved theme
     window.api.settings.get().then((s: any) => {
       const theme = s?.theme ?? 'dark'
@@ -109,13 +114,13 @@ export default function App() {
           {section === 'marketplace' && <Marketplace />}
         </ErrorBoundary>
         <ErrorBoundary section="Team">
-          {section === 'team'        && <TeamManager />}
+          {isSectionEnabled('team') && section === 'team' && <TeamManager />}
         </ErrorBoundary>
         <ErrorBoundary section="Patches">
           {section === 'patches'     && <PatchManager />}
         </ErrorBoundary>
         <ErrorBoundary section="Account">
-          {section === 'account'     && <AccountPage />}
+          {isSectionEnabled('account') && section === 'account' && <AccountPage />}
         </ErrorBoundary>
         <ErrorBoundary section="Settings">
           {section === 'settings'    && <SettingsPage />}
@@ -133,16 +138,16 @@ export default function App() {
           {section === 'mobile-workflows' && <MobileWorkflowBuilder />}
         </ErrorBoundary>
         <ErrorBoundary section="Mobile Devices">
-          {section === 'mobile-devices' && <MobileDeviceManager />}
+          {isSectionEnabled('mobile-devices') && section === 'mobile-devices' && <MobileDeviceManager />}
         </ErrorBoundary>
         <ErrorBoundary section="Analytics">
-          {section === 'analytics' && <AnalyticsDashboardPage />}
+          {isSectionEnabled('analytics') && section === 'analytics' && <AnalyticsDashboardPage />}
         </ErrorBoundary>
         <ErrorBoundary section="Billing">
-          {section === 'billing' && <BillingPortal />}
+          {isSectionEnabled('billing') && section === 'billing' && <BillingPortal />}
         </ErrorBoundary>
         <ErrorBoundary section="Support">
-          {section === 'support' && <SupportCenter />}
+          {isSectionEnabled('support') && section === 'support' && <SupportCenter />}
         </ErrorBoundary>
       </main>
       <ToastContainer />

@@ -320,7 +320,7 @@ export class BrowserManager {
     }
 
     const err = new Error(
-      'Chrome/Chromium not found. Please install Google Chrome (or Microsoft Edge) to use Ghost Browser.'
+      'Chrome/Chromium not found. Please install Google Chrome (or Microsoft Edge) to use ShadowDesk.'
     ) as any
     err.code = 'CHROMIUM_NOT_FOUND'
     throw err

@@ -249,7 +249,7 @@ export function collectDiagnostics(): DiagnosticBundle {
 export function getDiagnosticsText(): string {
   const d = collectDiagnostics()
   return [
-    `Ghost Browser Diagnostics`,
+    `ShadowDesk Diagnostics`,
     `========================`,
     `App Version: ${d.app_version}`,
     `Electron: ${d.electron_version}`,
