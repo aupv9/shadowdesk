@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import type { DetectionTestResult } from '../../types'
+import { buildTrendPoints, pickHeadline } from './trend'
 
 interface Props {
   results: DetectionTestResult[]
@@ -23,28 +24,11 @@ export function HealthTrendChart({ results }: Props) {
     return Array.from(map.entries())
   }, [results])
 
-  // Filter + bucket by day
-  const points = useMemo(() => {
-    const filtered = profileFilter === 'all'
-      ? results
-      : results.filter((r) => r.profileId === profileFilter)
-
-    const byDay = new Map<string, { total: number; count: number }>()
-    for (const r of filtered) {
-      // Defensive: skip rows missing testedAt (e.g. legacy/snake_case rows
-      // before the database mapper was added).
-      if (!r.testedAt || typeof r.testedAt !== 'string') continue
-      const day = r.testedAt.slice(0, 10) // YYYY-MM-DD
-      const existing = byDay.get(day) ?? { total: 0, count: 0 }
-      existing.total += r.overallScore
-      existing.count += 1
-      byDay.set(day, existing)
-    }
-
-    return Array.from(byDay.entries())
-      .map(([day, agg]) => ({ day, score: Math.round(agg.total / agg.count) }))
-      .sort((a, b) => a.day.localeCompare(b.day))
-  }, [results, profileFilter])
+  // Two series, because the two scores answer different questions and one line
+  // hides the case worth spotting: injection integrity holding at 100 while
+  // detection risk slides. Averaging them together erases exactly that.
+  const points = useMemo(() => buildTrendPoints(results, profileFilter), [results, profileFilter])
+  const headline = useMemo(() => pickHeadline(points), [points])
 
   if (points.length === 0) {
     return (
@@ -55,9 +39,9 @@ export function HealthTrendChart({ results }: Props) {
     )
   }
 
-  // Compute trend delta (first vs last)
-  const first = points[0].score
-  const last = points[points.length - 1].score
+  // Trend delta is measured on the headline series only.
+  const first = headline.series[0]
+  const last = headline.series[headline.series.length - 1]
   const delta = last - first
   const trendIcon = delta > 2 ? <TrendingUp className="w-4 h-4 text-green-400" />
                   : delta < -2 ? <TrendingDown className="w-4 h-4 text-red-400" />
@@ -77,15 +61,30 @@ export function HealthTrendChart({ results }: Props) {
 
   const yFor = (score: number) => PAD.top + innerH - (score / 100) * innerH
 
-  const pathD = points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yFor(p.score).toFixed(1)}`)
-    .join(' ')
+  /** Path over a series, skipping days the series has no value for. */
+  const pathOver = (pick: (p: typeof points[number]) => number | null) => {
+    let started = false
+    const segments: string[] = []
+    points.forEach((p, i) => {
+      const v = pick(p)
+      if (v === null) return
+      segments.push(`${started ? 'L' : 'M'} ${xFor(i).toFixed(1)} ${yFor(v).toFixed(1)}`)
+      started = true
+    })
+    return segments.join(' ')
+  }
 
-  // Area fill (path closed to baseline)
-  const areaD =
-    pathD +
-    ` L ${xFor(points.length - 1).toFixed(1)} ${(PAD.top + innerH).toFixed(1)}` +
-    ` L ${xFor(0).toFixed(1)} ${(PAD.top + innerH).toFixed(1)} Z`
+  const headlinePath = pathOver((p) => (headline.key === 'risk' ? p.risk : p.injection))
+  // Only drawn when it adds information — with no risk series it would be the
+  // headline line traced twice.
+  const secondaryPath = headline.key === 'risk' ? pathOver((p) => p.injection) : ''
+
+  // Area fill under the headline line, closed to the baseline.
+  const areaD = headlinePath
+    ? headlinePath +
+      ` L ${xFor(points.length - 1).toFixed(1)} ${(PAD.top + innerH).toFixed(1)}` +
+      ` L ${xFor(0).toFixed(1)} ${(PAD.top + innerH).toFixed(1)} Z`
+    : ''
 
   const lineColor = last >= 90 ? '#22c55e' : last >= 70 ? '#eab308' : '#ef4444'
   const fillColor = last >= 90 ? 'rgba(34,197,94,0.18)' : last >= 70 ? 'rgba(234,179,8,0.18)' : 'rgba(239,68,68,0.18)'
@@ -96,12 +95,20 @@ export function HealthTrendChart({ results }: Props) {
   return (
     <div className="card mb-4">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-white">Health Trend</h3>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="text-sm font-semibold text-white">{headline.label} trend</h3>
           {trendIcon}
           <span className={`text-xs ${delta > 0 ? 'text-green-400' : delta < 0 ? 'text-red-400' : 'text-slate-500'}`}>
             {delta > 0 ? '+' : ''}{delta}% over {points.length} day{points.length !== 1 ? 's' : ''}
           </span>
+          {secondaryPath && (
+            <span className="flex items-center gap-1 text-[10px] text-slate-500 ml-1">
+              <svg width="14" height="6" aria-hidden>
+                <line x1="0" y1="3" x2="14" y2="3" stroke="#64748b" strokeWidth="1.5" strokeDasharray="4 3" />
+              </svg>
+              injection integrity
+            </span>
+          )}
         </div>
         {profiles.length > 1 && (
           <select
@@ -137,25 +144,40 @@ export function HealthTrendChart({ results }: Props) {
           )
         })}
 
-        {/* Area */}
-        <path d={areaD} fill={fillColor} />
-        {/* Line */}
-        <path d={pathD} fill="none" stroke={lineColor} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        {/* Area under the headline series */}
+        {areaD && <path d={areaD} fill={fillColor} />}
+
+        {/* Injection integrity, dimmed and dashed — context, not the point */}
+        {secondaryPath && (
+          <path
+            d={secondaryPath}
+            fill="none"
+            stroke="#64748b"
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
+            strokeLinecap="round"
+          />
+        )}
+
+        {/* Headline series */}
+        {headlinePath && (
+          <path d={headlinePath} fill="none" stroke={lineColor} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        )}
 
         {/* Points */}
-        {points.map((p, i) => (
-          <g key={p.day}>
-            <circle
-              cx={xFor(i)}
-              cy={yFor(p.score)}
-              r={3}
-              fill="#0f172a"
-              stroke={lineColor}
-              strokeWidth={1.5}
-            />
-            <title>{`${p.day}: ${p.score}%`}</title>
-          </g>
-        ))}
+        {points.map((p, i) => {
+          const v = headline.key === 'risk' ? p.risk : p.injection
+          if (v === null) return null
+          return (
+            <g key={p.day}>
+              <circle cx={xFor(i)} cy={yFor(v)} r={3} fill="#0f172a" stroke={lineColor} strokeWidth={1.5} />
+              <title>
+                {`${p.day} — ${headline.label}: ${v}%` +
+                  (headline.key === 'risk' ? `, injection integrity: ${p.injection}%` : '')}
+              </title>
+            </g>
+          )
+        })}
 
         {/* X-axis labels: first, middle, last */}
         {points.length > 0 && (

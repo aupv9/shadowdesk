@@ -16,8 +16,11 @@ export function CategoryScoreChart({ result }: Props) {
   // Aggregate pass / total per category preserving CATEGORY_ORDER
   const CATEGORY_ORDER = ['Automation', 'Browser', 'Graphics', 'Audio', 'Hardware', 'Locale', 'Timing', 'API']
 
+  // Only vectors that actually ran. A category made up of skipped checks would
+  // otherwise render as a category that failed everything.
   const byCategory: Record<string, { passed: number; total: number }> = {}
   for (const v of result.vectors) {
+    if (v.status === 'unavailable') continue
     const cat = v.category ?? 'Other'
     if (!byCategory[cat]) byCategory[cat] = { passed: 0, total: 0 }
     byCategory[cat].total += 1

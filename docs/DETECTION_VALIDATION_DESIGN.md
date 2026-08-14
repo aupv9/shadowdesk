@@ -1,13 +1,11 @@
 # ShadowDesk — Detection Validation Design
 
-**Version 1.2** | **Date:** 2026-08-13 | **Status:** Phases A–D implemented; E outstanding
+**Version 1.3** | **Date:** 2026-08-13 | **Status:** Phases A–E implemented
 
 > **Landed:** severity model and weighted scoring, guarded vector runner, dual
 > scores, the coherence engine (R1–R14), the WAF canary with fingerprint-vs-IP
-> attribution, and the external probe manifest with its freshness job.
->
-> **Outstanding:** Phase E reporting beyond the dual-score gauges already in the
-> dashboard.
+> attribution, the external probe manifest with its freshness job, and
+> source-grouped reporting with a dual-series trend.
 >
 > **Two caveats worth carrying forward.**
 >
@@ -340,9 +338,20 @@ verifies a reading can be *obtained* rather than that it passes; it treats a
 zero count as unreadable, since "nothing failed" and "dead selector" are
 indistinguishable from the outside.
 
-### Phase E — Reporting (S)
+### Phase E — Reporting (S) ✅
 Dashboard split by source; export includes raw probe verdicts; risk-score
 trend replaces the current single-score chart.
+
+*As built:* the result detail groups by evidence source with the question each
+one answers spelled out, because category alone put "chrome.runtime exists"
+beside a live WAF verdict as though they weighed the same. The trend plots
+detection risk as the headline with injection integrity dimmed behind it —
+one line would hide the case worth spotting, where the engine holds at 100
+while risk slides. Rows predating the split contribute their `overallScore` to
+the injection series only, never to risk. Probe rot gets its own notice rather
+than being left to a grey row among sixty, since `unavailable` is deliberately
+cheap and would otherwise go unread. Bucketing and headline selection live in
+`trend.ts` as pure functions so the legacy-fallback path is tested.
 
 **Sequence rationale:** A → B → C → D → E. B before D because B is
 deterministic and permanent while D carries ongoing cost; C before D because a
