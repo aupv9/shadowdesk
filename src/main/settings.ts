@@ -34,6 +34,15 @@ export interface CanarySettings {
   sentinel: string
 }
 
+/**
+ * Layer 2 external probes. Off by default: they send traffic from every
+ * profile tested to third-party fingerprint testers, which is a choice an
+ * anti-detect product's user should make deliberately.
+ */
+export interface ProbeSettings {
+  enabled: boolean
+}
+
 export interface AppSettings {
   defaultPreset: string
   language: 'en' | 'vi' | 'th' | 'id'
@@ -52,6 +61,8 @@ export interface AppSettings {
   ai: AiConfig
   /** Detection Layer 3 — live WAF canary. */
   canary: CanarySettings
+  /** Detection Layer 2 — external fingerprint-tester probes. */
+  probes: ProbeSettings
 }
 
 const DEFAULT_CAPTCHA: CaptchaConfig = {
@@ -75,6 +86,10 @@ const DEFAULT_CANARY: CanarySettings = {
   sentinel: ''
 }
 
+const DEFAULT_PROBES: ProbeSettings = {
+  enabled: false
+}
+
 const DEFAULTS: AppSettings = {
   defaultPreset: 'win10-chrome120',
   language: 'en',
@@ -83,7 +98,8 @@ const DEFAULTS: AppSettings = {
   autoSyncBinaryUA: true,
   captcha: DEFAULT_CAPTCHA,
   ai: DEFAULT_AI,
-  canary: DEFAULT_CANARY
+  canary: DEFAULT_CANARY,
+  probes: DEFAULT_PROBES
 }
 
 let cached: AppSettings | null = null
@@ -108,7 +124,8 @@ export function getSettings(): AppSettings {
     ...DEFAULTS,
     captcha: { ...DEFAULT_CAPTCHA, apiKeys: { ...DEFAULT_CAPTCHA.apiKeys } },
     ai: { ...DEFAULT_AI },
-    canary: { ...DEFAULT_CANARY }
+    canary: { ...DEFAULT_CANARY },
+    probes: { ...DEFAULT_PROBES }
   }
   return cached
 }
@@ -129,7 +146,11 @@ function mergeWithDefaults(raw: any): AppSettings {
     ...DEFAULT_CANARY,
     ...(raw?.canary ?? {})
   }
-  return { ...DEFAULTS, ...raw, captcha, ai, canary }
+  const probes: ProbeSettings = {
+    ...DEFAULT_PROBES,
+    ...(raw?.probes ?? {})
+  }
+  return { ...DEFAULTS, ...raw, captcha, ai, canary, probes }
 }
 
 export function updateSettings(partial: Partial<AppSettings>): AppSettings {

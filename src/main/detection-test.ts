@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import { v4 as uuidv4 } from 'uuid'
 import type { Page } from 'puppeteer-core'
 import { BrowserManager } from './browser-manager'
@@ -22,6 +23,7 @@ import {
 } from './fingerprint/coherence-collector'
 import { runCanary, canaryVector, type CanaryVerdict } from './detection/canary'
 import { attributeVerdict } from './detection/attribution'
+import { loadManifest, runProbes, probeVector } from './detection/probes'
 import { getSettings } from './settings'
 
 /**
@@ -40,6 +42,21 @@ const COHERENCE_TIMEOUT_MS = 30000
 
 /** A challenge page plus its JS can take a while; give the canary room. */
 const CANARY_TIMEOUT_MS = 40000
+
+/**
+ * Probes are the slowest layer by far — CreepJS alone needs ~12s of settle
+ * time after load, and several targets are loaded in sequence.
+ */
+const PROBE_TIMEOUT_MS = 180000
+
+/** userData path, or undefined outside Electron (tests, tooling). */
+function safeUserDataDir(): string | undefined {
+  try {
+    return app.getPath('userData')
+  } catch {
+    return undefined
+  }
+}
 
 /**
  * Detection Test Runner — launches a profile's browser and runs
@@ -267,7 +284,36 @@ export class DetectionTestRunner {
       CANARY_TIMEOUT_MS
     )
 
-    return [...injectionVectors, ...coherenceVectors, ...canaryVectors]
+    // Layer 2 — external fingerprint testers. Opt-in: this sends traffic from
+    // the profile to third parties.
+    const probeVectors = await this.runGuarded(
+      'Probes: external testers',
+      () => this.evaluateProbes(page),
+      PROBE_TIMEOUT_MS
+    )
+
+    return [...injectionVectors, ...coherenceVectors, ...canaryVectors, ...probeVectors]
+  }
+
+  /**
+   * Loads each configured probe target through this profile's browser.
+   *
+   * Runs in its own tab, like the canary, so the sweep never navigates the
+   * user's page to an external site.
+   */
+  private async evaluateProbes(page: Page): Promise<DetectionVectorResult[]> {
+    if (!getSettings().probes?.enabled) return []
+
+    const manifest = loadManifest(safeUserDataDir())
+    if (manifest.probes.length === 0) return []
+
+    const probePage = await page.browser().newPage()
+    try {
+      const results = await runProbes(probePage, manifest.probes)
+      return results.map(({ probe, outcome }) => probeVector(probe, outcome))
+    } finally {
+      await probePage.close().catch(() => {})
+    }
   }
 
   /**

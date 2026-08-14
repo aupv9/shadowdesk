@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Save, RefreshCw, Info, Keyboard, Server, Play, Square, Copy, CheckCircle, Cpu, AlertTriangle, ShieldCheck, Lock, Unlock, Plus, Trash2, KeyRound, Radar } from 'lucide-react'
+import { Save, RefreshCw, Info, Keyboard, Server, Play, Square, Copy, CheckCircle, Cpu, AlertTriangle, ShieldCheck, Lock, Unlock, Plus, Trash2, KeyRound, Radar, Globe } from 'lucide-react'
 import type { ApiServerStatus, ApiServerConfig } from '../../types'
 import { RemoteNodesPanel } from './RemoteNodesPanel'
 import { CommunityPresetsPanel } from './CommunityPresetsPanel'
@@ -28,6 +28,7 @@ interface Settings {
   autoSyncBinaryUA: boolean
   captcha: CaptchaConfig
   canary: CanarySettings
+  probes: { enabled: boolean }
 }
 
 const CAPTCHA_PROVIDERS: { id: CaptchaProviderId; displayName: string }[] = [
@@ -825,6 +826,42 @@ export function SettingsPage() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Detection Layer 2 — external fingerprint-tester probes */}
+        <div className="card">
+          <h2 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
+            <Globe className="w-4 h-4" />
+            External Probes
+          </h2>
+          <p className="text-xs text-slate-500 mb-4">
+            Loads public fingerprint testers (CreepJS, bot.sannysoft.com) through each profile and reads
+            their verdict. CreepJS is the valuable one: it hunts for tampering specifically, which is the
+            one thing a self-test can never find.
+          </p>
+
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={settings.probes?.enabled ?? false}
+              onChange={(e) => setSettings({ ...settings, probes: { enabled: e.target.checked } })}
+            />
+            <span className="text-xs text-slate-300">
+              Run external probes during detection tests
+              <span className="block text-[11px] text-slate-500 mt-0.5">
+                Off by default. This sends traffic from every profile you test to third-party sites, and
+                adds a minute or more per run.
+              </span>
+            </span>
+          </label>
+
+          <p className="text-[11px] text-slate-600 mt-3 pt-3 border-t border-slate-800">
+            These targets change layout on their own schedule. A selector that stops matching reports as
+            <span className="text-slate-500"> unavailable</span> and never lowers a score. To patch one
+            without waiting for a release, drop a <code className="text-slate-500">probes.json</code> into
+            the app data folder — it is merged over the built-in manifest by probe id.
+          </p>
         </div>
 
         <RemoteNodesPanel />

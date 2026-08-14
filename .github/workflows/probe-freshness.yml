@@ -1,0 +1,64 @@
+name: Probe freshness
+
+# Layer 2 probes fail soft by design: a selector that stops matching reports
+# `unavailable` rather than dropping a user's score. That safety property means
+# nothing in the product would ever tell us the manifest rotted. This job is
+# that signal — without it the manifest quietly decays to no probes at all.
+on:
+  schedule:
+    # Mondays 06:00 UTC.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/main/detection/probes.json'
+      - 'scripts/check-probe-freshness.ts'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  freshness:
+    name: Check probe selectors against live targets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check probes
+        id: check
+        run: npx tsx scripts/check-probe-freshness.ts 2>&1 | tee freshness.log
+        continue-on-error: true
+
+      # Only file an issue on the scheduled run. On a pull request the failing
+      # step is feedback enough, and an issue per push would be noise.
+      - name: Open a maintenance issue
+        if: steps.check.outcome == 'failure' && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # gh issue create fails outright on an unknown label.
+          gh label create probe-rot --color D93F0B \
+            --description "A Layer 2 detection probe selector no longer matches" 2>/dev/null || true
+          existing=$(gh issue list --label probe-rot --state open --json number --jq '.[0].number')
+          body=$(printf 'The weekly freshness check could not read one or more Layer 2 probes.\n\nUsers are not affected — probes fail soft and report `unavailable` rather than failing a profile. But an unreadable probe contributes nothing, so the manifest needs updating.\n\n```\n%s\n```\n\nFix the selectors in `src/main/detection/probes.json`.\n' "$(cat freshness.log)")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create \
+              --title "Detection probe selectors have gone stale" \
+              --label probe-rot \
+              --body "$body"
+          fi
+
+      - name: Fail the run if any probe was unreadable
+        if: steps.check.outcome == 'failure'
+        run: exit 1

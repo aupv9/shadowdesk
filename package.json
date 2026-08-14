@@ -24,6 +24,7 @@
     "test:ecommerce:seed": "npm run test:ecommerce:seed:generate && npm run test:ecommerce:seed:db",
     "test:ecommerce:smoke:dry": "npx tsx tests/smoke/ecommerce-live-smoke.ts",
     "test:ecommerce:smoke:live": "npx tsx tests/smoke/ecommerce-live-smoke.ts --live",
+    "probes:freshness": "npx tsx scripts/check-probe-freshness.ts",
     "test:multilogin:generate": "npx tsx scripts/generate-multilogin-testdata.ts",
     "test:multilogin:run": "npx tsx src/main/test-multilogin.ts",
     "test:multilogin": "npm run test:multilogin:generate && npm run test:multilogin:run",

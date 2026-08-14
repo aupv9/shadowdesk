@@ -1,19 +1,27 @@
 # ShadowDesk — Detection Validation Design
 
-**Version 1.1** | **Date:** 2026-08-13 | **Status:** Phases A–C implemented; D–E outstanding
+**Version 1.2** | **Date:** 2026-08-13 | **Status:** Phases A–D implemented; E outstanding
 
 > **Landed:** severity model and weighted scoring, guarded vector runner, dual
-> scores, the coherence engine (R1–R14), and the WAF canary with
-> fingerprint-vs-IP attribution.
+> scores, the coherence engine (R1–R14), the WAF canary with fingerprint-vs-IP
+> attribution, and the external probe manifest with its freshness job.
 >
-> **Outstanding:** Layer 2 external probes (Phase D) and the reporting work in
-> Phase E beyond the dual-score gauges already in the dashboard.
+> **Outstanding:** Phase E reporting beyond the dual-score gauges already in the
+> dashboard.
 >
-> **Not yet exercised against a live browser.** The rules, classifier,
-> attribution and persistence are unit-tested, but the collectors
-> (`coherence-collector.ts`) and `runCanary` have only been typechecked. In
-> particular, if `collectWorker`/`collectIframe` return null in practice, R3
-> and R4 will report `unavailable` rather than actually comparing realms.
+> **Two caveats worth carrying forward.**
+>
+> 1. *Not yet exercised against a live browser.* Rules, classifier,
+>    attribution, probe evaluation and persistence are unit-tested, but the
+>    collectors (`coherence-collector.ts`), `runCanary` and `runProbes` have
+>    only been typechecked. If `collectWorker`/`collectIframe` return null in
+>    practice, R3 and R4 report `unavailable` rather than comparing realms.
+>
+> 2. *The shipped probe selectors are unverified.* They were authored without
+>    network access to the targets. Fail-soft is what makes shipping them safe —
+>    a wrong selector yields `unavailable`, never a lower score — and the weekly
+>    freshness job is what turns them from guesses into something to trust. No
+>    probe carries a `lastVerified` date yet.
 
 > Supersedes the framing in `DETECTION_ANALYSIS.md` and `DETECTION_SCORECARD.md`.
 > Those documents grade the existing suite as "production ready" against the
@@ -316,12 +324,21 @@ than guessing when no passing comparison exists. The canary loads in its own
 tab so the sweep does not navigate whatever the user had open. Disabled by
 default, with no third-party URL shipped.
 
-### Phase D — External probes (M, highest maintenance)
+### Phase D — External probes (M, highest maintenance) ✅
 `probes.json` manifest; probe runner with fail-soft parsing; CreepJS +
 sannysoft first; weekly freshness workflow.
 
 *Done when:* deleting a selector from the manifest yields `unavailable` and a
 maintenance warning — never a score drop.
+
+*As built:* `detection/probes.ts` keeps every selector in JSON and the
+evaluator pure, so the rot cases are tested directly. Probes sharing a URL are
+loaded once — two readings off one CreepJS page should not cost two 12-second
+settles. An operator can drop a `probes.json` into userData to repair one
+rotted selector by id without waiting for a release. `check-probe-freshness.ts`
+verifies a reading can be *obtained* rather than that it passes; it treats a
+zero count as unreadable, since "nothing failed" and "dead selector" are
+indistinguishable from the outside.
 
 ### Phase E — Reporting (S)
 Dashboard split by source; export includes raw probe verdicts; risk-score
