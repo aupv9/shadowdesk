@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import { v4 as uuidv4 } from 'uuid'
 import type { Page } from 'puppeteer-core'
 import { BrowserManager } from './browser-manager'
@@ -10,7 +11,52 @@ import {
   testEdgeSpecificVectors,
   testBrowserConsistency
 } from './fingerprint/browser-vectors'
-import type { DetectionTestResult, DetectionVectorResult } from '../shared/types'
+import type { DetectionTestResult, DetectionVectorResult, FingerprintConfig } from '../shared/types'
+import { normalizeVector, splitScores, statusFor } from './detection/scoring'
+import { runCoherenceRules, type ProxyGeo } from './fingerprint/coherence'
+import {
+  collectMain,
+  collectWorker,
+  collectIframe,
+  collectRenderHashes,
+  collectWebrtcPublicIps
+} from './fingerprint/coherence-collector'
+import { runCanary, canaryVector, type CanaryVerdict } from './detection/canary'
+import { attributeVerdict } from './detection/attribution'
+import { loadManifest, runProbes, probeVector } from './detection/probes'
+import { getSettings } from './settings'
+
+/**
+ * Per-probe budget. A stalled page.evaluate() used to hang the entire run;
+ * 5s is generous for an in-page evaluation and bounds a full sweep.
+ */
+const VECTOR_TIMEOUT_MS = 5000
+
+/**
+ * The coherence sweep needs far more headroom than a single probe: ICE
+ * gathering alone waits 4s, and the first `detectBinaryVersion()` call launches
+ * a throwaway Chromium. Under the per-probe budget the whole layer would have
+ * timed out on every run and silently reported itself unavailable.
+ */
+const COHERENCE_TIMEOUT_MS = 30000
+
+/** A challenge page plus its JS can take a while; give the canary room. */
+const CANARY_TIMEOUT_MS = 40000
+
+/**
+ * Probes are the slowest layer by far — CreepJS alone needs ~12s of settle
+ * time after load, and several targets are loaded in sequence.
+ */
+const PROBE_TIMEOUT_MS = 180000
+
+/** userData path, or undefined outside Electron (tests, tooling). */
+function safeUserDataDir(): string | undefined {
+  try {
+    return app.getPath('userData')
+  } catch {
+    return undefined
+  }
+}
 
 /**
  * Detection Test Runner — launches a profile's browser and runs
@@ -50,17 +96,26 @@ export class DetectionTestRunner {
 
     try {
       const vectors = await this.evaluateVectors(profileId)
-      const passedCount = vectors.filter(v => v.passed).length
-      const overallScore = Math.round((passedCount / vectors.length) * 100)
+      const { injection, risk } = splitScores(vectors)
+
+      // The report is judged on detection risk when we have it, and falls back
+      // to injection integrity when only layer-0 vectors ran. Reporting one
+      // merged number is what let users read "my overrides applied" as "I am
+      // undetectable" — see docs/DETECTION_VALIDATION_DESIGN.md.
+      const headline = risk ?? injection
 
       const result: DetectionTestResult = {
         id: uuidv4(),
         profileId,
         profileName: profile.name,
         testedAt: new Date().toISOString(),
-        overallScore,
+        overallScore: injection.score,
         vectors,
-        status: overallScore >= 90 ? 'passed' : overallScore >= 70 ? 'warning' : 'failed'
+        status: statusFor(headline),
+        injectionScore: injection.score,
+        riskScore: risk?.score,
+        proxyId: profile.proxy_id ?? null,
+        unavailableCount: injection.unavailableCount + (risk?.unavailableCount ?? 0)
       }
 
       // Persist result to DB
@@ -79,6 +134,39 @@ export class DetectionTestRunner {
   getResults(profileId?: string): DetectionTestResult[] {
     const db = Database.getInstance()
     return db.getDetectionTestResults(profileId)
+  }
+
+  /**
+   * Runs one probe with a timeout, converting a hang or a throw into an
+   * `unavailable` vector. A check that could not run must never look like a
+   * check that caught something, so these are excluded from scoring rather
+   * than counted as failures.
+   */
+  private async runGuarded(
+    name: string,
+    run: () => Promise<DetectionVectorResult | DetectionVectorResult[]>,
+    timeoutMs: number = VECTOR_TIMEOUT_MS
+  ): Promise<DetectionVectorResult[]> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      const result = await Promise.race([
+        run(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`timed out after ${timeoutMs}ms`)), timeoutMs)
+        })
+      ])
+      return Array.isArray(result) ? result : [result]
+    } catch (e: any) {
+      return [{
+        name,
+        category: 'Automation',
+        passed: false,
+        status: 'unavailable',
+        detail: `Could not run: ${e?.message ?? String(e)}`
+      }]
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
   }
 
   /** Evaluate all detection vectors inside a running profile's browser */
@@ -101,85 +189,262 @@ export class DetectionTestRunner {
     const vectors: DetectionVectorResult[] = []
 
     // Run each test and collect results
-    vectors.push(await this.testWebdriver(page))
-    vectors.push(await this.testChromeRuntime(page))
-    vectors.push(await this.testChromeApp(page))
-    vectors.push(await this.testPlugins(page))
-    vectors.push(await this.testPermissions(page))
-    vectors.push(await this.testNavigatorProps(page))
-    vectors.push(await this.testCanvasFingerprint(page))
-    vectors.push(await this.testWebglVendor(page))
-    vectors.push(await this.testAudioContext(page))
-    vectors.push(await this.testScreenConsistency(page))
-    vectors.push(await this.testTimezone(page))
-    vectors.push(await this.testLanguageConsistency(page))
-    vectors.push(await this.testConnectionApi(page))
-    vectors.push(await this.testStorageQuota(page))
-    vectors.push(await this.testErrorStack(page))
-    vectors.push(await this.testFunctionToString(page))
-    vectors.push(await this.testHeadlessSignals(page))
-    vectors.push(await this.testCdcVariables(page))
-    vectors.push(await this.testPerformanceEntries(page))
-    vectors.push(await this.testNotificationPermission(page))
-    // Phase 6: 10 new vectors
-    vectors.push(await this.testDateNowPrecision(page))
-    vectors.push(await this.testWebAssemblySupport(page))
-    vectors.push(await this.testObjectDefinePropertyConsistency(page))
-    vectors.push(await this.testWorkerWebdriver(page))
-    vectors.push(await this.testCssMediaConsistency(page))
-    vectors.push(await this.testBatteryApiShape(page))
-    vectors.push(await this.testViewportConsistency(page))
-    vectors.push(await this.testSeleniumArtifacts(page))
-    vectors.push(await this.testServiceWorkerSupport(page))
-    vectors.push(await this.testDocumentFocus(page))
-    // Phase 8: 15 new deep detection vectors
-    vectors.push(await this.testIntlLocaleConsistency(page))
-    vectors.push(await this.testUserAgentDataBrands(page))
-    vectors.push(await this.testUserAgentDataPlatform(page))
-    vectors.push(await this.testWebGPUPresence(page))
-    vectors.push(await this.testMathFpuFingerprint(page))
-    vectors.push(await this.testProtoChainIntegrity(page))
-    vectors.push(await this.testMediaCapabilitiesApi(page))
-    vectors.push(await this.testKeyboardApiPresence(page))
-    vectors.push(await this.testWebRtcSdpFingerprint(page))
-    vectors.push(await this.testDevicePixelRatioConsistency(page))
-    vectors.push(await this.testNavigationTimingConsistency(page))
-    vectors.push(await this.testSpeechSynthesisConsistency(page))
-    vectors.push(await this.testTrustTokenApiShape(page))
-    vectors.push(await this.testSharedArrayBufferAvailability(page))
-    // P0 FIX: KeyboardEvent.key alignment test
-    vectors.push(await this.testKeyboardEventKeyAlignment(page))
-    vectors.push(await this.testIntlSupportedValues(page))
-    // Phase 12.A.2: 5 network/UA alignment vectors
-    vectors.push(await this.testBinaryUaAlignment(page))
-    vectors.push(await this.testUachBrandsAlignment(page))
-    vectors.push(await this.testUachPlatformAlignment(page))
-    vectors.push(await this.testUachMobileTouchAlignment(page))
-    vectors.push(await this.testAcceptLanguageAlignment(page))
+    // Every probe runs through runGuarded: a hang or a throw yields an
+    // `unavailable` vector instead of aborting the whole report. Previously one
+    // stalled page.evaluate() hung the run indefinitely and one exception lost
+    // the other 50-odd results.
+    const probes: Array<[string, () => Promise<DetectionVectorResult | DetectionVectorResult[]>]> = [
+      ['navigator.webdriver',                () => this.testWebdriver(page)],
+      ['chrome.runtime exists',              () => this.testChromeRuntime(page)],
+      ['chrome.app stub',                    () => this.testChromeApp(page)],
+      ['navigator.plugins',                  () => this.testPlugins(page)],
+      ['Permissions API consistency',        () => this.testPermissions(page)],
+      ['Navigator properties',               () => this.testNavigatorProps(page)],
+      ['Canvas fingerprint',                 () => this.testCanvasFingerprint(page)],
+      ['WebGL vendor/renderer',              () => this.testWebglVendor(page)],
+      ['AudioContext',                       () => this.testAudioContext(page)],
+      ['Screen dimensions consistency',      () => this.testScreenConsistency(page)],
+      ['Timezone override',                  () => this.testTimezone(page)],
+      ['Language consistency',               () => this.testLanguageConsistency(page)],
+      ['Network Information API',            () => this.testConnectionApi(page)],
+      ['Storage quota',                      () => this.testStorageQuota(page)],
+      ['Error stack traces',                 () => this.testErrorStack(page)],
+      ['Function.toString masking',          () => this.testFunctionToString(page)],
+      ['Headless browser signals',           () => this.testHeadlessSignals(page)],
+      ['ChromeDriver variables',             () => this.testCdcVariables(page)],
+      ['Performance entries',                () => this.testPerformanceEntries(page)],
+      ['Notification.permission',            () => this.testNotificationPermission(page)],
+      // Phase 6
+      ['Date.now() precision',               () => this.testDateNowPrecision(page)],
+      ['WebAssembly support',                () => this.testWebAssemblySupport(page)],
+      ['Object.defineProperty consistency',  () => this.testObjectDefinePropertyConsistency(page)],
+      ['Worker navigator.webdriver',         () => this.testWorkerWebdriver(page)],
+      ['CSS media query consistency',        () => this.testCssMediaConsistency(page)],
+      ['Battery API shape',                  () => this.testBatteryApiShape(page)],
+      ['Viewport consistency',               () => this.testViewportConsistency(page)],
+      ['Selenium / WebDriver artifacts',     () => this.testSeleniumArtifacts(page)],
+      ['Service Worker API',                 () => this.testServiceWorkerSupport(page)],
+      ['Document focus / visibility',        () => this.testDocumentFocus(page)],
+      // Phase 8
+      ['Intl locale consistency',            () => this.testIntlLocaleConsistency(page)],
+      ['UACH brands list',                   () => this.testUserAgentDataBrands(page)],
+      ['UACH platform vs UA',                () => this.testUserAgentDataPlatform(page)],
+      ['WebGPU API presence',                () => this.testWebGPUPresence(page)],
+      ['Math FPU fingerprint',               () => this.testMathFpuFingerprint(page)],
+      ['Prototype chain integrity',          () => this.testProtoChainIntegrity(page)],
+      ['MediaCapabilities API',              () => this.testMediaCapabilitiesApi(page)],
+      ['Keyboard Layout API',                () => this.testKeyboardApiPresence(page)],
+      ['WebRTC SDP fingerprint',             () => this.testWebRtcSdpFingerprint(page)],
+      ['devicePixelRatio consistency',       () => this.testDevicePixelRatioConsistency(page)],
+      ['Navigation Timing v2',               () => this.testNavigationTimingConsistency(page)],
+      ['SpeechSynthesis consistency',        () => this.testSpeechSynthesisConsistency(page)],
+      ['Private State Tokens API',           () => this.testTrustTokenApiShape(page)],
+      ['SharedArrayBuffer + Atomics',        () => this.testSharedArrayBufferAvailability(page)],
+      ['KeyboardEvent.key alignment',        () => this.testKeyboardEventKeyAlignment(page)],
+      ['Intl.supportedValuesOf stability',   () => this.testIntlSupportedValues(page)],
+      // Phase 12.A.2 — network/UA alignment
+      ['UA ↔ binary version alignment',      () => this.testBinaryUaAlignment(page)],
+      ['UA ↔ UACH brands alignment',         () => this.testUachBrandsAlignment(page)],
+      ['UA-CH platform alignment',           () => this.testUachPlatformAlignment(page)],
+      ['UA-CH mobile ↔ touch alignment',     () => this.testUachMobileTouchAlignment(page)],
+      ['Accept-Language alignment',          () => this.testAcceptLanguageAlignment(page)],
+      // P2 — behaviour drift (synchronous, but guarded for uniformity)
+      ['Behavior consistency & drift risk',  async () => {
+        const allResults = db.getDetectionTestResults(profileId)
+        return createBehaviorConsistencyVector(
+          analyzeBehaiorDrift(profileId, profile?.name || 'Unknown', fingerprint, allResults.length)
+        )
+      }],
+      // P3 — browser-specific
+      ['Browser consistency',                () => testBrowserConsistency(page, fingerprint)],
+      ['Firefox-specific vectors',           () => testFirefoxSpecificVectors(page, fingerprint)],
+      ['Safari-specific vectors',            () => testSafariSpecificVectors(page, fingerprint)],
+      ['Edge-specific vectors',              () => testEdgeSpecificVectors(page, fingerprint)]
+    ]
 
-    // P2: Behavior drift detection test
-    const allResults = db.getDetectionTestResults(profileId)
-    const behaviorDriftReport = analyzeBehaiorDrift(
-      profileId,
-      profile?.name || 'Unknown',
-      fingerprint,
-      allResults.length // session count
+    for (const [name, run] of probes) {
+      vectors.push(...(await this.runGuarded(name, run)))
+    }
+
+    const injectionVectors = vectors.map((v) => normalizeVector(v, 'injection'))
+
+    // Layer 1 — coherence. These carry source 'coherence' and feed the risk
+    // score rather than the injection score.
+    const coherenceVectors = await this.runGuarded(
+      'Coherence: engine',
+      () => this.evaluateCoherence(profileId, page, fingerprint),
+      COHERENCE_TIMEOUT_MS
     )
-    vectors.push(createBehaviorConsistencyVector(behaviorDriftReport))
 
-    // P3: Browser-specific vectors (Firefox, Safari, Edge, Brave)
-    vectors.push(await testBrowserConsistency(page, fingerprint))
+    // Layer 3 — live WAF verdict. Opt-in, and a no-op unless the operator has
+    // pointed it at a canary they own.
+    const canaryVectors = await this.runGuarded(
+      'Canary: live WAF verdict',
+      () => this.evaluateCanary(profileId, page),
+      CANARY_TIMEOUT_MS
+    )
 
-    // P3: Browser-specific detailed checks
-    const firefoxVectors = await testFirefoxSpecificVectors(page, fingerprint)
-    const safariVectors = await testSafariSpecificVectors(page, fingerprint)
-    const edgeVectors = await testEdgeSpecificVectors(page, fingerprint)
+    // Layer 2 — external fingerprint testers. Opt-in: this sends traffic from
+    // the profile to third parties.
+    const probeVectors = await this.runGuarded(
+      'Probes: external testers',
+      () => this.evaluateProbes(page),
+      PROBE_TIMEOUT_MS
+    )
 
-    vectors.push(...firefoxVectors)
-    vectors.push(...safariVectors)
-    vectors.push(...edgeVectors)
+    return [...injectionVectors, ...coherenceVectors, ...canaryVectors, ...probeVectors]
+  }
 
-    return vectors
+  /**
+   * Loads each configured probe target through this profile's browser.
+   *
+   * Runs in its own tab, like the canary, so the sweep never navigates the
+   * user's page to an external site.
+   */
+  private async evaluateProbes(page: Page): Promise<DetectionVectorResult[]> {
+    if (!getSettings().probes?.enabled) return []
+
+    const manifest = loadManifest(safeUserDataDir())
+    if (manifest.probes.length === 0) return []
+
+    const probePage = await page.browser().newPage()
+    try {
+      const results = await runProbes(probePage, manifest.probes)
+      return results.map(({ probe, outcome }) => probeVector(probe, outcome))
+    } finally {
+      await probePage.close().catch(() => {})
+    }
+  }
+
+  /**
+   * Loads the operator's canary through this profile's browser and records the
+   * verdict against the (profile × proxy) pair it belongs to.
+   */
+  private async evaluateCanary(profileId: string, page: Page): Promise<DetectionVectorResult[]> {
+    const config = getSettings().canary
+    if (!config?.enabled || !config.url) {
+      return [canaryVector({ verdict: 'unreachable', detail: 'Canary not configured' })]
+    }
+
+    const db = Database.getInstance()
+    const profile = db.getProfile(profileId) as any
+    const proxyId = profile?.proxy_id ?? null
+
+    // Load the canary in its own tab. The rest of the sweep reuses the
+    // profile's first page, and navigating that to an external URL would
+    // clobber whatever the user had open.
+    const canaryPage = await page.browser().newPage()
+    let classification
+    try {
+      classification = await runCanary(canaryPage, config)
+    } finally {
+      await canaryPage.close().catch(() => {})
+    }
+
+    // Attribute before recording, so this run is not compared against itself.
+    const history = db.getCanaryHistory().map((h) => ({
+      profileId: h.profileId,
+      proxyId: h.proxyId,
+      verdict: h.verdict as CanaryVerdict,
+      testedAt: h.testedAt
+    }))
+    const attribution = attributeVerdict(
+      { profileId, proxyId, verdict: classification.verdict },
+      history
+    )
+
+    db.saveCanaryResult({
+      id: uuidv4(),
+      profileId,
+      proxyId,
+      url: config.url,
+      verdict: classification.verdict,
+      detail: classification.detail,
+      testedAt: new Date().toISOString()
+    })
+
+    return [
+      canaryVector(
+        classification,
+        attribution.suspect === 'inconclusive' && classification.verdict === 'passed'
+          ? undefined
+          : attribution.summary
+      )
+    ]
+  }
+
+  /**
+   * Collects the four realms and runs the coherence rules over them.
+   *
+   * Realm collection is individually fault-tolerant: a worker that cannot be
+   * created yields `null`, and the rule that needs it reports `unavailable`
+   * rather than failing the profile.
+   */
+  private async evaluateCoherence(
+    profileId: string,
+    page: Page,
+    fingerprint: FingerprintConfig
+  ): Promise<DetectionVectorResult[]> {
+    const db = Database.getInstance()
+
+    const [main, worker, iframe, render, webrtcPublicIps, proxy, binaryMajor] = await Promise.all([
+      collectMain(page),
+      collectWorker(page).catch(() => null),
+      collectIframe(page).catch(() => null),
+      collectRenderHashes(page),
+      collectWebrtcPublicIps(page).catch(() => [] as string[]),
+      this.resolveProxyGeo(profileId),
+      this.resolveBinaryMajor()
+    ])
+
+    const baseline = db.getFingerprintHashes(profileId)
+    const otherProfiles = db.getOtherFingerprintHashes(profileId).map((r) => ({
+      profileId: r.profile_id,
+      hashes: { canvas: r.canvas, webgl: r.webgl, audio: r.audio }
+    }))
+
+    const results = runCoherenceRules({
+      declared: fingerprint,
+      main,
+      worker,
+      iframe,
+      proxy,
+      render,
+      baseline: baseline ? { canvas: baseline.canvas, webgl: baseline.webgl, audio: baseline.audio } : null,
+      otherProfiles,
+      webrtcPublicIps,
+      binaryMajor
+    })
+
+    // Record after evaluating, so R11 compares this run against the previous
+    // one rather than against itself.
+    db.saveFingerprintHashes(profileId, render)
+
+    return results
+  }
+
+  /** Geo of the profile's proxy, or null when it runs direct. */
+  private async resolveProxyGeo(profileId: string): Promise<ProxyGeo | null> {
+    const db = Database.getInstance()
+    const profile = db.getProfile(profileId) as any
+    if (!profile?.proxy_id) return null
+    const proxy = (db.getAllProxies() as any[]).find((p) => p.id === profile.proxy_id)
+    if (!proxy) return null
+    return {
+      ip: proxy.last_ip ?? proxy.host,
+      countryCode: proxy.country ?? undefined,
+      timezone: proxy.timezone ?? undefined
+    }
+  }
+
+  /** Real Chromium major version, for the R10 UA-vs-binary comparison. */
+  private async resolveBinaryMajor(): Promise<number | undefined> {
+    try {
+      const info = await BrowserManager.getInstance().detectBinaryVersion()
+      return info?.major || undefined
+    } catch {
+      return undefined
+    }
   }
 
   private async testWebdriver(page: Page): Promise<DetectionVectorResult> {

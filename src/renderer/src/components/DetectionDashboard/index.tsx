@@ -3,7 +3,7 @@ import {
   Shield, ShieldCheck, ShieldAlert, Play,
   ChevronDown, CheckCircle, XCircle, Clock,
   BarChart3, RefreshCw, Trash2, ListChecks,
-  AlertTriangle, X, ChevronRight, Download, ExternalLink
+  AlertTriangle, X, ChevronRight, Download, ExternalLink, MinusCircle
 } from 'lucide-react'
 import { Header } from '../Layout/Header'
 import { useProfileStore } from '../../stores/profileStore'
@@ -13,7 +13,54 @@ import type { DetectionTestResult, DetectionTestSummary, BatchTestStatus } from 
 import type { NavSection } from '../../types'
 
 // Group detection vector categories for breakdown display
-const CATEGORY_ORDER = ['Automation', 'Browser', 'Graphics', 'Audio', 'Hardware', 'Locale', 'Timing', 'API']
+const CATEGORY_ORDER = ['Automation', 'Browser', 'Graphics', 'Audio', 'Hardware', 'Locale', 'Timing', 'API', 'Network']
+
+type VectorSource = 'injection' | 'coherence' | 'probe' | 'canary'
+
+/**
+ * Evidence sources, strongest last. Spelling out what each one answers is the
+ * whole point of the split: an injection pass says the engine worked, which
+ * users previously read as "this profile is undetectable".
+ */
+const SOURCE_META: Array<{ key: VectorSource; label: string; question: string }> = [
+  { key: 'injection', label: 'Injection integrity', question: 'Did the fingerprint overrides apply?' },
+  { key: 'coherence', label: 'Coherence', question: 'Do the profile’s own values contradict each other?' },
+  { key: 'probe', label: 'External probes', question: 'What do public fingerprint testers say?' },
+  { key: 'canary', label: 'WAF canary', question: 'Did a real bot-mitigation system challenge this profile?' }
+]
+
+interface ScoreGaugeProps {
+  label: string
+  hint: string
+  score?: number
+  barColor: (s: number) => string
+  textColor: (s: number) => string
+  /** Shown instead of a number when the score was not produced this run. */
+  emptyNote?: string
+}
+
+/** One of the two headline numbers, with the question it answers spelled out. */
+function ScoreGauge({ label, hint, score, barColor, textColor, emptyNote }: ScoreGaugeProps) {
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[11px] font-medium text-slate-300">{label}</span>
+        {score === undefined ? (
+          <span className="text-xs text-slate-600">—</span>
+        ) : (
+          <span className={`text-lg font-bold ${textColor(score)}`}>{score}%</span>
+        )}
+      </div>
+      <p className="text-[10px] text-slate-500 mt-0.5">{score === undefined ? (emptyNote ?? hint) : hint}</p>
+      <div className="w-full h-1.5 bg-slate-800 rounded-full mt-2">
+        <div
+          className={`h-full rounded-full transition-all ${score === undefined ? 'bg-slate-700' : barColor(score)}`}
+          style={{ width: `${score ?? 0}%` }}
+        />
+      </div>
+    </div>
+  )
+}
 
 interface Props {
   onNavigate?: (section: NavSection) => void
@@ -117,12 +164,21 @@ export function DetectionDashboard({ onNavigate }: Props) {
 
   const handleExportCSV = () => {
     if (results.length === 0) return
-    const rows: string[] = ['Profile,Score,Status,TestedAt,Vector,Category,Passed,Detail']
+    const rows: string[] = [
+      'Profile,InjectionScore,RiskScore,Status,TestedAt,ProxyId,Vector,Category,Source,Severity,Result,Detail'
+    ]
     for (const r of results) {
       for (const v of r.vectors) {
+        const status = v.status ?? (v.passed ? 'pass' : 'fail')
         rows.push([
-          `"${r.profileName}"`, r.overallScore, r.status, r.testedAt,
-          `"${v.name}"`, v.category, v.passed ? 'true' : 'false',
+          `"${r.profileName}"`,
+          r.injectionScore ?? r.overallScore,
+          r.riskScore ?? '',
+          r.status,
+          r.testedAt,
+          r.proxyId ?? '',
+          `"${v.name}"`, v.category, v.source ?? 'injection', v.severity ?? '',
+          status,
           `"${(v.detail ?? '').replace(/"/g, "'")}"`
         ].join(','))
       }
@@ -166,6 +222,115 @@ export function DetectionDashboard({ onNavigate }: Props) {
     }
     return map
   }
+
+  const vectorsBySource = (vectors: DetectionTestResult['vectors']) => {
+    const map = new Map<VectorSource, typeof vectors>()
+    for (const v of vectors) {
+      const source = (v.source ?? 'injection') as VectorSource
+      if (!map.has(source)) map.set(source, [])
+      map.get(source)!.push(v)
+    }
+    return map
+  }
+
+  /**
+   * Collapsible category rows for one source's vectors.
+   *
+   * Expansion is keyed on `source:category` because the same category now
+   * appears under more than one source — "Network" holds both an injection
+   * vector and the canary — and a bare category key would open both at once.
+   */
+  const renderCategoryGroups = (source: VectorSource, vectors: DetectionTestResult['vectors']) =>
+    Array.from(vectorsByCategory(vectors).entries())
+      .sort(([a], [b]) => {
+        const ai = CATEGORY_ORDER.indexOf(a)
+        const bi = CATEGORY_ORDER.indexOf(b)
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+      })
+      .map(([category, catVectors]) => {
+        // Counts run over vectors that actually executed — a category of
+        // skipped checks must not read as a category of failures.
+        const ran = catVectors.filter((v) => v.status !== 'unavailable')
+        const passed = ran.filter((v) => v.passed).length
+        const key = `${source}:${category}`
+        const isExpanded = expandedCategory === key
+        const allPassed = ran.length > 0 && passed === ran.length
+        const nonePassed = ran.length > 0 && passed === 0
+
+        return (
+          <div key={key} className="rounded-lg overflow-hidden border border-slate-800">
+            <button
+              onClick={() => setExpandedCategory(isExpanded ? null : key)}
+              className="w-full flex items-center gap-2 px-3 py-2 bg-slate-800/50 hover:bg-slate-800 transition-colors text-left"
+            >
+              {allPassed ? (
+                <CheckCircle className="w-3.5 h-3.5 text-green-400 shrink-0" />
+              ) : nonePassed ? (
+                <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              ) : ran.length === 0 ? (
+                <MinusCircle className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+              ) : (
+                <AlertTriangle className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+              )}
+              <span className="text-xs font-medium text-slate-200 flex-1">{category}</span>
+              <span className={`text-xs ${
+                ran.length === 0 ? 'text-slate-600'
+                  : allPassed ? 'text-green-400'
+                  : nonePassed ? 'text-red-400' : 'text-yellow-400'
+              }`}>
+                {ran.length === 0 ? 'skipped' : `${passed}/${ran.length}`}
+              </span>
+              <ChevronRight className={`w-3 h-3 text-slate-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+            </button>
+
+            {isExpanded && (
+              <div className="divide-y divide-slate-800/50">
+                {catVectors.map((v, i) => (
+                  <div key={i} className="flex items-center gap-2.5 px-3 py-2 bg-slate-900/30">
+                    {/* A check that could not run is grey, not red — it is the
+                        absence of evidence, not evidence of a leak. */}
+                    {v.status === 'unavailable' ? (
+                      <MinusCircle className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                    ) : v.passed ? (
+                      <CheckCircle className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                    ) : (
+                      <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                    )}
+                    <span className={`text-xs flex-1 ${
+                      v.status === 'unavailable' ? 'text-slate-500'
+                        : v.passed ? 'text-slate-300' : 'text-red-300'
+                    }`}>
+                      {v.name}
+                      {v.severity === 'fatal' && v.status === 'fail' && (
+                        <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-red-600/20 text-red-400 font-medium">
+                          fatal
+                        </span>
+                      )}
+                    </span>
+                    {v.detail && (
+                      <span className="text-xs text-slate-600 max-w-[140px] truncate" title={v.detail}>
+                        {v.detail}
+                      </span>
+                    )}
+                    {!v.passed && v.status !== 'unavailable' && onNavigate && (
+                      <button
+                        onClick={() => onNavigate('fingerprint')}
+                        className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded
+                                   text-ghost-400 hover:text-ghost-200 hover:bg-ghost-600/20
+                                   transition-colors shrink-0"
+                        title="Open Fingerprint Editor to review this vector"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Fix
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })
 
   return (
     <div className="flex flex-col h-full">
@@ -285,7 +450,9 @@ export function DetectionDashboard({ onNavigate }: Props) {
                 </button>
               </div>
               <p className="text-xs text-slate-500 mt-2">
-                Launches the profile browser and evaluates 30 detection vectors across 7 categories. Results are saved for tracking.
+                Launches the profile browser, checks that the fingerprint overrides applied, then cross-checks
+                the main thread against the worker, iframe and proxy geo for contradictions. Results are saved
+                for tracking.
               </p>
             </>
           ) : (
@@ -363,11 +530,13 @@ export function DetectionDashboard({ onNavigate }: Props) {
                   <ShieldAlert className="w-6 h-6 text-red-400" />
                 )}
                 <div>
-                  <h3 className="text-sm font-semibold text-white">
-                    {activeResult.profileName} — Score: {activeResult.overallScore}%
-                  </h3>
+                  <h3 className="text-sm font-semibold text-white">{activeResult.profileName}</h3>
                   <p className="text-xs text-slate-400">
-                    {activeResult.vectors.filter(v => v.passed).length}/{activeResult.vectors.length} vectors passed
+                    {activeResult.vectors.filter(v => v.status !== 'unavailable' && v.passed).length}/
+                    {activeResult.vectors.filter(v => v.status !== 'unavailable').length} vectors passed
+                    {(activeResult.unavailableCount ?? 0) > 0 && (
+                      <> · {activeResult.unavailableCount} could not run</>
+                    )}
                     · {new Date(activeResult.testedAt).toLocaleString()}
                   </p>
                 </div>
@@ -386,88 +555,81 @@ export function DetectionDashboard({ onNavigate }: Props) {
               </div>
             </div>
 
-            {/* Score bar */}
-            <div className="w-full h-1.5 bg-slate-800 rounded-full mb-4">
-              <div
-                className={`h-full rounded-full transition-all ${scoreBarColor(activeResult.overallScore)}`}
-                style={{ width: `${activeResult.overallScore}%` }}
+            {/* Two scores, never one. "Injection integrity" answers whether the
+                engine worked; "detection risk" answers whether a real site would
+                flag the profile. Merging them is what let users read the first
+                as the second — see docs/DETECTION_VALIDATION_DESIGN.md. */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <ScoreGauge
+                label="Injection integrity"
+                hint="Did the fingerprint overrides apply?"
+                score={activeResult.injectionScore ?? activeResult.overallScore}
+                barColor={scoreBarColor}
+                textColor={scoreColor}
+              />
+              <ScoreGauge
+                label="Detection risk"
+                hint="Would a real site flag this profile?"
+                score={activeResult.riskScore}
+                barColor={scoreBarColor}
+                textColor={scoreColor}
+                emptyNote="No coherence or probe vectors in this run"
               />
             </div>
 
             {/* Per-category score breakdown chart */}
             <CategoryScoreChart result={activeResult} />
 
-            {/* Category breakdown */}
-            <div className="space-y-1">
-              {Array.from(vectorsByCategory(activeResult.vectors).entries())
-                .sort(([a], [b]) => {
-                  const ai = CATEGORY_ORDER.indexOf(a)
-                  const bi = CATEGORY_ORDER.indexOf(b)
-                  return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
-                })
-                .map(([category, vectors]) => {
-                  const passed = vectors.filter(v => v.passed).length
-                  const isExpanded = expandedCategory === category
-                  const allPassed = passed === vectors.length
-                  const nonePassed = passed === 0
+            {/* A probe whose selector rotted reports `unavailable`, which is
+                deliberately cheap — so it needs saying out loud somewhere, or
+                the manifest decays to nothing and no one notices. */}
+            {(() => {
+              const stale = activeResult.vectors.filter(
+                (v) => v.status === 'unavailable' && v.source === 'probe'
+              )
+              if (stale.length === 0) return null
+              return (
+                <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-600/30 bg-amber-600/10 px-3 py-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-amber-200/80">
+                    {stale.length} external probe{stale.length !== 1 ? 's' : ''} could not be read and
+                    {stale.length !== 1 ? ' were' : ' was'} left out of the score. The target&apos;s layout
+                    has most likely changed — run <code className="text-amber-200">npm run probes:freshness</code> and
+                    update the manifest.
+                  </p>
+                </div>
+              )
+            })()}
 
-                  return (
-                    <div key={category} className="rounded-lg overflow-hidden border border-slate-800">
-                      <button
-                        onClick={() => setExpandedCategory(isExpanded ? null : category)}
-                        className="w-full flex items-center gap-2 px-3 py-2 bg-slate-800/50 hover:bg-slate-800 transition-colors text-left"
-                      >
-                        {allPassed ? (
-                          <CheckCircle className="w-3.5 h-3.5 text-green-400 shrink-0" />
-                        ) : nonePassed ? (
-                          <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                        ) : (
-                          <AlertTriangle className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
-                        )}
-                        <span className="text-xs font-medium text-slate-200 flex-1">{category}</span>
-                        <span className={`text-xs ${allPassed ? 'text-green-400' : nonePassed ? 'text-red-400' : 'text-yellow-400'}`}>
-                          {passed}/{vectors.length}
-                        </span>
-                        <ChevronRight className={`w-3 h-3 text-slate-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                      </button>
+            {/* Grouped by evidence source. Category alone put "chrome.runtime
+                exists" next to a live WAF verdict as though they carried the
+                same weight. */}
+            {((grouped) => SOURCE_META.map(({ key, label, question }) => {
+              const sourceVectors = grouped.get(key)
+              if (!sourceVectors || sourceVectors.length === 0) return null
+              const ran = sourceVectors.filter((v) => v.status !== 'unavailable')
+              const passed = ran.filter((v) => v.passed).length
 
-                      {isExpanded && (
-                        <div className="divide-y divide-slate-800/50">
-                          {vectors.map((v, i) => (
-                            <div key={i} className="flex items-center gap-2.5 px-3 py-2 bg-slate-900/30">
-                              {v.passed ? (
-                                <CheckCircle className="w-3.5 h-3.5 text-green-400 shrink-0" />
-                              ) : (
-                                <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                              )}
-                              <span className={`text-xs flex-1 ${v.passed ? 'text-slate-300' : 'text-red-300'}`}>
-                                {v.name}
-                              </span>
-                              {v.detail && (
-                                <span className="text-xs text-slate-600 max-w-[140px] truncate" title={v.detail}>
-                                  {v.detail}
-                                </span>
-                              )}
-                              {!v.passed && onNavigate && (
-                                <button
-                                  onClick={() => onNavigate('fingerprint')}
-                                  className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded
-                                             text-ghost-400 hover:text-ghost-200 hover:bg-ghost-600/20
-                                             transition-colors shrink-0"
-                                  title="Open Fingerprint Editor to review this vector"
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                  Fix
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+              return (
+                <div key={key} className="mt-4">
+                  <div className="flex items-baseline justify-between gap-3 mb-1.5">
+                    <div className="min-w-0">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+                        {label}
+                      </span>
+                      <span className="block text-[10px] text-slate-600">{question}</span>
                     </div>
-                  )
-                })}
-            </div>
+                    <span className="text-[11px] text-slate-500 shrink-0">
+                      {ran.length > 0 ? `${passed}/${ran.length}` : 'not run'}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {renderCategoryGroups(key, sourceVectors)}
+                  </div>
+                </div>
+              )
+            }))(vectorsBySource(activeResult.vectors))}
+
           </div>
         )}
 

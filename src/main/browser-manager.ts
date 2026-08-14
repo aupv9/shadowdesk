@@ -353,7 +353,9 @@ export class BrowserManager {
     return { proxy: null }
   }
 
-  async testProxy(proxy: ProxyConfig): Promise<{ latency_ms: number; ip: string }> {
+  async testProxy(
+    proxy: ProxyConfig
+  ): Promise<{ latency_ms: number; ip: string; timezone?: string; countryCode?: string }> {
     const chromiumPath = await this.findChromium()
     const creds = proxy.username
       ? `${encodeURIComponent(proxy.username)}:${encodeURIComponent(proxy.password ?? '')}@`
@@ -379,7 +381,15 @@ export class BrowserManager {
       })
       const latency_ms = Date.now() - start
       const data = (await response!.json()) as any
-      return { latency_ms, ip: data.query ?? proxy.host }
+      // ip-api already returns geo alongside the IP. Coherence rule R6 compares
+      // the browser's timezone against where the exit node actually is, so keep
+      // the timezone rather than throwing it away.
+      return {
+        latency_ms,
+        ip: data.query ?? proxy.host,
+        timezone: typeof data.timezone === 'string' ? data.timezone : undefined,
+        countryCode: typeof data.countryCode === 'string' ? data.countryCode : undefined
+      }
     } finally {
       await browser.close()
     }

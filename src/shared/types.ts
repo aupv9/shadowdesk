@@ -1402,14 +1402,41 @@ export interface RecordedScreenshot {
 
 // ─── Detection Test Types ──────────────────────────────────────────────────
 
+/**
+ * How much a failed vector matters. A `fatal` failure sinks the whole report
+ * regardless of how many other vectors pass — under the old unweighted mean a
+ * profile could leak `navigator.webdriver`, pass the other 44 checks and still
+ * be labelled "passed" at 97/100.
+ */
+export type VectorSeverity = 'fatal' | 'high' | 'medium' | 'low'
+
+/**
+ * Where a vector's evidence comes from. `injection` vectors mostly confirm our
+ * own overrides applied, so they answer "is the engine working" rather than
+ * "would a real site flag this profile" — see docs/DETECTION_VALIDATION_DESIGN.md.
+ */
+export type VectorSource = 'injection' | 'coherence' | 'probe' | 'canary'
+
+/** `unavailable` = the check could not run. Never counts against a score. */
+export type VectorStatus = 'pass' | 'fail' | 'unavailable'
+
 export interface DetectionTestResult {
   id: string
   profileId: string
   profileName: string
   testedAt: string
-  overallScore: number  // 0–100 (higher = less detectable)
+  /** Kept for back-compat with stored rows; mirrors `injectionScore`. */
+  overallScore: number
   vectors: DetectionVectorResult[]
   status: 'passed' | 'warning' | 'failed'
+  /** Is the fingerprint engine working on this profile? Source: `injection`. */
+  injectionScore?: number
+  /** Would a real site flag this profile? Sources: everything else. */
+  riskScore?: number
+  /** Proxy in use, if any — network-dependent verdicts are per profile × proxy. */
+  proxyId?: string | null
+  /** Vectors that could not run, excluded from both scores. */
+  unavailableCount?: number
 }
 
 export interface DetectionVectorResult {
@@ -1417,6 +1444,12 @@ export interface DetectionVectorResult {
   category: string
   passed: boolean
   detail?: string
+  /** Absent on rows stored before the severity model landed; treated as `medium`. */
+  severity?: VectorSeverity
+  /** Absent on legacy rows; treated as `injection`. */
+  source?: VectorSource
+  /** Absent on legacy rows; derived from `passed`. */
+  status?: VectorStatus
 }
 
 export interface DetectionTestSummary {

@@ -1022,7 +1022,9 @@ export function registerIpcHandlers(): void {
     const start = Date.now()
     try {
       const result = await bm.testProxy(proxy)
-      db.updateProxyHealth(id, result.latency_ms, true)
+      // Persist the exit IP and its timezone — coherence rule R6 compares the
+      // browser's clock against where the proxy actually terminates.
+      db.updateProxyHealth(id, result.latency_ms, true, { ip: result.ip, timezone: result.timezone })
       return { latency_ms: result.latency_ms, healthy: true, ip: result.ip }
     } catch {
       const latency_ms = Date.now() - start

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Save, RefreshCw, Info, Keyboard, Server, Play, Square, Copy, CheckCircle, Cpu, AlertTriangle, ShieldCheck, Lock, Unlock, Plus, Trash2, KeyRound } from 'lucide-react'
+import { Save, RefreshCw, Info, Keyboard, Server, Play, Square, Copy, CheckCircle, Cpu, AlertTriangle, ShieldCheck, Lock, Unlock, Plus, Trash2, KeyRound, Radar, Globe } from 'lucide-react'
 import type { ApiServerStatus, ApiServerConfig } from '../../types'
 import { RemoteNodesPanel } from './RemoteNodesPanel'
 import { CommunityPresetsPanel } from './CommunityPresetsPanel'
@@ -14,6 +14,12 @@ interface CaptchaConfig {
   apiKeys: Record<CaptchaProviderId, string>
 }
 
+interface CanarySettings {
+  enabled: boolean
+  url: string
+  sentinel: string
+}
+
 interface Settings {
   defaultPreset: string
   language: string
@@ -21,6 +27,8 @@ interface Settings {
   autoLaunchLastSession: boolean
   autoSyncBinaryUA: boolean
   captcha: CaptchaConfig
+  canary: CanarySettings
+  probes: { enabled: boolean }
 }
 
 const CAPTCHA_PROVIDERS: { id: CaptchaProviderId; displayName: string }[] = [
@@ -753,6 +761,109 @@ export function SettingsPage() {
         </div>
 
         {/* Phase 14.A — Remote Browser Nodes */}
+        {/* Detection Layer 3 — live WAF canary */}
+        <div className="card">
+          <h2 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
+            <Radar className="w-4 h-4" />
+            Detection Canary
+          </h2>
+          <p className="text-xs text-slate-500 mb-4">
+            Loads a page you control through each profile during a detection test and records whether a
+            real WAF challenged it. Every other check reasons about your fingerprint; this one measures
+            what a production bot-mitigation system actually did.
+          </p>
+
+          <label className="flex items-start gap-2.5 mb-4 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={settings.canary?.enabled ?? false}
+              onChange={(e) => setSettings({
+                ...settings,
+                canary: { ...(settings.canary ?? { url: '', sentinel: '' }), enabled: e.target.checked }
+              })}
+            />
+            <span className="text-xs text-slate-300">
+              Run the canary during detection tests
+              <span className="block text-[11px] text-slate-500 mt-0.5">
+                Off by default — it sends a request from every profile you test.
+              </span>
+            </span>
+          </label>
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Canary URL</label>
+              <input
+                className="input-field text-xs w-full"
+                placeholder="https://canary.yourdomain.com/"
+                value={settings.canary?.url ?? ''}
+                onChange={(e) => setSettings({
+                  ...settings,
+                  canary: { ...(settings.canary ?? { enabled: false, sentinel: '' }), url: e.target.value }
+                })}
+              />
+              <p className="text-[11px] text-slate-600 mt-1">
+                Use a domain you own, behind Cloudflare Bot Fight Mode or equivalent. Pointing this at a
+                third party gives unreliable readings and puts load on someone else&apos;s site.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Page sentinel</label>
+              <input
+                className="input-field text-xs w-full"
+                placeholder="a string that appears only on the real page"
+                value={settings.canary?.sentinel ?? ''}
+                onChange={(e) => setSettings({
+                  ...settings,
+                  canary: { ...(settings.canary ?? { enabled: false, url: '' }), sentinel: e.target.value }
+                })}
+              />
+              <p className="text-[11px] text-slate-600 mt-1">
+                Challenge pages are often served with HTTP 200. Without a sentinel to look for, an
+                interstitial is indistinguishable from your real page.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Detection Layer 2 — external fingerprint-tester probes */}
+        <div className="card">
+          <h2 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
+            <Globe className="w-4 h-4" />
+            External Probes
+          </h2>
+          <p className="text-xs text-slate-500 mb-4">
+            Loads public fingerprint testers (CreepJS, bot.sannysoft.com) through each profile and reads
+            their verdict. CreepJS is the valuable one: it hunts for tampering specifically, which is the
+            one thing a self-test can never find.
+          </p>
+
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={settings.probes?.enabled ?? false}
+              onChange={(e) => setSettings({ ...settings, probes: { enabled: e.target.checked } })}
+            />
+            <span className="text-xs text-slate-300">
+              Run external probes during detection tests
+              <span className="block text-[11px] text-slate-500 mt-0.5">
+                Off by default. This sends traffic from every profile you test to third-party sites, and
+                adds a minute or more per run.
+              </span>
+            </span>
+          </label>
+
+          <p className="text-[11px] text-slate-600 mt-3 pt-3 border-t border-slate-800">
+            These targets change layout on their own schedule. A selector that stops matching reports as
+            <span className="text-slate-500"> unavailable</span> and never lowers a score. To patch one
+            without waiting for a release, drop a <code className="text-slate-500">probes.json</code> into
+            the app data folder — it is merged over the built-in manifest by probe id.
+          </p>
+        </div>
+
         <RemoteNodesPanel />
 
         {/* Phase 15.B — Community Fingerprint Presets */}
